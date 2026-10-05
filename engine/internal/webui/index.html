@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>durexec control panel</title>
+<style>
+  :root{
+    --bg:#f6f3ee; --surface:#ffffff; --surface-2:#efe9e0; --border:#ddd4c4;
+    --text:#221f1a; --text-dim:#6f6858; --accent:#c1571a; --accent-ink:#fff8f1;
+    --running:#1d4ed8; --completed:#166534; --failed:#b91c1c; --comp:#a15c00;
+    --node-a:#2f6f6b; --node-b:#5b4b8a; --node-c:#a1355c;
+    --shadow:0 1px 2px rgba(20,15,5,.06), 0 6px 16px rgba(20,15,5,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#17140f; --surface:#211c15; --surface-2:#2a231a; --border:#3c3324;
+      --text:#f3ece0; --text-dim:#ab9e88; --accent:#e2843f; --accent-ink:#1c1108;
+      --running:#7aa2f7; --completed:#5fd489; --failed:#f87171; --comp:#f2b64c;
+      --node-a:#4fb3ac; --node-b:#9d8de0; --node-c:#e0688f;
+      --shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 24px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px; line-height:1.45;
+  }
+  code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+  header{
+    padding:22px 24px 18px; border-bottom:1px solid var(--border);
+    display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  }
+  header h1{margin:0; font-size:20px; letter-spacing:.2px}
+  header h1 .tick{color:var(--accent)}
+  header p{margin:2px 0 0; color:var(--text-dim); font-size:12.5px}
+  .status{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-dim)}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--failed)}
+  .dot.up{background:var(--completed)}
+  main{padding:20px 24px 40px; display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start}
+  @media (max-width:880px){ main{grid-template-columns:1fr} }
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    box-shadow:var(--shadow); padding:16px 16px 18px; margin-bottom:18px;
+  }
+  .card h2{margin:0 0 4px; font-size:13.5px; text-transform:uppercase; letter-spacing:.5px}
+  .card .hint{margin:0 0 12px; color:var(--text-dim); font-size:12px}
+  label{display:block; font-size:12px; color:var(--text-dim); margin:10px 0 3px}
+  label:first-of-type{margin-top:0}
+  input,select{
+    width:100%; padding:7px 9px; border-radius:6px; border:1px solid var(--border);
+    background:var(--surface-2); color:var(--text); font:inherit;
+  }
+  input:focus,select:focus{outline:2px solid var(--accent); outline-offset:1px}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .checkline{display:flex; align-items:center; gap:6px; margin-top:10px}
+  .checkline input{width:auto}
+  button{
+    margin-top:14px; width:100%; padding:9px 12px; border-radius:6px; border:none;
+    background:var(--accent); color:var(--accent-ink); font-weight:600; font-size:13px;
+    cursor:pointer;
+  }
+  button.ghost{background:transparent; border:1px solid var(--border); color:var(--text)}
+  button.small{margin-top:8px; width:auto; padding:5px 10px; font-size:12px}
+  button:disabled{opacity:.5; cursor:default}
+  .msg{margin-top:10px; font-size:12.5px; padding:8px 10px; border-radius:6px; display:none; line-height:1.5}
+  .msg.ok{display:block; background:color-mix(in srgb, var(--completed) 16%, transparent); color:var(--completed)}
+  .msg.err{display:block; background:color-mix(in srgb, var(--failed) 16%, transparent); color:var(--failed)}
+  .msg a{color:inherit; font-weight:600}
+  table{width:100%; border-collapse:collapse; font-size:12.5px}
+  th{text-align:left; color:var(--text-dim); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--border)}
+  td{padding:7px 8px; border-bottom:1px solid var(--border); vertical-align:top}
+  tr.row-item{cursor:pointer}
+  tr.row-item:hover{background:var(--surface-2)}
+  tr.selected{background:var(--surface-2); box-shadow:inset 3px 0 0 var(--accent)}
+  .pill{
+    display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600;
+    background:var(--surface-2); color:var(--text-dim);
+  }
+  .pill.RUNNING{color:var(--running); background:color-mix(in srgb, var(--running) 14%, transparent)}
+  .pill.COMPLETED{color:var(--completed); background:color-mix(in srgb, var(--completed) 14%, transparent)}
+  .pill.FAILED{color:var(--failed); background:color-mix(in srgb, var(--failed) 14%, transparent)}
+  .pill.COMPENSATING,.pill.COMPENSATING_FAILED{color:var(--comp); background:color-mix(in srgb, var(--comp) 16%, transparent)}
+  .pill.expired{color:var(--failed)}
+  .pill.self{color:var(--accent)}
+  .pill.DUPLICATE{color:var(--running); background:color-mix(in srgb, var(--running) 16%, transparent)}
+  .pill.ESCALATE{color:var(--comp); background:color-mix(in srgb, var(--comp) 18%, transparent)}
+  .pill.DISTINCT{color:var(--completed); background:color-mix(in srgb, var(--completed) 16%, transparent)}
+  .wide{grid-column:1/-1}
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+  @media (max-width:1180px){ .split{grid-template-columns:1fr} }
+  .empty{color:var(--text-dim); font-size:12.5px; padding:6px 2px}
+
+  /* ---- per-node shard-count chips ---- */
+  .node-summary{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 8px;
+    border-radius:8px; border:1px solid var(--border); background:var(--surface-2);
+    font-size:12px;
+  }
+  .chip-dot{width:8px; height:8px; border-radius:50%; flex-shrink:0}
+  .chip b{font-variant-numeric:tabular-nums}
+
+  /* ---- fencing token: bold always, flashes when it just changed ---- */
+  td.token{font-weight:700; font-size:13px}
+  @keyframes tokenFlash{
+    0%{background:color-mix(in srgb, var(--accent) 45%, transparent)}
+    100%{background:transparent}
+  }
+  tr.flash-row{animation:tokenFlash 1.8s ease-out}
+
+  /* ---- semantic dedup verdicts ---- */
+  .verdict-card{
+    border:1px solid var(--border); border-radius:8px; padding:10px 12px;
+    margin-bottom:10px; background:var(--surface-2);
+  }
+  .verdict-card:last-child{margin-bottom:0}
+  .verdict-top{display:flex; align-items:center; gap:10px; font-size:12.5px}
+  .verdict-top .mono{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .simbar{position:relative; height:6px; border-radius:3px; margin:9px 0 4px; background:var(--surface)}
+  .simbar .zone{position:absolute; top:0; bottom:0; border-radius:3px}
+  .simbar .marker{
+    position:absolute; top:50%; width:11px; height:11px; border-radius:50%;
+    transform:translate(-50%,-50%); border:2px solid var(--surface-2); box-shadow:var(--shadow);
+  }
+  .verdict-meta{color:var(--text-dim); font-size:11.5px; margin-top:4px}
+  .verdict-intent{margin-top:6px; font-size:12px; font-style:italic; color:var(--text-dim)}
+
+  /* ---- event history: a vertical timeline, not a JSON dump ---- */
+  .events{max-height:420px; overflow:auto}
+  .ev{display:flex; gap:10px; padding:2px 2px 10px}
+  .ev-rail{display:flex; flex-direction:column; align-items:center; width:12px; flex-shrink:0}
+  .ev-dot{width:9px; height:9px; border-radius:50%; background:var(--text-dim); margin-top:4px; flex-shrink:0}
+  .ev-dot.cat-ok{background:var(--completed)}
+  .ev-dot.cat-run{background:var(--running)}
+  .ev-dot.cat-bad{background:var(--failed)}
+  .ev-dot.cat-check{background:var(--comp)}
+  .ev-rail-line{flex:1; width:1px; background:var(--border); margin-top:3px}
+  .ev-body{flex:1; min-width:0}
+  .ev-head{display:flex; justify-content:space-between; gap:8px; font-size:12.5px}
+  .ev-label b{font-weight:600}
+  .ev-type{color:var(--text-dim); font-size:11px; margin-left:6px}
+  .ev-when{color:var(--text-dim); white-space:nowrap; font-size:11.5px}
+  .ev-meta{color:var(--text-dim); font-size:11.5px; margin-top:2px}
+  .ev-toggle{
+    margin-top:4px; width:auto; padding:0; font-size:11px; background:none;
+    border:none; color:var(--accent); cursor:pointer; text-decoration:underline;
+  }
+  .ev-raw{
+    margin:6px 0 0; white-space:pre-wrap; word-break:break-word; font-size:11px;
+    color:var(--text-dim); background:var(--surface-2); border:1px solid var(--border);
+    border-radius:6px; padding:6px 8px;
+  }
+  footer{padding:14px 24px 30px; color:var(--text-dim); font-size:11.5px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1><span class="tick">&#9679;</span> durexec control panel</h1>
+    <p>Place an order, watch it move through the shards, and try breaking it.</p>
+  </div>
+  <div class="status"><span class="dot" id="conn-dot"></span><span id="conn-text">connecting&hellip;</span></div>
+</header>
+
+<main>
+  <div>
+    <section class="card">
+      <h2>Place a delivery order</h2>
+      <p class="hint">Starts a DeliveryOrder workflow (app/delivery). Order ID is generated for you.</p>
+      <form id="order-form">
+        <label for="o-id">Order ID</label>
+        <input id="o-id" readonly>
+        <div class="row">
+          <div><label for="o-customer">Customer ID</label><input id="o-customer" value="cust-1" required></div>
+          <div><label for="o-restaurant">Restaurant ID</label><input id="o-restaurant" value="rest-1" required></div>
+        </div>
+        <div class="row">
+          <div><label for="o-sku">Item SKU</label><input id="o-sku" value="SKU-42" required></div>
+          <div><label for="o-qty">Quantity</label><input id="o-qty" type="number" min="1" value="2" required></div>
+        </div>
+        <div class="row">
+          <div><label for="o-amount">Amount (USD)</label><input id="o-amount" type="number" min="0" step="0.01" value="25.99" required></div>
+          <div><label for="o-prep">Prep time (min)</label><input id="o-prep" type="number" min="1" value="1"></div>
+        </div>
+        <button type="submit">Place order</button>
+        <div class="msg" id="order-msg"></div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Admin &mdash; fail this step</h2>
+      <p class="hint">Arms a deliberate activity failure (needs FAULT_INJECTION=true on the node that owns the shard).</p>
+      <form id="fail-form">
+        <label for="f-workflow">Workflow ID</label>
+        <input id="f-workflow" placeholder="pick a row below, or type one" required>
+        <div class="row">
+          <div><label for="f-activity">Activity type</label><input id="f-activity" placeholder="ChargePayment" required></div>
+          <div><label for="f-k">K (step index)</label><input id="f-k" type="number" min="0" value="0"></div>
+        </div>
+        <div class="row">
+          <div><label for="f-attempts">Attempts to fail</label><input id="f-attempts" type="number" min="1" value="1"></div>
+          <div><label for="f-error">Error message</label><input id="f-error" value="injected from webui"></div>
+        </div>
+        <div class="checkline"><input id="f-nonretryable" type="checkbox"><label for="f-nonretryable" style="margin:0">Non-retryable (skip straight to compensation)</label></div>
+        <button type="submit" class="ghost">Arm failure</button>
+        <div class="msg" id="fail-msg"></div>
+      </form>
+    </section>
+  </div>
+
+  <div>
+    <section class="card">
+      <h2>Running workflows</h2>
+      <p class="hint">Polled every 3s, this node's shards only. Click a row to load its history and prefill the admin panel.</p>
+      <table>
+        <thead><tr><th>Workflow</th><th>Type</th><th>Status</th><th>Shard</th><th>Seq</th></tr></thead>
+        <tbody id="wf-body"><tr><td colspan="5" class="empty">loading&hellip;</td></tr></tbody>
+      </table>
+    </section>
+
+    <div class="split">
+      <section class="card">
+        <h2>Event history</h2>
+        <p class="hint" id="history-hint">Select a workflow to see everything that happened to it, oldest first. Click "raw json" on any entry for the underlying event.</p>
+        <div class="events" id="events"></div>
+      </section>
+
+      <section class="card">
+        <h2>Shard ownership</h2>
+        <p class="hint">From GET /v1/shards. The token only ever goes up — when a node dies and another takes its shard, watch the number jump; a flash marks the moment it changes.</p>
+        <div class="node-summary" id="node-summary"></div>
+        <table>
+          <thead><tr><th>Shard</th><th>Owner</th><th>Token</th><th>Lease</th></tr></thead>
+          <tbody id="shard-body"><tr><td colspan="4" class="empty">loading&hellip;</td></tr></tbody>
+        </table>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Duplicate-check audit trail</h2>
+      <p class="hint">From GET /v1/dedup/verdicts. Every time the engine considers skipping a step because it looks like a repeat, it writes down why &mdash; this is that written record, so a skipped action never has to be taken on trust.</p>
+      <div id="verdicts"><div class="empty">loading&hellip;</div></div>
+    </section>
+  </div>
+</main>
+
+<footer>No external requests: this page is a single file embedded in the engine binary (internal/webui). Every call below goes to the engine's own REST API, either at this same origin or, when a shard belongs to a different node, to that node's port on localhost.</footer>
+
+<script>
+'use strict';
+const POLL_MS = 3000;
+let selectedWorkflow = null;
+let prevTokens = {}; // shard_id -> last-seen fencing_token, to detect a change
+
+// The demo cluster's fixed node-name -> published-port mapping
+// (see deploy/docker-compose.yml). A NotOwner response names the owning
+// node; this is how the dashboard turns that name into somewhere to go.
+const NODE_PORTS = { 'node-a': 8081, 'node-b': 8082, 'node-c': 8083 };
+
+function newOrderID(){ return 'order-' + Date.now().toString(36) + '-' + Math.floor(Math.random()*1000); }
+document.getElementById('o-id').value = newOrderID();
+
+// ---- low-level fetch helpers ------------------------------------------
+
+// apiRequest makes exactly one call to exactly the path given (which may be
+// a full cross-origin URL) and throws an Error carrying structured fields
+// (code/owner/shardId) when the engine reports one of its own error shapes.
+async function apiRequest(path, opts){
+  const res = await fetch(path, opts);
+  const text = await res.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch(e) { /* non-JSON error body */ }
+  if(!res.ok){
+    const err = new Error((body && (body.message || body.error)) || res.statusText || ('HTTP ' + res.status));
+    err.status = res.status;
+    err.code = body && body.error;
+    err.owner = body && body.current_owner;
+    err.shardId = body && body.shard_id;
+    throw err;
+  }
+  return body;
+}
+const api = apiRequest;
+
+// ownerOrigin turns a node name from a 409's current_owner field into a URL
+// this browser can reach, or null if the name is not one of the demo's three.
+function ownerOrigin(owner){
+  const port = NODE_PORTS[owner];
+  return port ? (location.protocol + '//' + location.hostname + ':' + port) : null;
+}
+
+// apiReadFollow is for GET requests only. A read is safe to retry, so if this
+// node answers "that's not mine, ask node-b" it quietly asks node-b itself
+// and hands back node-b's answer. If the API's own server-side forwarding has
+// already landed, this node never 409s in the first place and the fallback is
+// simply never used — either way the caller gets data, not a routing error.
+async function apiReadFollow(path, opts){
+  try {
+    return await apiRequest(path, opts);
+  } catch(err){
+    if(err.code === 'NotOwner' && err.owner){
+      const origin = ownerOrigin(err.owner);
+      if(origin){
+        try { return await apiRequest(origin + path, opts); }
+        catch(e2) { /* fall through and surface the original, clearer error */ }
+      }
+    }
+    throw err;
+  }
+}
+
+// renderNotOwner turns a NotOwner error into a plain-language sentence naming
+// the owning node, with a link to it when the dashboard knows its port. Used
+// for the two forms below, which write data and so are never auto-retried
+// silently against another origin.
+function renderNotOwner(err, verb){
+  if(err.code !== 'NotOwner') return escapeHtml(err.message);
+  if(!err.owner){
+    return 'Shard ' + err.shardId + ' has no owner at this exact moment (a lease is being re-acquired) &mdash; wait a couple of seconds and try again.';
+  }
+  const origin = ownerOrigin(err.owner);
+  const who = '<b>' + escapeHtml(err.owner) + '</b>';
+  if(origin){
+    return 'Shard ' + err.shardId + ' is owned by ' + who + ', not this node. <a href="' + origin + '/" target="_blank" rel="noopener">Open ' + origin.replace(/^https?:\/\//,'') + '</a> to ' + verb + ' there.';
+  }
+  return 'Shard ' + err.shardId + ' is owned by ' + who + ', not this node.';
+}
+
+function showMsg(el, text, ok){
+  el.textContent = text;
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+function showMsgHTML(el, html, ok){
+  el.innerHTML = html;
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+function fmtDur(ms){
+  const s = Math.max(0, Math.round(Math.abs(ms) / 1000));
+  if(s < 60) return s + 's';
+  if(s < 3600) return Math.round(s / 60) + 'm';
+  return Math.round(s / 3600) + 'h';
+}
+function fmtRelative(iso){
+  const ms = Date.now() - new Date(iso).getTime();
+  return ms >= 0 ? fmtDur(ms) + ' ago' : 'in ' + fmtDur(ms);
+}
+
+function setConn(up, node){
+  document.getElementById('conn-dot').classList.toggle('up', up);
+  document.getElementById('conn-text').textContent = up ? ('connected — ' + (node || 'this node')) : 'unreachable';
+}
+
+// ---- place an order --------------------------------------------------
+
+document.getElementById('order-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('o-id').value;
+  const amountCents = Math.round(parseFloat(document.getElementById('o-amount').value || '0') * 100);
+  const prepMin = parseFloat(document.getElementById('o-prep').value || '0');
+  const input = {
+    order_id: id,
+    customer_id: document.getElementById('o-customer').value,
+    restaurant_id: document.getElementById('o-restaurant').value,
+    items: [{ sku: document.getElementById('o-sku').value, quantity: parseInt(document.getElementById('o-qty').value || '1', 10) }],
+    amount_cents: amountCents,
+    currency: 'USD',
+  };
+  if(prepMin > 0) input.prep_time_ns = Math.round(prepMin * 60 * 1e9);
+
+  const msg = document.getElementById('order-msg');
+  try {
+    const res = await apiRequest('/v1/workflows', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflow_id: id, workflow_type: 'DeliveryOrder', input }),
+    });
+    showMsg(msg, 'started ' + res.workflow_id + ' on shard ' + res.shard_id + ' (' + res.status + ')', true);
+    document.getElementById('o-id').value = newOrderID();
+    refreshWorkflows();
+  } catch(err){
+    if(err.code === 'NotOwner') showMsgHTML(msg, renderNotOwner(err, 'place this order'), false);
+    else showMsg(msg, err.message, false);
+  }
+});
+
+// ---- fail-step admin panel --------------------------------------------
+
+document.getElementById('fail-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('fail-msg');
+  const body = {
+    workflow_id: document.getElementById('f-workflow').value,
+    activity_type: document.getElementById('f-activity').value,
+    k: parseInt(document.getElementById('f-k').value || '0', 10),
+    attempts: parseInt(document.getElementById('f-attempts').value || '1', 10),
+    non_retryable: document.getElementById('f-nonretryable').checked,
+    error: document.getElementById('f-error').value,
+  };
+  try {
+    const res = await apiRequest('/v1/admin/fail-step', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    showMsg(msg, 'armed on ' + res.workflow_id + ' (shard ' + res.shard_id + ')', true);
+  } catch(err){
+    if(err.code === 'NotOwner') showMsgHTML(msg, renderNotOwner(err, 'arm the failure'), false);
+    else showMsg(msg, err.message, false);
+  }
+});
+
+// ---- running workflows --------------------------------------------------
+
+function selectWorkflow(id){
+  selectedWorkflow = id;
+  document.getElementById('f-workflow').value = id;
+  document.querySelectorAll('tr.row-item').forEach(tr => tr.classList.toggle('selected', tr.dataset.id === id));
+  refreshHistory();
+}
+
+async function refreshWorkflows(){
+  const body = document.getElementById('wf-body');
+  try {
+    const res = await apiRequest('/v1/workflows?limit=50');
+    const rows = res.executions || [];
+    if(rows.length === 0){
+      body.innerHTML = '<tr><td colspan="5" class="empty">no workflows on this node&apos;s shards yet</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(w => `
+      <tr class="row-item${w.workflow_id === selectedWorkflow ? ' selected' : ''}" data-id="${escapeHtml(w.workflow_id)}">
+        <td class="mono">${escapeHtml(w.workflow_id)}</td>
+        <td>${escapeHtml(w.workflow_type || '')}</td>
+        <td><span class="pill ${w.status}">${w.status}</span></td>
+        <td>${w.shard_id}</td>
+        <td>${w.last_seq}</td>
+      </tr>`).join('');
+    body.querySelectorAll('tr.row-item').forEach(tr => tr.addEventListener('click', () => selectWorkflow(tr.dataset.id)));
+  } catch(err){
+    body.innerHTML = `<tr><td colspan="5" class="empty">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// ---- event history --------------------------------------------------
+
+// Plain-language labels for the engine's event types. The technical name is
+// still shown, smaller, next to the label — this is a translation, not a
+// replacement.
+const EVENT_LABELS = {
+  WorkflowExecutionStarted: 'Workflow started',
+  WorkflowExecutionCompleted: 'Workflow completed',
+  WorkflowExecutionFailed: 'Workflow failed',
+  ActivityTaskScheduled: 'Step scheduled',
+  ActivityTaskCompleted: 'Step finished',
+  ActivityTaskFailed: 'Step failed',
+  TimerStarted: 'Wait started',
+  TimerFired: 'Wait finished',
+  SignalReceived: 'Signal received',
+  SideEffectRecorded: 'Value recorded',
+  SemanticDedupEvaluated: 'Duplicate check',
+  CompensationScheduled: 'Undo scheduled',
+  CompensationCompleted: 'Undo finished',
+  CompensationFailed: 'Undo failed',
+};
+function eventCategory(type){
+  if(/Failed$/.test(type)) return 'cat-bad';
+  if(/Completed$|Fired$/.test(type)) return 'cat-ok';
+  if(type === 'SemanticDedupEvaluated') return 'cat-check';
+  return 'cat-run';
+}
+
+async function refreshHistory(){
+  if(!selectedWorkflow) return;
+  const hint = document.getElementById('history-hint');
+  const box = document.getElementById('events');
+  try {
+    const res = await apiReadFollow('/v1/workflows/' + encodeURIComponent(selectedWorkflow) + '/history');
+    hint.textContent = res.workflow_id + ' · run ' + res.run_id + ' · ' + res.count + ' events, oldest first';
+    const events = res.events || [];
+    box.innerHTML = events.map((ev, i) => {
+      const k = (ev.payload && typeof ev.payload.k === 'number') ? ev.payload.k : null;
+      const label = EVENT_LABELS[ev.event_type] || ev.event_type;
+      return `
+      <div class="ev">
+        <div class="ev-rail"><span class="ev-dot ${eventCategory(ev.event_type)}"></span>${i < events.length - 1 ? '<span class="ev-rail-line"></span>' : ''}</div>
+        <div class="ev-body">
+          <div class="ev-head">
+            <span class="ev-label"><b>${escapeHtml(label)}</b><span class="ev-type mono">${escapeHtml(ev.event_type)}</span></span>
+            <span class="ev-when">${fmtRelative(ev.created_at)}</span>
+          </div>
+          <div class="ev-meta">seq ${ev.seq}${k !== null ? ' · step k=' + k : ''}</div>
+          <button type="button" class="ev-toggle" data-idx="${i}">raw json</button>
+          <pre class="ev-raw" id="ev-raw-${i}" hidden>${escapeHtml(JSON.stringify(ev.payload, null, 2))}</pre>
+        </div>
+      </div>`;
+    }).join('') || '<div class="empty">no events yet</div>';
+  } catch(err){
+    hint.innerHTML = err.code === 'NotOwner' ? renderNotOwner(err, 'view this workflow') : escapeHtml(err.message);
+  }
+}
+
+document.getElementById('events').addEventListener('click', (e) => {
+  const btn = e.target.closest('.ev-toggle');
+  if(!btn) return;
+  const pre = document.getElementById('ev-raw-' + btn.dataset.idx);
+  if(!pre) return;
+  pre.hidden = !pre.hidden;
+  btn.textContent = pre.hidden ? 'raw json' : 'hide raw json';
+});
+
+// ---- shard ownership --------------------------------------------------
+
+function nodeColor(name){
+  if(name === 'node-a') return 'var(--node-a)';
+  if(name === 'node-b') return 'var(--node-b)';
+  if(name === 'node-c') return 'var(--node-c)';
+  // Any other cluster name still gets a stable, distinct colour.
+  let h = 0;
+  for(let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return 'hsl(' + h + ', 45%, 45%)';
+}
+
+async function refreshShards(){
+  const body = document.getElementById('shard-body');
+  const summary = document.getElementById('node-summary');
+  try {
+    const res = await apiRequest('/v1/shards');
+    const rows = (res.shards || []).slice().sort((a,b) => a.shard_id - b.shard_id);
+    if(rows.length === 0){
+      body.innerHTML = '<tr><td colspan="4" class="empty">no leases yet</td></tr>';
+      summary.innerHTML = '';
+      return;
+    }
+
+    const now = Date.now();
+    const counts = {};
+    rows.forEach(s => {
+      const prev = prevTokens[s.shard_id];
+      s._changed = prev !== undefined && String(prev) !== String(s.fencing_token);
+      prevTokens[s.shard_id] = s.fencing_token;
+      if(!s.expired && s.owner) counts[s.owner] = (counts[s.owner] || 0) + 1;
+    });
+
+    summary.innerHTML = Object.keys(counts).sort().map(n => `
+      <span class="chip"><span class="chip-dot" style="background:${nodeColor(n)}"></span>${escapeHtml(n)} <b>${counts[n]}</b></span>`).join('');
+
+    body.innerHTML = rows.map(s => {
+      const exp = new Date(s.expires_at).getTime();
+      const lease = s.expired
+        ? `<span class="pill expired">expired ${fmtDur(now - exp)} ago</span>`
+        : `<span class="pill">renews in ${fmtDur(exp - now)}</span>`;
+      return `
+      <tr class="${s._changed ? 'flash-row' : ''}">
+        <td>${s.shard_id}</td>
+        <td class="mono">${escapeHtml(s.owner || '—')}${s.self ? ' <span class="pill self">this node</span>' : ''}</td>
+        <td class="mono token">${s.fencing_token}</td>
+        <td>${lease}</td>
+      </tr>`;
+    }).join('');
+  } catch(err){
+    body.innerHTML = `<tr><td colspan="4" class="empty">${escapeHtml(err.message)}</td></tr>`;
+    summary.innerHTML = '';
+  }
+}
+
+// ---- semantic dedup verdicts --------------------------------------------
+
+function verdictColor(v){
+  if(v === 'DUPLICATE') return 'var(--running)';
+  if(v === 'ESCALATE') return 'var(--comp)';
+  return 'var(--completed)';
+}
+
+function renderVerdict(v){
+  const lo = Math.max(0, Math.min(100, v.tau_low * 100));
+  const hi = Math.max(0, Math.min(100, v.tau_high * 100));
+  const pos = Math.max(0, Math.min(100, v.similarity * 100));
+  return `
+    <div class="verdict-card">
+      <div class="verdict-top">
+        <span class="pill ${v.verdict}">${v.verdict}</span>
+        <span class="mono">${escapeHtml(v.workflow_id)}</span>
+        <span class="ev-when">${fmtRelative(v.at)}</span>
+      </div>
+      <div class="simbar">
+        <div class="zone" style="left:0%; width:${lo}%; background:color-mix(in srgb, var(--completed) 20%, transparent)"></div>
+        <div class="zone" style="left:${lo}%; width:${hi - lo}%; background:color-mix(in srgb, var(--comp) 24%, transparent)"></div>
+        <div class="zone" style="left:${hi}%; width:${100 - hi}%; background:color-mix(in srgb, var(--running) 20%, transparent)"></div>
+        <div class="marker" style="left:${pos}%; background:${verdictColor(v.verdict)}"></div>
+      </div>
+      <div class="verdict-meta">similarity ${v.similarity.toFixed(3)} &middot; thresholds ${v.tau_low.toFixed(2)}&ndash;${v.tau_high.toFixed(2)} &middot; matched call #${v.matched_k} &middot; step k=${v.k} &middot; model ${escapeHtml(v.model || '—')}</div>
+      ${v.intent_text ? `<div class="verdict-intent">&ldquo;${escapeHtml(v.intent_text)}&rdquo;</div>` : ''}
+    </div>`;
+}
+
+async function refreshVerdicts(){
+  const box = document.getElementById('verdicts');
+  try {
+    const res = await apiReadFollow('/v1/dedup/verdicts?limit=20');
+    const list = (res.verdicts || []).slice().sort((a, b) => new Date(b.at) - new Date(a.at));
+    if(list.length === 0){
+      box.innerHTML = '<div class="empty">no duplicate-check verdicts yet &mdash; they appear once a workflow runs a semantically deduplicated activity (see app/agent).</div>';
+      return;
+    }
+    box.innerHTML = list.map(renderVerdict).join('');
+  } catch(err){
+    box.innerHTML = `<div class="empty">${err.code === 'NotOwner' ? renderNotOwner(err, 'view verdicts') : escapeHtml(err.message)}</div>`;
+  }
+}
+
+// ---- connectivity --------------------------------------------------
+
+async function refreshHealth(){
+  try {
+    const h = await apiRequest('/healthz');
+    setConn(true, h.node);
+  } catch(err){
+    setConn(false);
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function tick(){
+  refreshHealth();
+  refreshWorkflows();
+  refreshShards();
+  refreshVerdicts();
+  if(selectedWorkflow) refreshHistory();
+}
+tick();
+setInterval(tick, POLL_MS);
+</script>
+</body>
+</html>
