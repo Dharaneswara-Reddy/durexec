@@ -1,0 +1,227 @@
+name: CI
+
+# Stage 1 of 7: push and pull request are the only triggers. Everything below
+# runs in order — each stage only starts once the one before it is green —
+# so a failure in unit tests, say, never wastes cluster minutes on a compose
+# run that was always going to be built on broken code.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+env:
+  GO_VERSION: "1.25"
+  DATABASE_URL: postgres://durexec:durexec@localhost:5433/durexec?sslmode=disable
+
+jobs:
+  # Stage 2 of 7: static checks. Cheapest possible failure, so it runs first.
+  lint-and-vet:
+    name: Lint and vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: gofmt check
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "the following files are not gofmt-clean:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+  # Stage 3 of 7: every package's own unit tests, with no database available.
+  # Anything under internal/*/integration_test.go skips itself when
+  # DUREXEC_TEST_DSN is unset, so this stage is a clean test of the engine's
+  # logic in isolation before stage 4 pays for a real Postgres.
+  unit-tests:
+    name: Unit tests
+    needs: lint-and-vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: go test (no database)
+        run: go test ./...
+
+  # Stage 4 of 7: the same test suite again, this time against a real
+  # PostgreSQL with the pgvector extension, so the tests gated on
+  # DUREXEC_TEST_DSN run too.
+  integration-tests:
+    name: Integration tests
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: durexec
+          POSTGRES_PASSWORD: durexec
+          POSTGRES_DB: durexec
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U durexec -d durexec"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: go test (with database)
+        env:
+          DUREXEC_TEST_DSN: postgres://durexec:durexec@localhost:5432/durexec?sslmode=disable
+        run: go test ./...
+
+  # Stage 5 of 7: the production image actually builds. Not pushed anywhere —
+  # this stage exists to catch a broken Dockerfile or a package that compiles
+  # under `go test` but not under the container's CGO_ENABLED=0 cross-build.
+  build-image:
+    name: Build image
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: docker build
+        run: docker build -t durexec/engined:ci .
+
+  # Stage 6 of 7: the full compose stack — three nodes, leader and standby
+  # Postgres, Prometheus, Grafana — actually starts and every healthcheck
+  # passes. This is deliberately a separate, smaller stage from stage 7: it
+  # answers "does the demo cluster come up at all", which should fail fast
+  # and cheaply before stage 7 spends time driving load and killing a node.
+  compose-up:
+    name: Compose up
+    needs: build-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: validate compose file
+        run: docker compose -f deploy/docker-compose.yml config
+
+      - name: bring the cluster up and wait for every healthcheck
+        run: docker compose -f deploy/docker-compose.yml up -d --build --wait
+
+      - name: smoke the three nodes
+        run: |
+          curl -sf http://localhost:8081/healthz
+          curl -sf http://localhost:8082/healthz
+          curl -sf http://localhost:8083/healthz
+
+      - name: dump logs on failure
+        if: failure()
+        run: docker compose -f deploy/docker-compose.yml logs --tail=500
+
+      - name: tear down
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml down -v
+
+  # ---------------------------------------------------------------------
+  # Stage 7 of 7: fault-injection smoke test.
+  #
+  # Why this stage exists: the whole project is built around one safety
+  # claim — that no event is ever written twice to the log, even when a
+  # node is killed in the middle of owning a shard and another node takes
+  # its place. A claim like that is easy to state and easy to believe after
+  # watching one demo go well. It is a different thing entirely to know it
+  # holds. A safety property that is only ever checked by a person running
+  # a demo by hand, once, before showing it to someone, is not a guarantee —
+  # it is a hope that happened to survive the last rehearsal. This stage
+  # turns it into a guarantee by making the check automatic and mandatory
+  # on every push: it brings up the real cluster, sends it real work, kills
+  # a real container out from under a real shard lease, waits for a real
+  # failover, and then runs deploy/assert_no_duplicates.sh — the one query
+  # that can prove the (shard_id, workflow_id, run_id, seq) invariant held
+  # throughout. If this stage is ever green without having actually run
+  # that assertion, the project's central claim silently stops being
+  # verified and becomes, again, just a hope.
+  # ---------------------------------------------------------------------
+  fault-injection-smoke:
+    name: Fault-injection smoke test
+    needs: compose-up
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: bring the cluster up
+        run: docker compose -f deploy/docker-compose.yml up -d --build --wait
+
+      - name: drive load — place several orders concurrently
+        run: |
+          for i in $(seq 1 10); do
+            order_id="ci-order-$i-$(date +%s%N)"
+            curl -sf -X POST http://localhost:8081/v1/workflows \
+              -H 'Content-Type: application/json' \
+              -d "{\"workflow_id\":\"$order_id\",\"workflow_type\":\"DeliveryOrder\",\"input\":{\"order_id\":\"$order_id\",\"customer_id\":\"cust-ci\",\"restaurant_id\":\"rest-ci\",\"items\":[{\"sku\":\"SKU-1\",\"quantity\":1}],\"amount_cents\":1500,\"currency\":\"USD\",\"prep_time_ns\":2000000000}}" \
+              >/dev/null &
+          done
+          wait
+
+      - name: kill the current owner of shard 2
+        run: |
+          owner="$(curl -sf http://localhost:8081/v1/shards | jq -r '.shards[] | select(.shard_id == 2) | .owner')"
+          echo "shard 2 is owned by: $owner"
+          if [ -z "$owner" ] || [ "$owner" = "null" ]; then
+            echo "shard 2 has no owner yet; failing rather than skipping the check"
+            exit 1
+          fi
+          docker kill "$owner"
+
+      - name: wait for shard 2 to be re-owned by a live node
+        run: |
+          for i in $(seq 1 30); do
+            owner="$(curl -sf http://localhost:8082/v1/shards 2>/dev/null \
+              | jq -r '.shards[] | select(.shard_id == 2 and .expired == false) | .owner' || true)"
+            if [ -n "$owner" ] && [ "$owner" != "null" ]; then
+              echo "shard 2 re-owned by $owner (poll $i)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "shard 2 was not re-owned within 60s"
+          exit 1
+
+      - name: place one more order right after the failover
+        # This is the order most likely to expose a double-append: it lands
+        # exactly at the seam between the old owner's abandoned transaction
+        # and the new owner's first one.
+        run: |
+          order_id="ci-order-post-failover-$(date +%s%N)"
+          curl -sf -X POST http://localhost:8082/v1/workflows \
+            -H 'Content-Type: application/json' \
+            -d "{\"workflow_id\":\"$order_id\",\"workflow_type\":\"DeliveryOrder\",\"input\":{\"order_id\":\"$order_id\",\"customer_id\":\"cust-ci\",\"restaurant_id\":\"rest-ci\",\"items\":[{\"sku\":\"SKU-1\",\"quantity\":1}],\"amount_cents\":1500,\"currency\":\"USD\",\"prep_time_ns\":1000000000}}"
+
+      - name: let in-flight work drain
+        run: sleep 20
+
+      - name: run the safety assertion — fail the build on any duplicate event
+        run: ./deploy/assert_no_duplicates.sh
+
+      - name: dump logs on failure
+        if: failure()
+        run: docker compose -f deploy/docker-compose.yml logs --tail=1000
+
+      - name: tear down
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml down -v
