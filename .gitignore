@@ -1,0 +1,35 @@
+# Material that is not part of the technical record
+.claude/
+presentation/
+research/
+progress.html
+docs/Title_and_Abstract.pdf
+docs/Project_Document.md
+docs/Problem_Statement.md
+docs/Comparison_Baselines.md
+docs/RELATED_WORK_AND_OBJECTIVES.md
+docs/Traditional_Architectures_Evidence.md
+
+# Compiled binaries, produced by `go build ./cmd/<name>`
+/engine/engined
+/engine/experiment
+/engine/loadgen
+/engine/acceptance
+/engine/healthcheck
+bin/
+dist/
+
+# Test and coverage output
+*.test
+*.out
+coverage*
+
+# Local environment
+.env
+.env.*
+
+# Editor and OS noise
+.idea/
+.vscode/
+.DS_Store
+*.swp
