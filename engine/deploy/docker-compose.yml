@@ -1,0 +1,212 @@
+# The demonstration cluster: three engine nodes sharing one 16-way keyspace,
+# a PostgreSQL leader with one streaming-replication follower, a real
+# sentence-embedding service for semantic dedup, and the Prometheus/Grafana
+# pair that makes the engine's safety and performance claims checkable while
+# it runs.
+#
+# Run it with `make up` (see ../Makefile), not `docker compose` directly, so
+# the same entry point is used locally and in CI.
+#
+# mem_limit is set on every service. The original budget, before the
+# Memory budget: 2300 MB, inside the 3072 MB (3 GB) target in the design
+# document. That is 3x300m engine nodes, 2x400m PostgreSQL, 300m Prometheus and
+# 300m Grafana.
+#
+# The embedding service is NOT here. It needs 900m on its own for CPU torch and
+# sentence-transformers, which would put the stack at 3200 MB and break the
+# documented claim. It lives in docker-compose.embedder.yml as an overlay, so
+# the default stack stays honest and semantic measurement is opt-in:
+#
+#   make up            base stack, built-in stand-in encoder
+#   make up-semantic   base stack + embedder, real all-MiniLM-L6-v2
+#
+# standby) + 2*300m (prometheus + grafana) = 2300m, comfortably under a 3 GB
+# (3072m) target. The embedder adds 900m on its own — sentence-transformers
+# plus a CPU build of torch need real headroom, not the 300m an engine node
+# gets by with — bringing the total to 3200m. THAT IS OVER THE ORIGINAL 3 GB
+# TARGET by about 128m (~4%). Trimming it back down (a smaller mem_limit
+# risks the model-loading process being OOM-killed mid-startup, a lighter
+# model than all-MiniLM-L6-v2, or shrinking one of the other services) is a
+# real tradeoff this file does not make unilaterally — flagging it here and
+# in the deploying agent's report instead of silently exceeding the budget.
+
+x-engine-common: &engine-common
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  # Demo-only. config.Validate refuses FAULT_INJECTION=true unless it is set
+  # explicitly in the environment (see internal/config/config.go), precisely
+  # so this switch can never reach a real deployment by accident. This
+  # compose file is that explicit, deliberate exception: the webui's "fail
+  # this step" admin control (internal/webui) is inert without it.
+  environment: &engine-common-env
+    DATABASE_URL: postgres://durexec:durexec@postgres-leader:5432/durexec?sslmode=disable
+    # Every node gets the same list; the ring is a pure function of it.
+    CLUSTER_NODES: node-a,node-b,node-c
+    SHARD_COUNT: "16"
+    LEASE_TTL: 10s
+    LEASE_RENEW: 3s
+    LISTEN_ADDR: ":8080"
+    FAULT_INJECTION: "true"
+  depends_on:
+    postgres-leader:
+      condition: service_healthy
+  mem_limit: 300m
+  # Not unless-stopped: `make kill-owner` / `docker kill <node>` is supposed
+  # to simulate a dead node and stay dead, so shard ownership visibly moves
+  # to a different node once its lease expires. An auto-restart policy here
+  # would let the same node quietly reclaim its own shard and hide that.
+  restart: "no"
+
+services:
+  # ---- PostgreSQL: one leader, one streaming-replication follower --------
+
+  postgres-leader:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: durexec
+      POSTGRES_PASSWORD: durexec
+      POSTGRES_DB: durexec
+      REPL_USER: replicator
+      REPL_PASSWORD: replicator
+      REPL_SLOT: standby_slot
+    volumes:
+      - ./postgres/10-replication.sh:/docker-entrypoint-initdb.d/10-replication.sh:ro
+      - pg-leader-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U durexec -d durexec"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    mem_limit: 400m
+    restart: unless-stopped
+
+  postgres-standby:
+    image: pgvector/pgvector:pg16
+    entrypoint: ["/scripts/standby-entrypoint.sh"]
+    environment:
+      PRIMARY_HOST: postgres-leader
+      REPL_USER: replicator
+      REPL_PASSWORD: replicator
+      REPL_SLOT: standby_slot
+      # docker-entrypoint.sh insists on a password even though the data
+      # directory it finds was cloned, not initialised, by pg_basebackup.
+      POSTGRES_USER: durexec
+      POSTGRES_PASSWORD: durexec
+      POSTGRES_DB: durexec
+    volumes:
+      - ./postgres/standby-entrypoint.sh:/scripts/standby-entrypoint.sh:ro
+      - pg-standby-data:/var/lib/postgresql/data
+    ports:
+      # Published purely so `make check-replication` and `psql` can reach
+      # the standby straight from the host, the same way 5433 does for the
+      # leader — no shell inside the container needed to prove replication
+      # is really working.
+      - "5434:5432"
+    depends_on:
+      postgres-leader:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U durexec -d durexec"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    mem_limit: 400m
+    restart: unless-stopped
+
+  # ---- semantic dedup's model server ---------------------------------------
+  #
+
+  node-a:
+    <<: *engine-common
+    container_name: node-a
+    environment:
+      <<: *engine-common-env
+      NODE_ID: node-a
+    ports:
+      - "8081:8080"
+
+  node-b:
+    <<: *engine-common
+    container_name: node-b
+    environment:
+      <<: *engine-common-env
+      NODE_ID: node-b
+    ports:
+      - "8082:8080"
+
+  node-c:
+    <<: *engine-common
+    container_name: node-c
+    environment:
+      <<: *engine-common-env
+      NODE_ID: node-c
+    ports:
+      - "8083:8080"
+
+  # ---- observability -------------------------------------------------------
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=6h
+    ports:
+      - "9090:9090"
+    depends_on:
+      node-a:
+        condition: service_healthy
+      node-b:
+        condition: service_healthy
+      node-c:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    mem_limit: 300m
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # No external network access, so Grafana must not phone home for
+      # update checks or telemetry.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+    mem_limit: 300m
+    restart: unless-stopped
+
+volumes:
+  pg-leader-data:
+  pg-standby-data:
+  prom-data:
+  grafana-data:
