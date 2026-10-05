@@ -1,0 +1,41 @@
+# Everything the build does not need. A smaller context means faster builds and
+# no chance of a local secret or a stale binary ending up in an image layer.
+
+.git
+.github
+.gitignore
+.dockerignore
+
+# The compose stack, dashboards and SQL are mounted or run at deploy time,
+# never built in. deploy/healthcheck is the one exception: it is a real Go
+# command the builder stage compiles into the image.
+deploy/docker-compose.yml
+deploy/prometheus.yml
+deploy/grafana
+deploy/sql
+deploy/postgres
+deploy/embedder
+deploy/assert_no_duplicates.sql
+deploy/assert_no_duplicates.sh
+deploy/check_replication.sh
+
+# Local build and test output.
+bin/
+dist/
+*.test
+*.out
+coverage*
+.env
+.env.*
+
+# Editor and OS noise.
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Documentation is not an input to the binary.
+README.md
+CONTRACT.md
+docs/
+*.md
