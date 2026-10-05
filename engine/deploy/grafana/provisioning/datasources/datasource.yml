@@ -1,0 +1,15 @@
+# Auto-provisions the one datasource the demo needs, so a fresh `make up`
+# comes up with Grafana already pointed at Prometheus — no click-through
+# setup required.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 5s

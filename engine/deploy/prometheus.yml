@@ -1,0 +1,19 @@
+# Scrape config for the demonstration cluster. Every collector in
+# internal/obs/metrics.go is served at /metrics on each node's own port
+# (8080 inside the compose network); this file is the only place that has to
+# know all three node names.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: durexec
+    metrics_path: /metrics
+    scrape_interval: 5s
+    static_configs:
+      - targets:
+          - node-a:8080
+          - node-b:8080
+          - node-c:8080
+        labels:
+          cluster: durexec-demo

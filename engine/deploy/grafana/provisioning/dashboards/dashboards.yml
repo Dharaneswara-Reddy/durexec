@@ -1,0 +1,16 @@
+# Points Grafana at ../../dashboards (mounted read-only into the container at
+# /var/lib/grafana/dashboards), so any JSON file dropped there is picked up
+# automatically instead of being imported by hand.
+apiVersion: 1
+
+providers:
+  - name: durexec
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

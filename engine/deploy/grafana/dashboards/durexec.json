@@ -1,0 +1,199 @@
+{
+  "id": null,
+  "uid": "durexec-overview",
+  "title": "durexec — engine overview",
+  "description": "The engine's safety and performance claims, made checkable: throughput, replay cost, shard failover time, lease churn, fencing rejections, dedup verdicts, and queue depth. Every panel reads a metric defined in internal/obs/metrics.go, scraped every 5s from the three demo nodes.",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "timezone": "browser",
+  "tags": ["durexec", "demo"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Workflows completed / sec",
+      "description": "workflow_completed_total, by workflow type and final status. The steady-state throughput number.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 12, "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (workflow_type, status) (rate(workflow_completed_total[1m]))",
+          "legendFormat": "{{workflow_type}} — {{status}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Replay duration",
+      "description": "replay_duration_seconds — time to rebuild workflow state from history before every decision. p50/p95/p99.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 6 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(replay_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(replay_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(replay_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Shard recovery time",
+      "description": "shard_recovery_seconds — time from a shard becoming ownerless to another node owning it. The headline availability number; watch this spike during make kill-owner.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "points", "pointSize": 6, "lineWidth": 1, "fillOpacity": 0 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(shard_recovery_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(shard_recovery_seconds_sum[5m])) / sum(rate(shard_recovery_seconds_count[5m]))",
+          "legendFormat": "mean"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Lease transitions",
+      "description": "lease_transitions_total, by shard and direction (acquired / renewed / lost / released). A burst of acquired+lost together is a failover.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (direction) (rate(lease_transitions_total[1m]))",
+          "legendFormat": "{{direction}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Fencing rejections",
+      "description": "fencing_rejections_total, by shard — writes a stale owner attempted after losing its lease. The only external evidence that the fencing mechanism actually fires; expect a small burst exactly when make kill-owner runs, and silence otherwise.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "fillOpacity": 80 },
+          "color": { "mode": "fixed", "fixedColor": "semi-dark-red" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (shard) (increase(fencing_rejections_total[1m]))",
+          "legendFormat": "shard {{shard}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Dedup verdicts by class",
+      "description": "dedup_verdict_total, by activity type and verdict (DUPLICATE / ESCALATE / DISTINCT) — the three-way outcome of semantic deduplication.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*DUPLICATE.*" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*ESCALATE.*" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*DISTINCT.*" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (activity_type, verdict) (rate(dedup_verdict_total[5m]))",
+          "legendFormat": "{{activity_type}} — {{verdict}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Task queue depth",
+      "description": "task_queue_depth — currently visible tasks waiting in a shard's queue, by shard and task type. A gauge, not a rate: it should sit near zero and only climb when a node is down or overloaded.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (shard, task_type) (task_queue_depth)",
+          "legendFormat": "shard {{shard}} — {{task_type}}"
+        }
+      ]
+    }
+  ]
+}
