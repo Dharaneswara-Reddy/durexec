@@ -1,0 +1,42 @@
+# Compiled binaries and build output.
+bin/
+dist/
+/healthcheck
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test and coverage output.
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace files: local to one machine, never shared.
+go.work
+go.work.sum
+
+# Local configuration and secrets. .env holds DATABASE_URL with a password.
+.env
+.env.*
+!.env.example
+
+# Docker and compose local state.
+deploy/.env
+deploy/data/
+
+# Editor and OS noise.
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Binaries produced by `go build ./cmd/<name>` run from this directory. Every
+# command directory is listed so a stray build can never be committed.
+/engined
+/experiment
+/loadgen
+/acceptance
+/healthcheck
