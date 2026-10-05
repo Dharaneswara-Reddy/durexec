@@ -1,0 +1,83 @@
+-- One database per shard. Six tables; every mechanism in the engine is these
+-- tables plus the code that manipulates them.
+
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- The append-only log. Never UPDATEd, never DELETEd. The primary key IS the
+-- concurrency control: two workers appending the same seq, one loses.
+CREATE TABLE IF NOT EXISTS events (
+    shard_id    INT         NOT NULL,
+    workflow_id TEXT        NOT NULL,
+    run_id      UUID        NOT NULL,
+    seq         BIGINT      NOT NULL,
+    event_type  TEXT        NOT NULL,
+    payload     JSONB       NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (shard_id, workflow_id, run_id, seq)
+);
+
+-- The mutable pointer. Keyed WITHOUT run_id so at most one run is open per
+-- business key, which makes StartWorkflow idempotent at the front door.
+CREATE TABLE IF NOT EXISTS executions (
+    shard_id      INT    NOT NULL,
+    workflow_id   TEXT   NOT NULL,
+    run_id        UUID   NOT NULL,
+    workflow_type TEXT   NOT NULL,
+    status        TEXT   NOT NULL,
+    last_seq      BIGINT NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (shard_id, workflow_id)
+);
+CREATE INDEX IF NOT EXISTS exec_running ON executions (shard_id, status) WHERE status = 'RUNNING';
+
+-- A lease queue, not delete-on-read. A dead worker's lock expires and the task
+-- becomes visible again; that is the whole crash-recovery story for in-flight work.
+CREATE TABLE IF NOT EXISTS tasks (
+    shard_id            INT         NOT NULL,
+    task_id             BIGSERIAL   NOT NULL,
+    task_type           TEXT        NOT NULL,
+    workflow_id         TEXT        NOT NULL,
+    run_id              UUID        NOT NULL,
+    scheduled_event_seq BIGINT,
+    visible_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    locked_until        TIMESTAMPTZ,
+    lock_token          UUID,
+    attempt             INT         NOT NULL DEFAULT 0,
+    PRIMARY KEY (shard_id, task_id)
+);
+CREATE INDEX IF NOT EXISTS tasks_pollable ON tasks (shard_id, task_type, visible_at, task_id);
+
+CREATE TABLE IF NOT EXISTS timers (
+    shard_id    INT         NOT NULL,
+    workflow_id TEXT        NOT NULL,
+    run_id      UUID        NOT NULL,
+    timer_seq   BIGINT      NOT NULL,
+    fire_at     TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (shard_id, workflow_id, run_id, timer_seq)
+);
+CREATE INDEX IF NOT EXISTS timers_due ON timers (shard_id, fire_at);
+
+-- Four columns that replace ZooKeeper. Read FOR UPDATE inside every mutating
+-- transaction, which is what makes a fenced-out node unable to write.
+CREATE TABLE IF NOT EXISTS shard_leases (
+    shard_id      INT         PRIMARY KEY,
+    owner_node    TEXT,
+    fencing_token BIGINT      NOT NULL DEFAULT 0,
+    expires_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Meaning-vectors for the semantic check. Candidate sets are bounded by
+-- workflow history length, not corpus size, so no ANN index is warranted.
+CREATE TABLE IF NOT EXISTS activity_intents (
+    shard_id      INT         NOT NULL,
+    workflow_id   TEXT        NOT NULL,
+    run_id        UUID        NOT NULL,
+    scheduled_seq BIGINT      NOT NULL,
+    activity_type TEXT        NOT NULL,
+    intent_text   TEXT        NOT NULL,
+    embedding     VECTOR(384) NOT NULL,
+    PRIMARY KEY (shard_id, workflow_id, run_id, scheduled_seq)
+);
+CREATE INDEX IF NOT EXISTS intents_by_type
+    ON activity_intents (shard_id, workflow_id, run_id, activity_type);

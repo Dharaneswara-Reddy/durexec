@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS activity_intents;
+DROP TABLE IF EXISTS shard_leases;
+DROP TABLE IF EXISTS timers;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS executions;
+DROP TABLE IF EXISTS events;
