@@ -1,0 +1,63 @@
+# Overlay that adds the real embedding service.
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.embedder.yml up -d
+#
+# Kept separate so the base stack stays inside the 3 GB budget the design
+# document claims. With this overlay the total is 3200 MB, which is over that
+# target on purpose and only while measuring the contribution.
+#
+# Without it the engine falls back to its built-in deterministic stand-in
+# encoder, which matches identical text and cannot recognise a reworded repeat
+# — fine for exercising the plumbing, useless for measuring the research claim.
+
+services:
+  node-a: &embedder-client
+    environment:
+      EMBEDDER_URL: http://embedder:8000/embed
+    depends_on:
+      embedder:
+        condition: service_healthy
+  node-b: *embedder-client
+  node-c: *embedder-client
+
+  # A tiny HTTP wrapper (deploy/embedder/app.py) around sentence-transformers'
+  # all-MiniLM-L6-v2, speaking the exact request/response shape
+  # internal/idem/semantic.HTTPEmbedder expects. Without this service the
+  # engine falls back to its built-in FakeEmbedder, which hashes text and so
+  # can recognise only a byte-identical repeat, never a reworded one — the
+  # entire point of the semantic path would go unmeasured.
+
+  embedder:
+    build:
+      context: ./embedder
+    ports:
+      # Published so `make experiment` can run cmd/experiment against the
+      # real embedder with a plain `go run` from the host, no container
+      # shell required — see EXPERIMENT_ENDPOINT in ../Makefile.
+      - "8000:8000"
+    healthcheck:
+      # No curl/wget in python:3.11-slim; urllib is stdlib, so this needs
+      # nothing installed beyond the interpreter that is already there.
+      test:
+        - "CMD-SHELL"
+        - "python3 -c \"import urllib.request as u; import sys; sys.exit(0 if u.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)\""
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      # Loading a sentence-transformer plus a CPU build of torch takes tens
+      # of seconds even from a warm local cache (see the Dockerfile). A short
+      # start_period here would let docker mark this unhealthy while it is
+      # still doing normal first-boot work, exactly the kind of false
+      # failure this stack's other services are careful to avoid.
+      start_period: 90s
+    # sentence-transformers + a CPU torch runtime need real headroom — see
+    # the budget note at the top of this file for what this does to the
+    # stack's total.
+    mem_limit: 900m
+    restart: unless-stopped
+
+  # ---- the three-node engine cluster --------------------------------------
+  #
+  # Identical in every way except NODE_ID and the published port. Each is a
+  # distinct owner name in shard_leases; watch X-Owner-Node headers or
+  # /v1/shards to see work move between them during `make kill-owner`.
