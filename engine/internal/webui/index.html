@@ -93,6 +93,41 @@
   .empty{color:var(--text-dim); font-size:12.5px; padding:6px 2px}
 
   /* ---- per-node shard-count chips ---- */
+  /* The type picker inherits the shared input,select rule above; it only needs
+     the trailing gap that separates it from the generated id field. */
+  #o-type{margin-bottom:10px}
+
+  /* The approval gate appears only while an agent is parked on its signal, so
+     it is styled to read as a prompt for action rather than as status text. */
+  .approval{
+    border:1px solid var(--accent); border-left-width:4px; border-radius:8px;
+    background:var(--surface-2); padding:12px 14px; margin:0 0 14px;
+  }
+  .approval-text{font-size:13px; line-height:1.5; margin-bottom:10px}
+  .approval-actions{display:flex; gap:8px}
+  .approval-actions button{width:auto; padding:6px 16px; margin:0}
+
+  /* A heartbeat the viewer can see. Without it there is no way to tell a page
+     that is polling and finding nothing from one whose script has died. */
+  .live{
+    display:inline-block; width:7px; height:7px; border-radius:50%;
+    background:var(--completed); vertical-align:middle; margin-left:8px;
+  }
+  .live.beat{animation:beat .5s ease-out}
+  @keyframes beat{0%{transform:scale(2.1); opacity:.35} 100%{transform:scale(1); opacity:1}}
+
+  /* ---- status filter: narrow the list instead of deleting history ---- */
+  .filters{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px}
+  .filter{
+    /* width:auto undoes the full-width rule the form buttons share; these are
+       pills in a row, not stacked actions. */
+    width:auto; margin:0; font:inherit; font-size:12px; cursor:pointer;
+    padding:4px 12px; border:1px solid var(--border); border-radius:999px;
+    background:transparent; color:var(--text-dim);
+  }
+  .filter:hover{border-color:var(--text); color:var(--text)}
+  .filter.active{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+
   .node-summary{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
   .chip{
     display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 8px;
@@ -167,24 +202,42 @@
 <main>
   <div>
     <section class="card">
-      <h2>Place a delivery order</h2>
-      <p class="hint">Starts a DeliveryOrder workflow (app/delivery). Order ID is generated for you.</p>
+      <h2 id="start-title">Start a workflow</h2>
+      <p class="hint" id="start-hint">Both applications run on this same unmodified binary &mdash; the engine is handed a workflow type, not an application. The ID is generated for you.</p>
       <form id="order-form">
-        <label for="o-id">Order ID</label>
+        <label for="o-type">Workflow type</label>
+        <select id="o-type">
+          <option value="DeliveryOrder" selected>DeliveryOrder &mdash; food delivery saga (app/delivery)</option>
+          <option value="TravelAgent">TravelAgent &mdash; AI agent, plan then tool call (app/agent)</option>
+        </select>
+        <label for="o-id">Workflow ID</label>
         <input id="o-id" readonly>
-        <div class="row">
-          <div><label for="o-customer">Customer ID</label><input id="o-customer" value="cust-1" required></div>
-          <div><label for="o-restaurant">Restaurant ID</label><input id="o-restaurant" value="rest-1" required></div>
+
+        <div class="wf-delivery">
+          <div class="row">
+            <div><label for="o-customer">Customer ID</label><input id="o-customer" value="cust-1"></div>
+            <div><label for="o-restaurant">Restaurant ID</label><input id="o-restaurant" value="rest-1"></div>
+          </div>
+          <div class="row">
+            <div><label for="o-sku">Item SKU</label><input id="o-sku" value="SKU-42"></div>
+            <div><label for="o-qty">Quantity</label><input id="o-qty" type="number" min="1" value="2"></div>
+          </div>
+          <div class="row">
+            <div><label for="o-amount">Amount (USD)</label><input id="o-amount" type="number" min="0" step="0.01" value="25.99"></div>
+            <div><label for="o-prep">Prep time (min)</label><input id="o-prep" type="number" min="1" value="1"></div>
+          </div>
         </div>
-        <div class="row">
-          <div><label for="o-sku">Item SKU</label><input id="o-sku" value="SKU-42" required></div>
-          <div><label for="o-qty">Quantity</label><input id="o-qty" type="number" min="1" value="2" required></div>
+
+        <div class="wf-agent" hidden>
+          <label for="a-goal">Goal, in the user's own words</label>
+          <input id="a-goal" value="Book a flight from Bangalore to Delhi on Friday for two people">
+          <div class="row">
+            <div><label for="a-user">User ID</label><input id="a-user" value="user-1"></div>
+            <div><label for="a-iters">Max iterations</label><input id="a-iters" type="number" min="1" value="3"></div>
+          </div>
         </div>
-        <div class="row">
-          <div><label for="o-amount">Amount (USD)</label><input id="o-amount" type="number" min="0" step="0.01" value="25.99" required></div>
-          <div><label for="o-prep">Prep time (min)</label><input id="o-prep" type="number" min="1" value="1"></div>
-        </div>
-        <button type="submit">Place order</button>
+
+        <button type="submit" id="o-submit">Place order</button>
         <div class="msg" id="order-msg"></div>
       </form>
     </section>
@@ -212,8 +265,15 @@
 
   <div>
     <section class="card">
-      <h2>Running workflows</h2>
-      <p class="hint">Polled every 3s, this node's shards only. Click a row to load its history and prefill the admin panel.</p>
+      <h2>Running workflows <span class="live" id="live-dot" title="polling the engine"></span></h2>
+      <p class="hint">Live, newest first, this node's shards only. Click a row to load its history and prefill the admin panel.</p>
+      <div class="filters" id="wf-filters">
+        <button type="button" class="filter active" data-status="">All</button>
+        <button type="button" class="filter" data-status="RUNNING">Running</button>
+        <button type="button" class="filter" data-status="COMPLETED">Completed</button>
+        <button type="button" class="filter" data-status="FAILED">Failed</button>
+        <button type="button" class="filter" data-status="COMPENSATING_FAILED">Compensated</button>
+      </div>
       <table>
         <thead><tr><th>Workflow</th><th>Type</th><th>Status</th><th>Shard</th><th>Seq</th></tr></thead>
         <tbody id="wf-body"><tr><td colspan="5" class="empty">loading&hellip;</td></tr></tbody>
@@ -224,6 +284,17 @@
       <section class="card">
         <h2>Event history</h2>
         <p class="hint" id="history-hint">Select a workflow to see everything that happened to it, oldest first. Click "raw json" on any entry for the underlying event.</p>
+        <div class="approval" id="approval" hidden>
+          <div class="approval-text">
+            <b>Waiting for human approval.</b>
+            This agent has parked itself on a signal. It is holding no thread and no memory &mdash; only a row on disk. It will wait indefinitely, and survives its node being killed.
+          </div>
+          <div class="approval-actions">
+            <button type="button" id="approve-yes">Approve</button>
+            <button type="button" id="approve-no" class="ghost">Reject</button>
+          </div>
+          <div class="msg" id="approval-msg"></div>
+        </div>
         <div class="events" id="events"></div>
       </section>
 
@@ -250,8 +321,23 @@
 
 <script>
 'use strict';
-const POLL_MS = 3000;
+// The page polls rather than streaming, because the engine's API is plain REST
+// and a workflow's state lives in PostgreSQL, not in any node's memory. 1.5s is
+// short enough that a step appears to land as it happens, and long enough that
+// a demo cluster is not answering list queries continuously.
+const POLL_MS = 1500;
 let selectedWorkflow = null;
+
+// The selected row's type and status, mirrored from the workflow table. The
+// history endpoint returns only events, so without these the page cannot tell
+// an agent parked on a signal from one that simply finished.
+let selectedType = '';
+let selectedStatus = '';
+
+// Which raw-payload panels the reader has expanded, by event sequence number.
+// Sequence is used rather than row position because it identifies the same
+// event across re-renders even after later events have been appended.
+const openRaw = new Set();
 let prevTokens = {}; // shard_id -> last-seen fencing_token, to detect a change
 
 // The demo cluster's fixed node-name -> published-port mapping
@@ -259,8 +345,7 @@ let prevTokens = {}; // shard_id -> last-seen fencing_token, to detect a change
 // node; this is how the dashboard turns that name into somewhere to go.
 const NODE_PORTS = { 'node-a': 8081, 'node-b': 8082, 'node-c': 8083 };
 
-function newOrderID(){ return 'order-' + Date.now().toString(36) + '-' + Math.floor(Math.random()*1000); }
-document.getElementById('o-id').value = newOrderID();
+function newWorkflowID(prefix){ return prefix + '-' + Date.now().toString(36) + '-' + Math.floor(Math.random()*1000); }
 
 // ---- low-level fetch helpers ------------------------------------------
 
@@ -355,33 +440,81 @@ function setConn(up, node){
 
 // ---- place an order --------------------------------------------------
 
+// Each workflow type needs a different input shape, so the form swaps its
+// fields rather than sending a union of both and letting the engine ignore
+// half of them. The id prefix changes too, because a list of mixed workflows
+// is much easier to read when the name says which application it came from.
+const WORKFLOW_TYPES = {
+  DeliveryOrder: {
+    prefix: 'order',
+    title: 'Place a delivery order',
+    hint: 'Starts a DeliveryOrder workflow (app/delivery): charge, reserve, notify, wait, dispatch — with compensation in reverse order if a step fails.',
+    button: 'Place order',
+    build(id){
+      const prepMin = parseFloat(document.getElementById('o-prep').value || '0');
+      const input = {
+        order_id: id,
+        customer_id: document.getElementById('o-customer').value,
+        restaurant_id: document.getElementById('o-restaurant').value,
+        items: [{ sku: document.getElementById('o-sku').value, quantity: parseInt(document.getElementById('o-qty').value || '1', 10) }],
+        amount_cents: Math.round(parseFloat(document.getElementById('o-amount').value || '0') * 100),
+        currency: 'USD',
+      };
+      if(prepMin > 0) input.prep_time_ns = Math.round(prepMin * 60 * 1e9);
+      return input;
+    },
+  },
+  TravelAgent: {
+    prefix: 'agent',
+    title: 'Run an AI agent',
+    hint: 'Starts a TravelAgent workflow (app/agent) on this same binary: the agent plans, calls a tool, then plans again. Tool calls go through the duplicate check before they execute.',
+    button: 'Run agent',
+    build(id){
+      const iters = parseInt(document.getElementById('a-iters').value || '0', 10);
+      const input = {
+        request_id: id,
+        user_id: document.getElementById('a-user').value,
+        goal: document.getElementById('a-goal').value,
+      };
+      if(iters > 0) input.max_iterations = iters;
+      return input;
+    },
+  },
+};
+
+function selectedWorkflowType(){ return document.getElementById('o-type').value; }
+
+function applyWorkflowType(){
+  const key = selectedWorkflowType();
+  const spec = WORKFLOW_TYPES[key];
+  document.getElementById('start-title').textContent = spec.title;
+  document.getElementById('start-hint').textContent = spec.hint;
+  document.getElementById('o-submit').textContent = spec.button;
+  document.querySelector('.wf-delivery').hidden = key !== 'DeliveryOrder';
+  document.querySelector('.wf-agent').hidden = key !== 'TravelAgent';
+  document.getElementById('o-id').value = newWorkflowID(spec.prefix);
+}
+
+document.getElementById('o-type').addEventListener('change', applyWorkflowType);
+
 document.getElementById('order-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const id = document.getElementById('o-id').value;
-  const amountCents = Math.round(parseFloat(document.getElementById('o-amount').value || '0') * 100);
-  const prepMin = parseFloat(document.getElementById('o-prep').value || '0');
-  const input = {
-    order_id: id,
-    customer_id: document.getElementById('o-customer').value,
-    restaurant_id: document.getElementById('o-restaurant').value,
-    items: [{ sku: document.getElementById('o-sku').value, quantity: parseInt(document.getElementById('o-qty').value || '1', 10) }],
-    amount_cents: amountCents,
-    currency: 'USD',
-  };
-  if(prepMin > 0) input.prep_time_ns = Math.round(prepMin * 60 * 1e9);
+  const type = selectedWorkflowType();
+  const input = WORKFLOW_TYPES[type].build(id);
 
   const msg = document.getElementById('order-msg');
   try {
     const res = await apiRequest('/v1/workflows', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workflow_id: id, workflow_type: 'DeliveryOrder', input }),
+      body: JSON.stringify({ workflow_id: id, workflow_type: type, input }),
     });
     showMsg(msg, 'started ' + res.workflow_id + ' on shard ' + res.shard_id + ' (' + res.status + ')', true);
-    document.getElementById('o-id').value = newOrderID();
+    document.getElementById('o-id').value = newWorkflowID(WORKFLOW_TYPES[type].prefix);
     refreshWorkflows();
   } catch(err){
-    if(err.code === 'NotOwner') showMsgHTML(msg, renderNotOwner(err, 'place this order'), false);
+    if(err.code === 'NotOwner') showMsgHTML(msg, renderNotOwner(err, 'start this workflow'), false);
     else showMsg(msg, err.message, false);
   }
 });
@@ -414,31 +547,59 @@ document.getElementById('fail-form').addEventListener('submit', async (e) => {
 
 // ---- running workflows --------------------------------------------------
 
-function selectWorkflow(id){
+function selectWorkflow(id, type, status){
   selectedWorkflow = id;
+  if(type !== undefined) selectedType = type;
+  if(status !== undefined) selectedStatus = status;
+  // A new workflow means new sequence numbers, so carrying the old expansions
+  // over would open arbitrary unrelated entries.
+  openRaw.clear();
+  document.getElementById('events').dataset.signature = '';
+  showApproval(false);
   document.getElementById('f-workflow').value = id;
   document.querySelectorAll('tr.row-item').forEach(tr => tr.classList.toggle('selected', tr.dataset.id === id));
   refreshHistory();
 }
 
+// statusFilter is the server-side filter, not a client-side one. The engine
+// holds far more history than a page can show, so narrowing has to happen in
+// the query — filtering the 50 rows we already fetched would just hide rows
+// without ever surfacing the ones further down.
+let statusFilter = '';
+
+document.getElementById('wf-filters').addEventListener('click', (e) => {
+  const btn = e.target.closest('.filter');
+  if(!btn) return;
+  statusFilter = btn.dataset.status;
+  document.querySelectorAll('#wf-filters .filter').forEach(b => b.classList.toggle('active', b === btn));
+  refreshWorkflows();
+});
+
 async function refreshWorkflows(){
   const body = document.getElementById('wf-body');
   try {
-    const res = await apiRequest('/v1/workflows?limit=50');
+    const q = '/v1/workflows?limit=50' + (statusFilter ? '&status=' + encodeURIComponent(statusFilter) : '');
+    const res = await apiRequest(q);
     const rows = res.executions || [];
     if(rows.length === 0){
-      body.innerHTML = '<tr><td colspan="5" class="empty">no workflows on this node&apos;s shards yet</td></tr>';
+      const what = statusFilter ? `no ${statusFilter} workflows on this node&apos;s shards` : 'no workflows on this node&apos;s shards yet';
+      body.innerHTML = `<tr><td colspan="5" class="empty">${what}</td></tr>`;
       return;
     }
     body.innerHTML = rows.map(w => `
-      <tr class="row-item${w.workflow_id === selectedWorkflow ? ' selected' : ''}" data-id="${escapeHtml(w.workflow_id)}">
+      <tr class="row-item${w.workflow_id === selectedWorkflow ? ' selected' : ''}" data-id="${escapeHtml(w.workflow_id)}" data-type="${escapeHtml(w.workflow_type || '')}" data-status="${escapeHtml(w.status)}">
         <td class="mono">${escapeHtml(w.workflow_id)}</td>
         <td>${escapeHtml(w.workflow_type || '')}</td>
         <td><span class="pill ${w.status}">${w.status}</span></td>
         <td>${w.shard_id}</td>
         <td>${w.last_seq}</td>
       </tr>`).join('');
-    body.querySelectorAll('tr.row-item').forEach(tr => tr.addEventListener('click', () => selectWorkflow(tr.dataset.id)));
+    body.querySelectorAll('tr.row-item').forEach(tr => tr.addEventListener('click', () => selectWorkflow(tr.dataset.id, tr.dataset.type, tr.dataset.status)));
+
+    // The selected workflow's status changes underneath us as it runs, and the
+    // approval panel below depends on it, so keep it in step with the table.
+    const mine = rows.find(w => w.workflow_id === selectedWorkflow);
+    if(mine){ selectedType = mine.workflow_type || ''; selectedStatus = mine.status; }
   } catch(err){
     body.innerHTML = `<tr><td colspan="5" class="empty">${escapeHtml(err.message)}</td></tr>`;
   }
@@ -480,6 +641,22 @@ async function refreshHistory(){
     const res = await apiReadFollow('/v1/workflows/' + encodeURIComponent(selectedWorkflow) + '/history');
     hint.textContent = res.workflow_id + ' · run ' + res.run_id + ' · ' + res.count + ' events, oldest first';
     const events = res.events || [];
+
+    // The poll runs every 3s. Re-rendering identical history would throw away
+    // whatever the reader had open, which is what made an expanded payload
+    // appear to close itself a moment after being clicked. A history is
+    // append-only, so workflow + event count is enough to know nothing changed.
+    // An agent that has already been answered must not be offered the gate
+    // again, so the decision is read from the history rather than from a flag
+    // this page keeps: the log is the only thing that survives a reload.
+    const answered = events.some(ev => ev.event_type === 'SignalReceived'
+      && ev.payload && ev.payload.name === SIGNAL_APPROVAL);
+    showApproval(selectedType === 'TravelAgent' && selectedStatus === 'RUNNING' && !answered);
+
+    const signature = selectedWorkflow + ':' + res.run_id + ':' + events.length;
+    if(box.dataset.signature === signature) return;
+    box.dataset.signature = signature;
+
     box.innerHTML = events.map((ev, i) => {
       const k = (ev.payload && typeof ev.payload.k === 'number') ? ev.payload.k : null;
       const label = EVENT_LABELS[ev.event_type] || ev.event_type;
@@ -492,8 +669,8 @@ async function refreshHistory(){
             <span class="ev-when">${fmtRelative(ev.created_at)}</span>
           </div>
           <div class="ev-meta">seq ${ev.seq}${k !== null ? ' · step k=' + k : ''}</div>
-          <button type="button" class="ev-toggle" data-idx="${i}">raw json</button>
-          <pre class="ev-raw" id="ev-raw-${i}" hidden>${escapeHtml(JSON.stringify(ev.payload, null, 2))}</pre>
+          <button type="button" class="ev-toggle" data-seq="${ev.seq}">${openRaw.has(ev.seq) ? 'hide raw json' : 'raw json'}</button>
+          <pre class="ev-raw" id="ev-raw-${ev.seq}" ${openRaw.has(ev.seq) ? '' : 'hidden'}>${escapeHtml(JSON.stringify(ev.payload, null, 2))}</pre>
         </div>
       </div>`;
     }).join('') || '<div class="empty">no events yet</div>';
@@ -502,12 +679,53 @@ async function refreshHistory(){
   }
 }
 
+// ---- human approval gate ----------------------------------------------
+
+const SIGNAL_APPROVAL = 'HumanApproval';
+
+function showApproval(on){
+  const box = document.getElementById('approval');
+  if(box.hidden === !on) return;
+  box.hidden = !on;
+  if(!on) document.getElementById('approval-msg').textContent = '';
+}
+
+async function sendApproval(approved){
+  if(!selectedWorkflow) return;
+  const msg = document.getElementById('approval-msg');
+  try {
+    await apiRequest('/v1/workflows/' + encodeURIComponent(selectedWorkflow) + '/signals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: SIGNAL_APPROVAL,
+        payload: { approved, reason: approved ? 'approved from dashboard' : 'rejected from dashboard' },
+      }),
+    });
+    showMsg(msg, approved ? 'approved — the agent resumes from its recorded history' : 'rejected — the agent will stop', true);
+    // The verdict is a new event, so drop the cached signature to force a redraw.
+    document.getElementById('events').dataset.signature = '';
+    refreshHistory();
+    refreshWorkflows();
+  } catch(err){
+    if(err.code === 'NotOwner') showMsgHTML(msg, renderNotOwner(err, 'answer this workflow'), false);
+    else showMsg(msg, err.message, false);
+  }
+}
+
+document.getElementById('approve-yes').addEventListener('click', () => sendApproval(true));
+document.getElementById('approve-no').addEventListener('click', () => sendApproval(false));
+
 document.getElementById('events').addEventListener('click', (e) => {
   const btn = e.target.closest('.ev-toggle');
   if(!btn) return;
-  const pre = document.getElementById('ev-raw-' + btn.dataset.idx);
+  const seq = Number(btn.dataset.seq);
+  const pre = document.getElementById('ev-raw-' + seq);
   if(!pre) return;
+  // Record the choice as well as applying it. The next poll re-renders from
+  // openRaw, so a panel the reader opened stays open when a new event lands.
   pre.hidden = !pre.hidden;
+  if(pre.hidden) openRaw.delete(seq); else openRaw.add(seq);
   btn.textContent = pre.hidden ? 'raw json' : 'hide raw json';
 });
 
@@ -627,12 +845,15 @@ function escapeHtml(s){
 }
 
 function tick(){
+  const dot = document.getElementById('live-dot');
+  if(dot){ dot.classList.remove('beat'); void dot.offsetWidth; dot.classList.add('beat'); }
   refreshHealth();
   refreshWorkflows();
   refreshShards();
   refreshVerdicts();
   if(selectedWorkflow) refreshHistory();
 }
+applyWorkflowType();
 tick();
 setInterval(tick, POLL_MS);
 </script>
