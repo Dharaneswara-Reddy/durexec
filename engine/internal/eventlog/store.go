@@ -121,7 +121,7 @@ func (s *Store) Create(ctx context.Context, shard core.ShardID, workflowID strin
 }
 
 const selectExecutionSQL = `
-SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq
+SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at
   FROM executions
  WHERE shard_id = $1 AND workflow_id = $2`
 
@@ -132,7 +132,7 @@ func (s *Store) Get(ctx context.Context, shard core.ShardID, workflowID string) 
 		runText string
 	)
 	err := s.pool.QueryRow(ctx, selectExecutionSQL, int32(shard), workflowID).
-		Scan(&e.ShardID, &e.WorkflowID, &runText, &e.WorkflowType, &e.Status, &e.LastSeq)
+		Scan(&e.ShardID, &e.WorkflowID, &runText, &e.WorkflowType, &e.Status, &e.LastSeq, &e.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return core.Execution{}, core.ErrWorkflowNotFound
 	}
@@ -161,7 +161,7 @@ func (s *Store) List(ctx context.Context, shard core.ShardID, status core.Execut
 			e       core.Execution
 			runText string
 		)
-		if err := rows.Scan(&e.ShardID, &e.WorkflowID, &runText, &e.WorkflowType, &e.Status, &e.LastSeq); err != nil {
+		if err := rows.Scan(&e.ShardID, &e.WorkflowID, &runText, &e.WorkflowType, &e.Status, &e.LastSeq, &e.CreatedAt); err != nil {
 			return nil, fmt.Errorf("eventlog: scan execution: %w", err)
 		}
 		e.RunID = core.RunID(runText)
@@ -199,7 +199,7 @@ func clampLimit(n int) int {
 // the argument order and the optional status filter can be unit tested without
 // a database, which is the only part of List that is easy to get wrong.
 func listExecutionsQuery(shard core.ShardID, status core.ExecutionStatus, limit int) (string, []any) {
-	const cols = `SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq FROM executions`
+	const cols = `SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at FROM executions`
 
 	args := []any{int32(shard)}
 	sql := cols + ` WHERE shard_id = $1`
@@ -208,7 +208,11 @@ func listExecutionsQuery(shard core.ShardID, status core.ExecutionStatus, limit 
 		sql += ` AND status = $2`
 	}
 	args = append(args, clampLimit(limit))
-	sql += fmt.Sprintf(` ORDER BY workflow_id LIMIT $%d`, len(args))
+	// Newest first. Ordering by workflow_id instead would be alphabetical, which
+	// buries a run the operator just started under thousands of older rows whose
+	// ids happen to sort earlier, so the list looks frozen on historical data.
+	// workflow_id breaks ties, keeping the order total and paging stable.
+	sql += fmt.Sprintf(` ORDER BY created_at DESC, workflow_id LIMIT $%d`, len(args))
 	return sql, args
 }
 

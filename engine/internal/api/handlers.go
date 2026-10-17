@@ -5,7 +5,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dharaneswar339/durexec/internal/core"
@@ -340,19 +342,28 @@ func (s *Server) handleListWorkflows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := make([]WorkflowResponse, 0, limit)
+	// Each shard is asked for a full page, not for whatever is left over. Taking
+	// limit-len(out) from each in turn fills the whole page from the first shard
+	// that has enough rows, so a run on a later shard stays invisible no matter
+	// how recent it is — which is the bug this replaces.
+	gathered := make([]core.Execution, 0, limit*2)
 	for _, shard := range shards {
-		if len(out) >= limit {
-			break
-		}
-		execs, err := s.deps.Executions.List(r.Context(), shard, status, limit-len(out))
+		execs, err := s.deps.Executions.List(r.Context(), shard, status, limit)
 		if err != nil {
 			writeError(w, err)
 			return
 		}
-		for _, e := range execs {
-			out = append(out, executionResponse(e))
-		}
+		gathered = append(gathered, execs...)
+	}
+
+	orderExecutions(gathered)
+
+	if len(gathered) > limit {
+		gathered = gathered[:limit]
+	}
+	out := make([]WorkflowResponse, 0, len(gathered))
+	for _, e := range gathered {
+		out = append(out, executionResponse(e))
 	}
 	writeJSON(w, http.StatusOK, ListWorkflowsResponse{Count: len(out), Executions: out})
 }
@@ -535,6 +546,30 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 // ---- helpers --------------------------------------------------------------
+
+// orderExecutions sorts rows gathered from several shards into the single order
+// the dashboard shows them in. Each shard arrives already sorted, but the
+// concatenation of sorted lists is not itself sorted, so the merged slice has
+// to be put in order here before it is truncated to a page.
+//
+// The ordering must be total: two runs created in the same millisecond still
+// need a stable relative position, or rows will swap places between polls and
+// the list will appear to flicker.
+func orderExecutions(execs []core.Execution) {
+	slices.SortFunc(execs, func(a, b core.Execution) int {
+		// Newest first, so a run the operator just started appears at the top.
+		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
+			return c
+		}
+		// Two runs can share a timestamp, and SortFunc is not stable, so the
+		// comparison continues into the primary key. Without this, equal-time
+		// rows swap places on every poll and the table visibly jitters.
+		if c := strings.Compare(a.WorkflowID, b.WorkflowID); c != 0 {
+			return c
+		}
+		return int(a.ShardID) - int(b.ShardID)
+	})
+}
 
 func executionResponse(e core.Execution) WorkflowResponse {
 	return WorkflowResponse{

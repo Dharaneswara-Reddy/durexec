@@ -1,6 +1,9 @@
 package core
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // The ports below are the only way engine code reaches PostgreSQL. They exist
 // so the workflow dispatcher can be tested with no database at all, which is
@@ -85,4 +88,9 @@ type Execution struct {
 	WorkflowType string
 	Status       ExecutionStatus
 	LastSeq      Seq
+	// CreatedAt is when the run started. It is carried on the struct, rather
+	// than left in the database, because a caller reading several shards has to
+	// merge their rows into one list and no other field orders them: sequence
+	// numbers are per workflow, and shard ids say nothing about time.
+	CreatedAt time.Time
 }
