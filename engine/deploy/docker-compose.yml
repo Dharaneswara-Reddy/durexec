@@ -34,6 +34,15 @@ x-engine-common: &engine-common
   build:
     context: ..
     dockerfile: Dockerfile
+  # One image name for all three nodes, because all three are the same binary.
+  # Without this, Compose derives an image name per service and builds
+  # deploy-node-a, deploy-node-b and deploy-node-c separately from identical
+  # source. `docker compose build node-a` then rebuilds only one of them, and a
+  # following --force-recreate quietly brings the other two back from whatever
+  # stale image they already had: the cluster ends up running two different
+  # builds of the engine while every health check still passes. Naming the
+  # image once makes that impossible.
+  image: durexec-engine:local
   # Demo-only. config.Validate refuses FAULT_INJECTION=true unless it is set
   # explicitly in the environment (see internal/config/config.go), precisely
   # so this switch can never reach a real deployment by accident. This
