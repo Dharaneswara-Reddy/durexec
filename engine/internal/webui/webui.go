@@ -22,5 +22,15 @@ var assets embed.FS
 // it safe to mount at the root of a mux alongside the engine's own /v1/*,
 // /healthz and /metrics routes — see the integration note in README.md.
 func Handler() http.Handler {
-	return http.FileServer(http.FS(assets))
+	files := http.FileServer(http.FS(assets))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The page is baked into the binary, so a new build means new markup at
+		// the same URL with no filename to change. http.FileServer offers an
+		// ETag and a Last-Modified date, which a browser will happily reuse —
+		// leaving an operator on yesterday's dashboard after a deploy, with no
+		// clue that a reload is needed. Revalidating on every load costs one
+		// conditional request and removes the whole class of confusion.
+		w.Header().Set("Cache-Control", "no-cache")
+		files.ServeHTTP(w, r)
+	})
 }

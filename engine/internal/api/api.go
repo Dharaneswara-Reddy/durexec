@@ -217,7 +217,7 @@ func (s *Server) Gateway() *Gateway { return s.gw }
 // Handler returns the fully wrapped handler, middleware included. Use this
 // rather than the Server itself when embedding in another mux.
 func (s *Server) Handler() http.Handler {
-	return s.withRequestID(s.withDefaultRoutingHeaders(s.withBufferedBody(s.mux)))
+	return s.withNoStore(s.withRequestID(s.withDefaultRoutingHeaders(s.withBufferedBody(s.mux))))
 }
 
 // ServeHTTP makes Server itself an http.Handler, so httptest.NewServer(s)
@@ -256,6 +256,22 @@ func (s *Server) metricsHandler() http.Handler {
 }
 
 // ---- middleware -----------------------------------------------------------
+
+// withNoStore forbids caching of every response this server produces.
+//
+// Without it the engine sends no cache directives at all, and a browser is then
+// free to apply its own heuristics: it may reuse an earlier reply to
+// GET /v1/workflows without asking the engine again. The dashboard polls those
+// endpoints to show live state, so a cached reply is not a stale optimisation
+// but a wrong answer — it showed workflows that had already been deleted. The
+// dashboard page itself is covered too, so a rebuilt UI is picked up on reload
+// rather than needing a forced refresh.
+func (s *Server) withNoStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, must-revalidate")
+		next.ServeHTTP(w, r)
+	})
+}
 
 // withRequestID gives every request an id and echoes it back.
 //
