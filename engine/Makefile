@@ -2,7 +2,8 @@
 # cluster, the usual Go hygiene commands, and the commands that make the
 # project's claims checkable — kill-owner (force a failover), verify (prove
 # no event was ever double-appended while it happened), check-replication
-# (prove the standby is a real, working replica) and experiment (measure
+# (prove the standby is a real, working replica), promote-drill (prove the
+# standby can actually take over) and experiment (measure
 # semantic dedup against a real embedding model instead of the built-in
 # hash-based stand-in).
 #
@@ -35,8 +36,12 @@ STANDBY_DATABASE_URL ?= postgres://durexec:durexec@localhost:5434/durexec?sslmod
 # `go run` at the real model server without a shell inside its container.
 EXPERIMENT_ENDPOINT ?= http://localhost:8000/embed
 
+# promote-drill puts the cluster back the way `make up` leaves it unless this
+# is 0.
+RESTORE ?= 1
+
 .PHONY: up down logs migrate test vet fmt lint build kill-owner demo verify \
-	check-replication embedder-logs experiment
+	check-replication promote-drill embedder-logs experiment
 
 ## up: build and start the demonstration cluster (3 engine nodes, leader +
 ## standby Postgres, Prometheus, Grafana), waiting for every healthcheck.
@@ -194,6 +199,15 @@ verify:
 ## if it never does. This is what makes the FR-9 claim demonstrable.
 check-replication:
 	LEADER_URL="$(DATABASE_URL)" STANDBY_URL="$(STANDBY_DATABASE_URL)" ./deploy/check_replication.sh
+
+## promote-drill: kill the leader under load, promote the standby, repoint the
+## three nodes at it and measure promotion time, data lost, workflows lost and
+## manual steps (see deploy/promote_standby.sh). Destructive to the running
+## cluster by design: it restores leader + standby + nodes afterwards, which
+## discards whatever the promoted standby wrote. RESTORE=0 skips that.
+## Record the output under docs/results/ with `make promote-drill 2>&1 | tee`.
+promote-drill:
+	RESTORE="$(RESTORE)" ./deploy/promote_standby.sh
 
 ## embedder-logs: follow the embedding service's logs on their own. `make
 ## logs` interleaves all nine services, and the model-loading messages

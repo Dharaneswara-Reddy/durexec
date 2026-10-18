@@ -1,0 +1,21 @@
+# Overlay used by `make promote-drill` (deploy/promote_standby.sh) to repoint
+# the three engine nodes at the standby once it has been promoted. It changes
+# exactly one thing, DATABASE_URL, and inherits everything else from
+# docker-compose.yml. It is never part of `make up`.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.promoted.yml \
+#       up -d --no-build --no-deps node-a node-b node-c
+#
+# Going back is simply `make up` (or the same command without this overlay):
+# compose sees the changed environment and recreates the nodes.
+
+services:
+  node-a:
+    environment:
+      DATABASE_URL: postgres://durexec:durexec@postgres-standby:5432/durexec?sslmode=disable
+  node-b:
+    environment:
+      DATABASE_URL: postgres://durexec:durexec@postgres-standby:5432/durexec?sslmode=disable
+  node-c:
+    environment:
+      DATABASE_URL: postgres://durexec:durexec@postgres-standby:5432/durexec?sslmode=disable
