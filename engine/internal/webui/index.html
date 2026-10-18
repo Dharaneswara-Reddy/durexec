@@ -128,6 +128,83 @@
   .filter:hover{border-color:var(--text); color:var(--text)}
   .filter.active{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
 
+  /* The workflow list is a picker, not the subject. Left to grow it runs to
+     fifty rows and pushes the shard map and the event history off the screen,
+     which are the two panels anyone watching actually needs to see. Capping it
+     keeps the whole argument above the fold; the header stays put so the
+     columns still make sense once it is scrolled. */
+  .wf-scroll{max-height:264px; overflow-y:auto; overscroll-behavior:contain}
+  .wf-scroll thead th{
+    position:sticky; top:0; z-index:1;
+    background:var(--surface); box-shadow:0 1px 0 var(--border);
+  }
+
+  /* A compensating step is the opposite of ordinary work: it is undoing
+     something that already succeeded. Tinting the rail and badging the row
+     makes the saga unwinding legible as a reversal rather than as more steps. */
+  .ev.undo .ev-dot{background:var(--comp); border-color:var(--comp)}
+  .ev.undo .ev-rail-line{background:var(--comp)}
+  .ev-undo{
+    font-size:9px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--comp); border:1px solid var(--comp); border-radius:999px;
+    padding:1px 5px; margin-right:6px; vertical-align:1px;
+  }
+
+  /* ---- shard map ----------------------------------------------------
+     The project's safety claim is that work moves when a node dies. A table
+     of sixteen rows states that; a grid lets you watch it. Each cell carries
+     its owner as colour, so a handover reads as a block changing hue across
+     a room, which a number ticking in a table never does. */
+  .shardmap{
+    display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px;
+  }
+  .sc{
+    --own: var(--border);
+    position:relative; border:1px solid var(--border); border-radius:8px;
+    padding:8px 9px 7px; background:var(--surface-2); overflow:hidden;
+    /* Fixed height so adoption never reflows the grid: during a failover the
+       owner label changes length, and a jumping layout reads as a glitch
+       exactly when the viewer is meant to trust what they are seeing. */
+    min-height:72px;
+  }
+  /* The owner colour is a bar rather than a wash, so the cell background stays
+     readable and the three node hues stay distinguishable side by side. */
+  .sc::before{
+    content:""; position:absolute; inset:0 auto 0 0; width:4px; background:var(--own);
+  }
+  .sc-top{display:flex; align-items:baseline; justify-content:space-between; gap:6px}
+  .sc-id{font-size:17px; font-weight:700; line-height:1}
+  .sc-token{
+    font-size:11px; color:var(--text-dim); padding:1px 5px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--border);
+  }
+  .sc-owner{
+    font-size:11px; margin-top:6px; color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .sc-self{
+    font-size:9px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--accent); margin-left:3px;
+  }
+  .sc-lease{font-size:10px; color:var(--text-dim); margin-top:2px}
+
+  .sc.orphan{
+    border-style:dashed; border-color:var(--failed); background:transparent;
+  }
+  .sc.orphan::before{background:var(--failed)}
+  .sc.orphan .sc-owner,
+  .sc.orphan .sc-lease{color:var(--failed)}
+
+  /* One flash on the poll where the token actually changed. Long enough to
+     catch the eye on a projector, short enough not to still be running when
+     the next handover happens. */
+  .sc.flash{animation:scflash 1.1s ease-out}
+  @keyframes scflash{
+    0%{box-shadow:0 0 0 2px var(--accent) inset; background:var(--accent); color:var(--accent-ink)}
+    100%{box-shadow:0 0 0 0 transparent inset}
+  }
+  @media (prefers-reduced-motion: reduce){ .sc.flash{animation:none; box-shadow:0 0 0 2px var(--accent) inset} }
+
   .node-summary{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
   .chip{
     display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 8px;
@@ -274,10 +351,12 @@
         <button type="button" class="filter" data-status="FAILED">Failed</button>
         <button type="button" class="filter" data-status="COMPENSATING_FAILED">Compensated</button>
       </div>
-      <table>
-        <thead><tr><th>Workflow</th><th>Type</th><th>Status</th><th>Shard</th><th>Seq</th></tr></thead>
-        <tbody id="wf-body"><tr><td colspan="5" class="empty">loading&hellip;</td></tr></tbody>
-      </table>
+      <div class="wf-scroll">
+        <table>
+          <thead><tr><th>Workflow</th><th>Type</th><th>Status</th><th>Shard</th><th>Seq</th></tr></thead>
+          <tbody id="wf-body"><tr><td colspan="5" class="empty">loading&hellip;</td></tr></tbody>
+        </table>
+      </div>
     </section>
 
     <div class="split">
@@ -299,13 +378,10 @@
       </section>
 
       <section class="card">
-        <h2>Shard ownership</h2>
-        <p class="hint">From GET /v1/shards. The token only ever goes up — when a node dies and another takes its shard, watch the number jump; a flash marks the moment it changes.</p>
+        <h2>Shard map</h2>
+        <p class="hint">Sixteen shards, coloured by the node that owns each. Kill a node and watch its block change colour as another adopts the work; the token under each shard counts handovers and only ever goes up.</p>
         <div class="node-summary" id="node-summary"></div>
-        <table>
-          <thead><tr><th>Shard</th><th>Owner</th><th>Token</th><th>Lease</th></tr></thead>
-          <tbody id="shard-body"><tr><td colspan="4" class="empty">loading&hellip;</td></tr></tbody>
-        </table>
+        <div class="shardmap" id="shard-map"><div class="empty">loading&hellip;</div></div>
       </section>
     </div>
 
@@ -657,15 +733,38 @@ async function refreshHistory(){
     if(box.dataset.signature === signature) return;
     box.dataset.signature = signature;
 
+    // Everything after the first failure is the saga unwinding. That reversal
+    // is the most important thing a reader can see here, and as plain rows it
+    // looks like more of the same work rather than the opposite of it.
+    const failedAt = events.findIndex(ev => ev.event_type === 'ActivityTaskFailed');
+
+    // Only the scheduling event names its activity; the completion that answers
+    // it carries just the result. Reading them as a pair recovers the name, so
+    // the history says "ChargePayment finished" rather than "Step finished" and
+    // can be followed without opening a single payload. k is the step's
+    // position in program order, which is exactly what pairs the two.
+    const actByK = new Map();
+    events.forEach(ev => {
+      const kk = ev.payload && typeof ev.payload.k === 'number' ? ev.payload.k : null;
+      if(kk !== null && ev.payload && ev.payload.activity_type) actByK.set(kk, String(ev.payload.activity_type));
+    });
+
     box.innerHTML = events.map((ev, i) => {
       const k = (ev.payload && typeof ev.payload.k === 'number') ? ev.payload.k : null;
-      const label = EVENT_LABELS[ev.event_type] || ev.event_type;
+      const act = k !== null ? (actByK.get(k) || '') : '';
+      const generic = EVENT_LABELS[ev.event_type] || ev.event_type;
+      // The scheduling event is named for the activity; the events that answer
+      // it keep the generic verb and gain the name, so the pairing stays visible
+      // instead of two identical-looking rows.
+      const label = !act ? generic
+        : (ev.event_type === 'ActivityTaskScheduled' ? act : act + ' — ' + generic.toLowerCase());
+      const undo = failedAt !== -1 && i > failedAt && !!act;
       return `
-      <div class="ev">
+      <div class="ev${undo ? ' undo' : ''}">
         <div class="ev-rail"><span class="ev-dot ${eventCategory(ev.event_type)}"></span>${i < events.length - 1 ? '<span class="ev-rail-line"></span>' : ''}</div>
         <div class="ev-body">
           <div class="ev-head">
-            <span class="ev-label"><b>${escapeHtml(label)}</b><span class="ev-type mono">${escapeHtml(ev.event_type)}</span></span>
+            <span class="ev-label">${undo ? '<span class="ev-undo" title="compensating: undoing a step that had already succeeded">undo</span>' : ''}<b>${escapeHtml(label)}</b><span class="ev-type mono">${escapeHtml(ev.event_type)}</span></span>
             <span class="ev-when">${fmtRelative(ev.created_at)}</span>
           </div>
           <div class="ev-meta">seq ${ev.seq}${k !== null ? ' · step k=' + k : ''}</div>
@@ -742,13 +841,13 @@ function nodeColor(name){
 }
 
 async function refreshShards(){
-  const body = document.getElementById('shard-body');
+  const body = document.getElementById('shard-map');
   const summary = document.getElementById('node-summary');
   try {
     const res = await apiRequest('/v1/shards');
     const rows = (res.shards || []).slice().sort((a,b) => a.shard_id - b.shard_id);
     if(rows.length === 0){
-      body.innerHTML = '<tr><td colspan="4" class="empty">no leases yet</td></tr>';
+      body.innerHTML = '<div class="empty">no leases yet</div>';
       summary.innerHTML = '';
       return;
     }
@@ -766,20 +865,28 @@ async function refreshShards(){
       <span class="chip"><span class="chip-dot" style="background:${nodeColor(n)}"></span>${escapeHtml(n)} <b>${counts[n]}</b></span>`).join('');
 
     body.innerHTML = rows.map(s => {
+      // An unowned shard is the one state worth seeing from the back of a room:
+      // it is the window after a node dies and before another adopts the work,
+      // and it is when the engine refuses requests rather than accepting work
+      // it cannot guarantee. It gets its own treatment rather than a colour.
+      const orphan = s.expired || !s.owner;
+      const tint = orphan ? '' : `style="--own:${nodeColor(s.owner)}"`;
       const exp = new Date(s.expires_at).getTime();
-      const lease = s.expired
-        ? `<span class="pill expired">expired ${fmtDur(now - exp)} ago</span>`
-        : `<span class="pill">renews in ${fmtDur(exp - now)}</span>`;
+      const lease = orphan
+        ? `no owner${s.expires_at ? ' &middot; ' + fmtDur(now - exp) : ''}`
+        : `renews in ${fmtDur(exp - now)}`;
       return `
-      <tr class="${s._changed ? 'flash-row' : ''}">
-        <td>${s.shard_id}</td>
-        <td class="mono">${escapeHtml(s.owner || '—')}${s.self ? ' <span class="pill self">this node</span>' : ''}</td>
-        <td class="mono token">${s.fencing_token}</td>
-        <td>${lease}</td>
-      </tr>`;
+      <div class="sc${orphan ? ' orphan' : ''}${s._changed ? ' flash' : ''}" ${tint} title="shard ${s.shard_id} &middot; ${escapeHtml(s.owner || 'unowned')} &middot; token ${s.fencing_token}">
+        <div class="sc-top">
+          <span class="sc-id">${s.shard_id}</span>
+          <span class="sc-token mono" title="fencing token">${s.fencing_token}</span>
+        </div>
+        <div class="sc-owner mono">${escapeHtml(s.owner || 'unowned')}${s.self ? ' <span class="sc-self">here</span>' : ''}</div>
+        <div class="sc-lease">${lease}</div>
+      </div>`;
     }).join('');
   } catch(err){
-    body.innerHTML = `<tr><td colspan="4" class="empty">${escapeHtml(err.message)}</td></tr>`;
+    body.innerHTML = `<div class="empty">${escapeHtml(err.message)}</div>`;
     summary.innerHTML = '';
   }
 }
