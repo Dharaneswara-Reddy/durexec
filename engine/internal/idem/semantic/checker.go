@@ -91,6 +91,16 @@ type Checker struct {
 	// most of what was embedded was punctuation and key names. An activity
 	// that knows its own shape can hand over just the sentence.
 	RenderIntent func(activityType string, input json.RawMessage) (string, error)
+
+	// Fields turns on the HYBRID comparator: deciding fields compared
+	// exactly, similarity reserved for the free text around them. Nil, the
+	// default, leaves the pure-semantic path below completely untouched —
+	// same candidate scan, same cosine, same journaled payload.
+	//
+	// It is opt-in because it is a different answer to the same question, and
+	// because the measured behaviour of the default is published. See
+	// hybrid.go for the design and for what the field extraction costs.
+	Fields FieldExtractor
 }
 
 // NewChecker builds a checker with the benchmarked default thresholds.
@@ -149,11 +159,27 @@ func (c *Checker) Check(ctx context.Context, req CheckRequest) (core.DedupEvalua
 		IntentText: text,
 	}
 
+	// Which comparator answers is decided here and nowhere else, so the two
+	// paths cannot drift into sharing half a decision.
+	if c.Fields != nil {
+		return c.checkHybrid(ctx, req, th, text, base, start)
+	}
+	return c.checkSemantic(ctx, req, th, text, base, start)
+}
+
+// checkSemantic is the pure-semantic comparison: embed the whole intent,
+// compare it against every prior invocation of the same activity in this run,
+// and classify the best cosine. It is the path the engine ships with and the
+// one docs/results/semantic-experiment-minilm.txt measures.
+func (c *Checker) checkSemantic(
+	ctx context.Context, req CheckRequest, th core.Thresholds,
+	text string, base core.DedupEvaluated, start time.Time,
+) (core.DedupEvaluated, error) {
 	if c.Embedder == nil {
 		// No model configured at all is the same situation as a model that is
 		// down, and is handled the same way rather than failing the workflow.
 		ev := base
-		ev.Model = FallbackPrefix + model
+		ev.Model = FallbackPrefix + base.Model
 		c.observe(req.ActivityType, ev.Verdict, start)
 		return ev, nil
 	}
@@ -166,7 +192,7 @@ func (c *Checker) Check(ctx context.Context, req CheckRequest) (core.DedupEvalua
 		// idempotency key still protects it at the worker. The alternative,
 		// guessing DUPLICATE, would skip real work on no evidence.
 		ev := base
-		ev.Model = FallbackPrefix + model
+		ev.Model = FallbackPrefix + base.Model
 		c.observe(req.ActivityType, ev.Verdict, start)
 		return ev, nil
 	}

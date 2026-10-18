@@ -81,6 +81,16 @@ type provenance struct {
 
 	TauMin, TauMax, TauStep, BandWidth float64
 
+	// TauLow and TauHigh are the shipped band. They are carried in the
+	// provenance, and not only used to build an arm, because the head-to-head
+	// table and the free-text probe both have to name the thresholds they
+	// report at.
+	TauLow, TauHigh float64
+
+	// Comparators names which strategies this run measured. A file that does
+	// not say so cannot be compared with one that measured different ones.
+	Comparators string
+
 	CacheDir      string
 	Cache         cacheStats
 	Retries       int
@@ -410,6 +420,21 @@ type perPairRow struct {
 	Arm     arm
 	Pair    Pair
 	Outcome outcome
+
+	// ---- hybrid-only, and empty on every other arm ------------------------
+
+	// Gated means the deciding-field gate rejected this pair outright, so the
+	// threshold never came into it.
+	Gated bool
+
+	// DecidingField names the field that closed the gate. It is the column an
+	// error analysis reads first: a gate that rejects everything on one field
+	// is a gate that has found one real distinction and may be blind to the
+	// rest.
+	DecidingField string
+
+	// ModelUsed says whether the free-text comparison needed an embedding.
+	ModelUsed bool
 }
 
 // Correct reports whether the verdict matched the ground truth. An ESCALATE is
@@ -441,6 +466,7 @@ func writeHeader(cfg config, prov *provenance) {
 	fmt.Printf(" embedder      : %s\n", prov.EmbedderLabel)
 	fmt.Printf(" model         : %s\n", prov.Model)
 	fmt.Printf(" activity      : %s\n", prov.ActivityType)
+	fmt.Printf(" comparators   : %s\n", prov.Comparators)
 	fmt.Printf(" thresholds    : %d arms — tau swept %.2f to %.2f step %.2f, "+
 		"escalation band width %.2f\n",
 		prov.Arms, prov.TauMin, prov.TauMax, prov.TauStep, prov.BandWidth)
@@ -472,6 +498,10 @@ func writeHeader(cfg config, prov *provenance) {
 		fmt.Printf("%s=%d", c, sum.ByCategory[c])
 	}
 	fmt.Println()
+	// The invocation, in the terminal output and not only in the HTML. This
+	// file is the artefact that gets archived, and a result nobody can re-run
+	// is a result nobody can check.
+	fmt.Printf(" command       : %s\n", prov.CommandLine)
 
 	if prov.Fake {
 		fmt.Println()
@@ -569,8 +599,11 @@ func printTable(results []*armResult) {
 		lastSeries = r.Arm.Series
 
 		mark := " "
-		if r.Arm.OperatingPoint {
+		switch {
+		case r.Arm.OperatingPoint:
 			mark = "*" // the thresholds the engine actually ships with
+		case r.Arm.Candidate:
+			mark = "+" // the opt-in comparator at those same thresholds
 		}
 		fmt.Printf("%s%-30s | %4d | %3d | %3d | %4d | %3d | %4d | %6.3f | %5.3f | %6.3f | %6s | %5.3f | %8.3f | %s / %s\n",
 			mark,
@@ -585,6 +618,7 @@ func printTable(results []*armResult) {
 	fmt.Println(ruler)
 	fmt.Println()
 	fmt.Println(" *      the thresholds the engine ships with — the operating point")
+	fmt.Println(" +      the OPT-IN hybrid comparator at those same thresholds — not the default")
 	fmt.Println(" dup    true duplicates in the corpus        detect  duplicate-detection rate (= recall)")
 	fmt.Println(" esc    pairs handed to a human             FPR     false-positive rate over distinct pairs")
 	fmt.Println(" hardFPR  false-positive rate over the LEXICALLY CLOSE distinct pairs only")
@@ -605,7 +639,7 @@ func printTable(results []*armResult) {
 func printBest(results []*armResult) {
 	fmt.Println("BEST ARM ON EACH SERIES, BY F1")
 	fmt.Println()
-	for _, series := range []string{seriesSingle, seriesBand} {
+	for _, series := range []string{seriesSingle, seriesBand, seriesHybridSingle, seriesHybridBand} {
 		var best *armResult
 		for _, r := range results {
 			if r.Arm.Series != series {
@@ -618,7 +652,7 @@ func printBest(results []*armResult) {
 		if best == nil {
 			continue
 		}
-		fmt.Printf("  %-18s %-30s precision %s  recall %.3f  F1 %.3f  hardFPR %.3f\n",
+		fmt.Printf("  %-23s %-30s precision %s  recall %.3f  F1 %.3f  hardFPR %.3f\n",
 			series, best.Arm.Name, precisionText(best), best.Recall(), best.F1(),
 			best.HardFalsePositiveRate())
 	}
@@ -779,7 +813,8 @@ func writeSummaryCSV(path string, results []*armResult, prov *provenance) error 
 	defer done()
 
 	header := []string{
-		"arm", "kind", "series", "operating_point", "tau_low", "tau_high", "embedder", "model",
+		"arm", "kind", "series", "operating_point", "opt_in_candidate",
+		"tau_low", "tau_high", "embedder", "model",
 		"pairs", "true_duplicates", "true_distincts", "hard_distincts",
 		"tp", "fp", "tn", "fn", "escalated_duplicates", "escalated_distincts", "fallbacks",
 		"duplicate_detection_rate", "false_positive_rate", "hard_false_positive_rate",
@@ -798,7 +833,7 @@ func writeSummaryCSV(path string, results []*armResult, prov *provenance) error 
 	for _, r := range results {
 		row := []string{
 			r.Arm.Name, string(r.Arm.Kind), r.Arm.Series,
-			strconv.FormatBool(r.Arm.OperatingPoint),
+			strconv.FormatBool(r.Arm.OperatingPoint), strconv.FormatBool(r.Arm.Candidate),
 			f(r.Arm.Thresholds.TauLow), f(r.Arm.Thresholds.TauHigh), r.Embedder, prov.Model,
 			strconv.Itoa(r.Pairs), strconv.Itoa(r.trueDuplicates()), strconv.Itoa(r.trueDistincts()),
 			strconv.Itoa(r.HardDistincts),
@@ -831,6 +866,10 @@ func writePairsCSV(path string, rows []perPairRow, prov *provenance) error {
 		"arm", "pair_id", "category", "hard_negative", "note", "side_a", "side_b",
 		"ground_truth", "verdict", "similarity", "correct", "dangerous",
 		"fallback", "latency_us",
+		// The four hybrid columns are appended rather than inserted, so a
+		// script written against the baseline's per-pair CSV still reads this
+		// one by position. They are empty on the exact and semantic arms.
+		"gate_rejected", "deciding_field", "model_consulted", "verdict_detail",
 		"labels_are_hand_labelled", "embedder_is_real", "run_is_complete",
 	}
 	if err := w.Write(header); err != nil {
@@ -843,6 +882,7 @@ func writePairsCSV(path string, rows []perPairRow, prov *provenance) error {
 			r.Pair.Truth.String(), string(r.Outcome.Verdict), f(r.Outcome.Similarity),
 			strconv.FormatBool(r.Correct()), strconv.FormatBool(r.Dangerous()),
 			strconv.FormatBool(r.Outcome.Fallback), us(r.Outcome.Latency),
+			hybridBool(r, r.Gated), r.DecidingField, hybridBool(r, r.ModelUsed), r.Outcome.Detail,
 			labelColumn(prov), embedderColumn(prov), completeColumn(prov),
 		}); err != nil {
 			return err
@@ -856,6 +896,16 @@ func writePairsCSV(path string, rows []perPairRow, prov *provenance) error {
 // reading "FALSE" invites a reader to filter it out and forget it; a column
 // reading "no - generated by construction, see corpus.go" survives being
 // pasted into a spreadsheet and then into a draft.
+
+// hybridBool leaves the hybrid-only columns EMPTY on an arm they do not apply
+// to, rather than writing "false". A false would read as "the gate did not
+// reject this pair", which is a claim about a gate that was never run.
+func hybridBool(r perPairRow, v bool) string {
+	if r.Arm.Kind != kindHybrid {
+		return ""
+	}
+	return strconv.FormatBool(v)
+}
 
 func labelColumn(prov *provenance) string {
 	if prov.LabelsHandAssigned() {

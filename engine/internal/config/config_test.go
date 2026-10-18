@@ -50,6 +50,9 @@ func TestLoadFromDefaults(t *testing.T) {
 		{EnvTauLow, cfg.TauLow, 0.85},
 		{EnvListenAddr, cfg.ListenAddr, ":8080"},
 		{EnvFaultInjection, cfg.FaultInjection, false},
+		// The hybrid comparator is opt-in: the default has to stay the path
+		// the published measurement describes.
+		{EnvSemanticHybrid, cfg.SemanticHybrid, false},
 	}
 	for _, c := range checks {
 		if c.got != c.want {
@@ -72,6 +75,7 @@ func TestLoadFromOverrides(t *testing.T) {
 		EnvTauLow:          "0.7",
 		EnvListenAddr:      "0.0.0.0:9090",
 		EnvFaultInjection:  "true",
+		EnvSemanticHybrid:  "on",
 	} {
 		kv[k] = v
 	}
@@ -101,6 +105,9 @@ func TestLoadFromOverrides(t *testing.T) {
 	}
 	if !cfg.FaultInjection {
 		t.Error("FAULT_INJECTION=true should enable injection")
+	}
+	if !cfg.SemanticHybrid {
+		t.Error("SEMANTIC_HYBRID=on should select the hybrid comparator")
 	}
 }
 

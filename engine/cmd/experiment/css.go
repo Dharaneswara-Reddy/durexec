@@ -52,6 +52,7 @@ const reportCSS = `
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
+  --series-4: #8257cc;
 
   --critical: #d03b3b;
   --critical-wash: #fbeceb;
@@ -85,6 +86,7 @@ const reportCSS = `
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
+    --series-4: #9a6fe0;
 
     --critical-wash: #2a1719;
     --good-wash:     #13251a;
@@ -107,6 +109,7 @@ const reportCSS = `
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
+  --series-4: #9a6fe0;
 
   --critical-wash: #2a1719;
   --good-wash:     #13251a;
@@ -436,6 +439,7 @@ a { color: var(--series-1); }
 .swatch.slot-1 { background: var(--series-1); }
 .swatch.slot-2 { background: var(--series-2); }
 .swatch.slot-3 { background: var(--series-3); }
+.swatch.slot-4 { background: var(--series-4); }
 
 figcaption {
   font-size: 0.9rem;
@@ -508,10 +512,12 @@ figcaption p:last-child { margin-bottom: 0; }
 .line.slot-1 { stroke: var(--series-1); }
 .line.slot-2 { stroke: var(--series-2); }
 .line.slot-3 { stroke: var(--series-3); }
+.line.slot-4 { stroke: var(--series-4); }
 
 .dot.slot-1 { fill: var(--series-1); }
 .dot.slot-2 { fill: var(--series-2); }
 .dot.slot-3 { fill: var(--series-3); }
+.dot.slot-4 { fill: var(--series-4); }
 
 /* The shipped operating point is ringed in ink as well as enlarged, so it is
    the one mark that is identifiable with the colour taken away. */

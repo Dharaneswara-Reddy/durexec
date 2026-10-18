@@ -96,6 +96,24 @@ type DedupEvaluated struct {
 	TauLow     float64      `json:"tau_low"`
 	Model      string       `json:"model"`
 	IntentText string       `json:"intent_text"`
+
+	// Detail is prose that explains a verdict the similarity score alone
+	// cannot explain, written by whichever comparator produced the verdict.
+	//
+	// It exists because a score answers "how close were they?" and some
+	// comparators decide on something else entirely. The hybrid comparator
+	// (see internal/idem/semantic) rejects a candidate when one DECIDING
+	// FIELD differs — a date, a route, a passenger count — and a reader of
+	// the log holding only "similarity 0.9712, verdict DISTINCT" would
+	// reasonably conclude the engine had malfunctioned. The field names what
+	// actually differed, so a skipped or repeated action stays explainable
+	// from the log alone, which is the property this whole mechanism is
+	// written around.
+	//
+	// It is additive and optional. Events journaled before it existed decode
+	// with Detail empty, and the pure-semantic path still leaves it empty, so
+	// the payload those verdicts produce is byte-for-byte what it always was.
+	Detail string `json:"detail,omitempty"`
 }
 
 type WorkflowCompleted struct {

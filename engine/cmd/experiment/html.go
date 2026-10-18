@@ -228,6 +228,9 @@ func writeFigure(b *strings.Builder, results []*armResult, prov *provenance) {
 	legendItem(b, 1, "circle", "Semantic, single threshold τ")
 	legendItem(b, 2, "circle", fmt.Sprintf("Semantic, escalation band [τ, τ+%.2f)", prov.BandWidth))
 	legendItem(b, 3, "square", "Exact match (the baseline)")
+	if hasHybrid(results) {
+		legendItem(b, 4, "circle", fmt.Sprintf("Hybrid, OPT-IN, escalation band [τ, τ+%.2f)", prov.BandWidth))
+	}
 	b.WriteString(`</div>`)
 
 	b.WriteString(`<figcaption>`)

@@ -35,6 +35,7 @@ const (
 	EnvFaultInjection  = "FAULT_INJECTION"
 	EnvEscalationBlock = "ESCALATION_BLOCKS"
 	EnvClusterNodes    = "CLUSTER_NODES"
+	EnvSemanticHybrid  = "SEMANTIC_HYBRID"
 )
 
 // leaseRenewSafetyFactor is the number of renewal attempts that must fit
@@ -98,6 +99,24 @@ type Config struct {
 	// to be able to run the same workload under both policies and compare
 	// them. See internal/runtime/dedup.go for the full argument.
 	EscalationBlocks bool
+
+	// SemanticHybrid chooses which comparator answers the semantic duplicate
+	// check.
+	//
+	// False, the default, is the pure-semantic comparator: the whole intent is
+	// embedded and one cosine against each prior invocation decides. That is
+	// the path the published measurement in
+	// docs/results/semantic-experiment-minilm.txt describes, and it stays the
+	// default so that measurement keeps describing the shipped engine.
+	//
+	// True turns on the hybrid comparator: the deciding fields of the intent —
+	// route, date, passenger count — must match EXACTLY, and similarity is
+	// consulted only for the free text around them. It is measured in
+	// docs/results/semantic-experiment-hybrid-minilm.txt. It is off by default
+	// because it needs a per-activity field extractor to be worth anything,
+	// and the engine ships with one such extractor, for flight booking. See
+	// internal/idem/semantic/hybrid.go for what that costs.
+	SemanticHybrid bool
 
 	// FaultInjection arms internal/faultinj. See faultExplicit.
 	FaultInjection bool
@@ -271,6 +290,15 @@ func LoadFrom(lookup func(string) (string, bool)) (Config, error) {
 		}
 	}
 
+	if v, ok := get(EnvSemanticHybrid); ok {
+		b, err := parseBool(v)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s=%q is not a boolean (use on/off, true/false, 1/0)", EnvSemanticHybrid, v))
+		} else {
+			cfg.SemanticHybrid = b
+		}
+	}
+
 	if v, ok := get(EnvFaultInjection); ok {
 		b, err := parseBool(v)
 		if err != nil {
@@ -377,10 +405,11 @@ func (c Config) Thresholds() (tauLow, tauHigh float64) { return c.TauLow, c.TauH
 // redacted because it carries a password.
 func (c Config) String() string {
 	return fmt.Sprintf(
-		"node=%s listen=%s shards=%d lease_ttl=%s lease_renew=%s task_lock=%s workers=%d/%d sync_commit=%t tau=%.2f/%.2f db=%s embedder=%s escalation_blocks=%t fault_injection=%t",
+		"node=%s listen=%s shards=%d lease_ttl=%s lease_renew=%s task_lock=%s workers=%d/%d sync_commit=%t tau=%.2f/%.2f db=%s embedder=%s dedup=%s escalation_blocks=%t fault_injection=%t",
 		c.NodeID, c.ListenAddr, c.ShardCount, c.LeaseTTL, c.LeaseRenew, c.TaskLock,
 		c.WorkflowWorkers, c.ActivityWorkers, c.SyncCommit, c.TauLow, c.TauHigh,
-		redactURL(c.DatabaseURL), embedderLabel(c.EmbedderURL), c.EscalationBlocks, c.FaultInjection)
+		redactURL(c.DatabaseURL), embedderLabel(c.EmbedderURL), comparatorLabel(c.SemanticHybrid),
+		c.EscalationBlocks, c.FaultInjection)
 }
 
 // embedderLabel names the encoder in the startup line, so "(built-in fake)"
@@ -390,6 +419,17 @@ func embedderLabel(raw string) string {
 		return "(built-in fake)"
 	}
 	return raw
+}
+
+// comparatorLabel names the duplicate comparator in the startup line. Which
+// one answered is the difference between two published sets of accuracy
+// figures, so a log that does not say which one was running cannot be matched
+// to either.
+func comparatorLabel(hybrid bool) string {
+	if hybrid {
+		return "hybrid (deciding fields exact, similarity on the free text)"
+	}
+	return "semantic (similarity over the whole intent)"
 }
 
 func parseBool(v string) (bool, error) {

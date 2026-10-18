@@ -53,6 +53,8 @@ type curvePoint struct {
 	Plotted bool
 	// Operating marks the thresholds the engine ships with.
 	Operating bool
+	// Candidate marks the opt-in comparator at those same thresholds.
+	Candidate bool
 	// Landmark marks a point worth labelling directly.
 	Landmark bool
 }
@@ -65,9 +67,15 @@ type series struct {
 }
 
 // buildSeries turns the arm results into the chart's data.
-func buildSeries(results []*armResult) (single, band series, exact *curvePoint) {
+//
+// The hybrid comparator gets its own line rather than more points on the
+// semantic ones. Moving from one comparator to the other is a change of
+// policy, and a line drawn between them would read as movement along a curve
+// that nothing can actually travel along.
+func buildSeries(results []*armResult) (single, band, hybrid series, exact *curvePoint) {
 	single = series{Name: "Semantic, single threshold τ", Slot: 1}
 	band = series{Name: "Semantic, escalation band [τ, τ+w)", Slot: 2}
+	hybrid = series{Name: "Hybrid (opt-in), escalation band [τ, τ+w)", Slot: 4}
 
 	for _, r := range results {
 		p := curvePoint{
@@ -78,6 +86,7 @@ func buildSeries(results []*armResult) (single, band series, exact *curvePoint) 
 			Label:     r.Arm.Name,
 			Plotted:   r.MadePositivePredictions(),
 			Operating: r.Arm.OperatingPoint,
+			Candidate: r.Arm.Candidate,
 			Landmark:  r.Arm.Landmark,
 		}
 		switch r.Arm.Series {
@@ -85,18 +94,23 @@ func buildSeries(results []*armResult) (single, band series, exact *curvePoint) 
 			single.Points = append(single.Points, p)
 		case seriesBand:
 			band.Points = append(band.Points, p)
+		case seriesHybridBand:
+			// Only the banded hybrid arms are drawn, so the figure compares
+			// band with band. The single-threshold hybrid arms are in the
+			// table and the CSV.
+			hybrid.Points = append(hybrid.Points, p)
 		case seriesExact:
 			p.Label = "Exact match (baseline)"
 			p.Landmark = true
 			exact = &p
 		}
 	}
-	return single, band, exact
+	return single, band, hybrid, exact
 }
 
 // renderCurve writes the whole figure.
 func renderCurve(results []*armResult) string {
-	single, band, exact := buildSeries(results)
+	single, band, hybrid, exact := buildSeries(results)
 
 	// No xmlns attribute: SVG written inline in an HTML document takes its
 	// namespace from the parser, and leaving the URL out keeps the report free
@@ -112,8 +126,9 @@ func renderCurve(results []*armResult) string {
 	writeAxes(&b)
 	writeSeries(&b, band)
 	writeSeries(&b, single)
+	writeSeries(&b, hybrid)
 	writeExact(&b, exact)
-	writeDirectLabels(&b, single, band, exact)
+	writeDirectLabels(&b, single, band, hybrid, exact)
 
 	b.WriteString(`</svg>`)
 	return b.String()
@@ -240,7 +255,7 @@ func writeSeries(b *strings.Builder, s series) {
 	for _, p := range plotted {
 		r := 4.0
 		cls := fmt.Sprintf("dot slot-%d", s.Slot)
-		if p.Operating {
+		if p.Operating || p.Candidate {
 			r, cls = 7.0, cls+" operating"
 		}
 		fmt.Fprintf(b, `<circle class="%s" cx="%.2f" cy="%.2f" r="%.1f"><title>%s</title></circle>`,
@@ -273,7 +288,7 @@ func pointTitle(p curvePoint) string {
 // already carries every value. What is labelled here is only what the figure
 // is about: the two ends of the swept curve, the shipped operating point, and
 // the baseline the whole argument is against.
-func writeDirectLabels(b *strings.Builder, single, band series, exact *curvePoint) {
+func writeDirectLabels(b *strings.Builder, single, band, hybrid series, exact *curvePoint) {
 	type placed struct {
 		p          curvePoint
 		text       string
@@ -288,7 +303,7 @@ func writeDirectLabels(b *strings.Builder, single, band series, exact *curvePoin
 			p: *exact, text: "exact match", dx: 12, dy: 5, anchor: "start", slotAnchor: 3,
 		})
 	}
-	for _, s := range []series{single, band} {
+	for _, s := range []series{single, band, hybrid} {
 		lo, hi, op := edgePoints(s)
 		if lo != nil {
 			labels = append(labels, placed{p: *lo,
@@ -302,6 +317,10 @@ func writeDirectLabels(b *strings.Builder, single, band series, exact *curvePoin
 			labels = append(labels, placed{p: *op,
 				text: "shipped default", dx: 14, dy: -10, anchor: "start", slotAnchor: s.Slot})
 		}
+		if cand := candidatePoint(s); cand != nil {
+			labels = append(labels, placed{p: *cand,
+				text: "hybrid, same thresholds", dx: -14, dy: 20, anchor: "end", slotAnchor: s.Slot})
+		}
 	}
 
 	for _, l := range labels {
@@ -309,6 +328,18 @@ func writeDirectLabels(b *strings.Builder, single, band series, exact *curvePoin
 		fmt.Fprintf(b, `<text class="point-label" x="%.2f" y="%.2f" text-anchor="%s">%s</text>`,
 			x, y, l.anchor, html.EscapeString(l.text))
 	}
+}
+
+// candidatePoint finds the opt-in comparator's point at the shipped
+// thresholds, which is the one point on the hybrid line a reader comparing
+// the two policies is looking for.
+func candidatePoint(s series) *curvePoint {
+	for i := range s.Points {
+		if s.Points[i].Candidate && s.Points[i].Plotted {
+			return &s.Points[i]
+		}
+	}
+	return nil
 }
 
 // edgePoints picks the lowest and highest plotted threshold on a series, plus

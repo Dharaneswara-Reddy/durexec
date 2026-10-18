@@ -663,7 +663,7 @@ func TestUndefinedPrecisionIsNeitherPlottedNorPrintedAsZero(t *testing.T) {
 	speaking.record(Pair{Truth: Distinct}, outcome{Verdict: core.VerdictDistinct})
 
 	results := []*armResult{speaking, silent}
-	single, _, _ := buildSeries(results)
+	single, _, _, _ := buildSeries(results)
 	if len(single.Points) != 2 || !single.Points[0].Plotted || single.Points[1].Plotted {
 		t.Fatalf("plotted flags %+v, want the silent arm left off the line", single.Points)
 	}

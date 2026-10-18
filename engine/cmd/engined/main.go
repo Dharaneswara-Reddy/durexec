@@ -161,12 +161,33 @@ func run() error {
 		},
 	}
 
+	// The opt-in hybrid comparator (SEMANTIC_HYBRID). Assigning the extractor
+	// is the whole switch: a nil Fields leaves the pure-semantic path exactly
+	// as it was, which is what keeps the published measurement of the default
+	// a measurement of what this binary does.
+	//
+	// One extractor is wired, for flight booking, because that is the only
+	// activity in this deployment whose deciding fields the engine can
+	// recover. An activity whose intent it cannot read falls back to the
+	// pure-semantic comparison and journals that it did — see
+	// internal/idem/semantic/hybrid.go.
+	if cfg.SemanticHybrid {
+		checker.Fields = semantic.ItineraryFields
+		log.Info(ctx, "semantic dedup: hybrid comparator enabled",
+			"deciding_fields", "route, when, daypart, pax",
+			"note", "similarity is consulted only for the free text around those fields")
+	}
+
 	queue := taskq.New(pool, taskq.Config{LockDuration: cfg.TaskLock})
 
 	engine := &runtime.Engine{
-		Events:           events,
-		Executions:       events,
-		Committer:        events,
+		Events:     events,
+		Executions: events,
+		// The committer is wrapped so that every write the fencing check refuses
+		// is counted. The wrapper returns the error untouched — the fenced-out
+		// worker stops exactly as it did before — and counts only a genuine token
+		// mismatch, not the other ways a commit can report lost ownership.
+		Committer:        eventlog.NewFencingCounter(events, metrics),
 		Tasks:            queue,
 		Leases:           leases,
 		Dispatcher:       dispatcher,
@@ -246,14 +267,31 @@ func run() error {
 		// engine correct — it is what stops a node polling a queue that is no
 		// longer its business and slowing down the node that owns it.
 		OnLost: func(s core.ShardID) {
-			metrics.LeaseTransition(s, obs.LeaseLost)
 			pool2.Stop(s)
 		},
 		OnError: func(s core.ShardID, err error) {
 			log.Warn(ctx, "lease operation failed", "shard", int(s), "error", err)
 		},
+		// Counting transitions here rather than inside OnLost is what lets the
+		// four directions be told apart: OnLost fires for a deliberate handback
+		// as well as for a lease genuinely taken away, and it never fires at all
+		// for an acquire or a renewal.
+		Transitions: metrics,
 	})
 	engine.TokenFor = manager.Token
+
+	// Queue depth is sampled on its own slow loop rather than measured as tasks
+	// are polled: the poll is the engine's hottest statement, and a backlog is
+	// interesting as a trend, not to the millisecond. It reports only the shards
+	// this node owns, because the dashboard sums the gauge across all three
+	// nodes and a shard reported twice would read as twice the backlog.
+	depth := taskq.NewDepthSampler(queue, taskq.DepthConfig{
+		Shards:   func() []core.ShardID { return ownedShards(manager) },
+		Observer: metrics,
+		OnError: func(err error) {
+			log.Warn(ctx, "queue depth sample failed", "error", err)
+		},
+	})
 
 	scanner := timers.NewScanner(timers.New(pool), queue, timers.ScannerConfig{
 		Interval: time.Second,
@@ -333,10 +371,12 @@ func run() error {
 	// ---- 6. leases, timers and workers ------------------------------------
 
 	background, cancelBackground := context.WithCancel(context.Background())
-	done := make(chan struct{}, 3)
+	const backgroundLoops = 4
+	done := make(chan struct{}, backgroundLoops)
 
 	go func() { _ = manager.Run(background); done <- struct{}{} }()
 	go func() { _ = scanner.Run(background); done <- struct{}{} }()
+	go func() { _ = depth.Run(background); done <- struct{}{} }()
 	go func() { pool2.Supervise(background, manager.Owned, tickFor(cfg.LeaseRenew)); done <- struct{}{} }()
 
 	log.Info(ctx, "engine node ready",
@@ -374,7 +414,7 @@ func run() error {
 	// it at all means the fleet does not have to wait out a whole TTL to
 	// notice that these shards are free.
 	cancelBackground()
-	for i := 0; i < 3; i++ {
+	for i := 0; i < backgroundLoops; i++ {
 		select {
 		case <-done:
 		case <-shutdownCtx.Done():

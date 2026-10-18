@@ -94,6 +94,7 @@ type config struct {
 	cacheDir     string
 	retries      int
 	retryBase    time.Duration
+	hybrid       bool
 	verbose      bool
 }
 
@@ -134,6 +135,10 @@ func parseFlags() config {
 		"how many attempts each embedding gets before the run is called incomplete")
 	flag.DurationVar(&c.retryBase, "retry-base", 200*time.Millisecond,
 		"first backoff delay between embedding attempts; it doubles each time")
+	flag.BoolVar(&c.hybrid, "hybrid", false,
+		"also measure the OPT-IN hybrid comparator (deciding fields compared exactly, similarity "+
+			"reserved for the free text), on the same pairs and the same sweep as the semantic arms. "+
+			"Off by default so that a plain run reproduces the published baseline exactly")
 	flag.BoolVar(&c.verbose, "v", false, "list every misclassified pair")
 	flag.Parse()
 	return c
@@ -149,10 +154,19 @@ func defaultCacheDir() string {
 	return filepath.Join(base, "durexec", "embeddings")
 }
 
-// commandLine reproduces the invocation, so the HTML report can state exactly
-// what produced it and a reader can re-run it without guessing.
+// commandLine reproduces the invocation, so the report can state exactly what
+// produced it and a reader can re-run it without guessing.
+//
+// `go run` builds into a temporary directory, so argv[0] is a path like
+// /tmp/go-build.../exe/experiment that exists for the length of one run and
+// tells a reader nothing. It is rewritten to the command that would rebuild
+// it, which is what somebody re-running this actually has to type.
 func commandLine() string {
-	return strings.Join(os.Args, " ")
+	args := append([]string{}, os.Args...)
+	if len(args) > 0 && strings.Contains(args[0], "/go-build") {
+		args[0] = "go run ./cmd/experiment"
+	}
+	return strings.Join(args, " ")
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +211,12 @@ type armKind string
 const (
 	kindExact    armKind = "exact"
 	kindSemantic armKind = "semantic"
+
+	// kindHybrid is the opt-in comparator: every deciding field of the intent
+	// must match exactly, and the threshold applies only to the free text
+	// that is left. Its arms are swept over the same taus as the semantic
+	// ones so the two are read off the same grid.
+	kindHybrid armKind = "hybrid"
 )
 
 // Series names the curve an arm belongs to on the chart. Single-threshold and
@@ -206,6 +226,13 @@ const (
 	seriesExact  = "exact"
 	seriesSingle = "single-threshold"
 	seriesBand   = "escalation-band"
+
+	// The hybrid comparator gets its own two curves rather than extra points
+	// on the semantic ones. It is a different policy, not a different
+	// threshold of the same policy, and plotting them on one line would
+	// invite reading a jump between policies as movement along a curve.
+	seriesHybridSingle = "hybrid-single-threshold"
+	seriesHybridBand   = "hybrid-escalation-band"
 )
 
 // arm is one deduplication strategy under test. Within the semantic mechanism
@@ -231,12 +258,24 @@ type arm struct {
 	// Landmark marks the handful of arms worth printing in full on a
 	// terminal. The complete sweep goes to the CSV and the HTML report.
 	Landmark bool
+
+	// Candidate marks the OPT-IN comparator at the shipped thresholds: not
+	// the operating point, because the engine does not run this way by
+	// default, but the arm a reader comparing the two comparators wants. It
+	// is marked separately so that nothing in the output can be mistaken for
+	// a claim about what the engine currently does.
+	Candidate bool
 }
 
 // Escalating reports whether this arm can return ESCALATE at all.
 func (a arm) Escalating() bool {
-	return a.Kind == kindSemantic && a.Thresholds.TauLow < a.Thresholds.TauHigh
+	return a.Kind != kindExact && a.Thresholds.TauLow < a.Thresholds.TauHigh
 }
+
+// Thresholded reports whether a threshold means anything to this arm. Both
+// comparators classify a score; only the exact baseline has no score to
+// classify.
+func (a arm) Thresholded() bool { return a.Kind != kindExact }
 
 // outcome is what one arm decided about one pair.
 type outcome struct {
@@ -244,6 +283,12 @@ type outcome struct {
 	Similarity float64
 	Latency    time.Duration
 	Fallback   bool
+
+	// Detail is the journaled explanation, which the hybrid comparator writes
+	// and the pure-semantic one leaves empty. It is carried through to the
+	// per-pair CSV so that an error analysis can read WHY a verdict was
+	// reached and not only what it was.
+	Detail string
 }
 
 // landmarkTaus are the thresholds printed individually on the terminal: the
@@ -355,11 +400,65 @@ func buildArms(cfg config) ([]arm, error) {
 			Landmark:       true,
 		})
 	}
+
+	if cfg.hybrid {
+		arms = append(arms, hybridArms(taus, cfg.bandWidth, operating, landmark)...)
+	}
 	return arms, nil
+}
+
+// hybridArms mirrors the semantic arms one for one.
+//
+// The mirror is the point. Every hybrid arm has a semantic arm with the same
+// threshold and the same band width, over the same pairs, so a difference
+// between the two tables is a difference between the comparators and cannot
+// be a difference in how they were measured.
+func hybridArms(taus []float64, bandWidth float64, operating core.Thresholds, landmark map[float64]bool) []arm {
+	var arms []arm
+	for _, tau := range taus {
+		arms = append(arms, arm{
+			Name:       fmt.Sprintf("hybrid tau=%.2f", tau),
+			Kind:       kindHybrid,
+			Thresholds: core.Thresholds{TauLow: tau, TauHigh: tau},
+			Series:     seriesHybridSingle,
+			Landmark:   landmark[tau],
+		})
+	}
+	haveShipped := false
+	for _, tau := range taus {
+		hi := roundTau(math.Min(tau+bandWidth, 1.0))
+		th := core.Thresholds{TauLow: tau, TauHigh: hi}
+		a := arm{
+			Name:       hybridBandArmName(th),
+			Kind:       kindHybrid,
+			Thresholds: th,
+			Series:     seriesHybridBand,
+			Landmark:   landmark[tau],
+		}
+		if th == operating {
+			a.Candidate, a.Landmark, haveShipped = true, true, true
+		}
+		arms = append(arms, a)
+	}
+	if !haveShipped {
+		arms = append(arms, arm{
+			Name:       hybridBandArmName(operating),
+			Kind:       kindHybrid,
+			Thresholds: operating,
+			Series:     seriesHybridBand,
+			Candidate:  true,
+			Landmark:   true,
+		})
+	}
+	return arms
 }
 
 func bandArmName(th core.Thresholds) string {
 	return fmt.Sprintf("semantic escalate [%.2f,%.2f)", th.TauLow, th.TauHigh)
+}
+
+func hybridBandArmName(th core.Thresholds) string {
+	return fmt.Sprintf("hybrid escalate [%.2f,%.2f)", th.TauLow, th.TauHigh)
 }
 
 // ---------------------------------------------------------------------------
@@ -403,6 +502,37 @@ type observation struct {
 	// after every retry.
 	Failed bool
 	Reason string
+
+	// ---- the hybrid comparator, measured only when -hybrid was passed -----
+	//
+	// It is recorded alongside the semantic measurement rather than in a
+	// second run, so both comparators see the identical pair, the identical
+	// intent text and the identical cached vectors. A difference between the
+	// two tables can then only be the comparators.
+
+	HybridMeasured bool
+
+	// HybridGated is the gate's answer: a deciding field differed, so no
+	// threshold can make this pair a duplicate. Scoring an arm needs this and
+	// the similarity, and nothing else — see score.
+	HybridGated bool
+
+	// HybridReadable is false when the extractor could not read one side's
+	// intent at all, in which case the engine fell back to the pure-semantic
+	// comparison for this pair and the verdict is not a gated one.
+	HybridReadable bool
+
+	// HybridModelUsed reports whether the free-text comparison actually
+	// needed an embedding. Counted because a corpus on which it is rarely
+	// true is a corpus on which the similarity half of this comparator did
+	// nothing, and the report has to say so.
+	HybridModelUsed bool
+
+	HybridSimilarity float64
+	HybridVerdict    core.DedupVerdict
+	HybridField      string
+	HybridDetail     string
+	HybridLatencies  []time.Duration
 }
 
 // observe measures every pair once per repetition.
@@ -456,6 +586,32 @@ func observe(ctx context.Context, cfg config, pairs []Pair, emb core.Embedder, s
 			o.Similarity = sem.Similarity
 			o.CheckerVerdict = sem.Verdict
 			o.Fallback = sem.Fallback
+
+			if !cfg.hybrid {
+				continue
+			}
+			hyb, cmp, herr := checkHybridPair(ctx, cfg, operating, p, emb)
+			if herr != nil {
+				o.Failed, o.Reason = true, herr.Error()
+				st.embedFailed(p.ID, herr)
+				break
+			}
+			o.HybridMeasured = true
+			o.HybridLatencies = append(o.HybridLatencies, hyb.Latency)
+			o.HybridSimilarity = hyb.Similarity
+			o.HybridVerdict = hyb.Verdict
+			o.HybridDetail = hyb.Detail
+			o.HybridGated = cmp.Gated
+			o.HybridReadable = cmp.MineReadable && cmp.TheirsReadable
+			o.HybridModelUsed = cmp.ModelUsed
+			o.HybridField = cmp.DifferingField
+			if hyb.Fallback {
+				// The model was needed for the free text and was not there.
+				// Counted as a fallback for the same reason the semantic path
+				// is: a similarity of zero that was never measured must not be
+				// read as a measurement.
+				o.Fallback = true
+			}
 		}
 
 		if o.Fallback {
@@ -497,6 +653,23 @@ func warmEmbeddings(ctx context.Context, cfg config, pairs []Pair, emb core.Embe
 			if _, err := emb.Embed(ctx, text); err != nil {
 				st.embedFailed(p.ID, fmt.Errorf("warm %q: %w", text, err))
 			}
+
+			if !cfg.hybrid {
+				continue
+			}
+			// The hybrid comparator embeds the FREE TEXT REMAINDER, not the
+			// whole intent, so it needs its own vectors warmed or its first
+			// timed check would pay for a model round-trip the semantic arms
+			// were not charged for. An empty remainder needs no vector at all
+			// — that is the case the comparator answers without a model.
+			fields, ferr := semantic.ItineraryFields(cfg.activityType, text)
+			if ferr != nil || fields.Remainder == "" || seen[fields.Remainder] {
+				continue
+			}
+			seen[fields.Remainder] = true
+			if _, err := emb.Embed(ctx, fields.Remainder); err != nil {
+				st.embedFailed(p.ID, fmt.Errorf("warm free text %q: %w", fields.Remainder, err))
+			}
 		}
 	}
 	st.UniqueIntents = len(seen)
@@ -513,6 +686,23 @@ func warmEmbeddings(ctx context.Context, cfg config, pairs []Pair, emb core.Embe
 // the sweep would be a fiction. So it is a hard error, not a warning.
 func verifyClassification(obs []observation, operating core.Thresholds) error {
 	for _, o := range obs {
+		if o.HybridMeasured && !o.Failed {
+			// The same guard for the hybrid comparator, and it has one more
+			// thing to prove: that a gated pair really is DISTINCT at every
+			// threshold rather than merely at this one.
+			want := operating.Classify(o.HybridSimilarity)
+			if o.HybridGated {
+				want = core.VerdictDistinct
+			}
+			if want != o.HybridVerdict {
+				return fmt.Errorf(
+					"pair %s: scoring the hybrid arm by its gate and threshold gives %s but "+
+						"semantic.Checker returned %s at similarity %.6f (gated=%t). The harness "+
+						"scores the whole sweep that way, and it is only valid while it agrees "+
+						"with the checker exactly",
+					o.Pair.ID, want, o.HybridVerdict, o.HybridSimilarity, o.HybridGated)
+			}
+		}
 		if o.Failed || o.CheckerVerdict == "" {
 			continue
 		}
@@ -542,6 +732,25 @@ func score(a arm, obs []observation) (*armResult, []perPairRow) {
 				out.Verdict, out.Similarity = core.VerdictDuplicate, 1.0
 			}
 			res.Latencies = append(res.Latencies, o.ExactLatencies...)
+		case kindHybrid:
+			// The gate is threshold-free: a pair whose deciding fields differ
+			// is DISTINCT at every threshold in the sweep, and no score was
+			// measured for it. Everything else is classified exactly as the
+			// semantic arms are, which is what makes the two tables
+			// comparable row for row.
+			out.Fallback = o.Fallback
+			out.Detail = o.HybridDetail
+			switch {
+			case o.Failed || !o.HybridMeasured:
+				out.Verdict, out.Similarity = core.VerdictDistinct, 0
+			case o.HybridGated:
+				out.Verdict, out.Similarity = core.VerdictDistinct, 0
+			default:
+				out.Similarity = o.HybridSimilarity
+				out.Verdict = a.Thresholds.Classify(o.HybridSimilarity)
+			}
+			res.Latencies = append(res.Latencies, o.HybridLatencies...)
+
 		default:
 			out.Similarity = o.Similarity
 			out.Verdict = a.Thresholds.Classify(o.Similarity)
@@ -557,7 +766,11 @@ func score(a arm, obs []observation) (*armResult, []perPairRow) {
 		}
 
 		res.record(o.Pair, out)
-		rows = append(rows, perPairRow{ArmName: a.Name, Arm: a, Pair: o.Pair, Outcome: out})
+		row := perPairRow{ArmName: a.Name, Arm: a, Pair: o.Pair, Outcome: out}
+		if a.Kind == kindHybrid {
+			row.Gated, row.DecidingField, row.ModelUsed = o.HybridGated, o.HybridField, o.HybridModelUsed
+		}
+		rows = append(rows, row)
 	}
 	return res, rows
 }
@@ -590,6 +803,8 @@ func run(cfg config) error {
 	prov.ActivityType = cfg.activityType
 	prov.TauMin, prov.TauMax, prov.TauStep = cfg.tauMin, cfg.tauMax, cfg.tauStep
 	prov.BandWidth = cfg.bandWidth
+	prov.TauLow, prov.TauHigh = roundTau(cfg.tauLow), roundTau(cfg.tauHigh)
+	prov.Comparators = hybridHeaderLine(cfg)
 	prov.CommandLine = commandLine()
 
 	writeHeader(cfg, prov)
@@ -617,9 +832,20 @@ func run(cfg config) error {
 	prov.finish(st)
 
 	printTable(results)
+	printHybridComparison(results, prov)
 	printBest(results)
 	printFixtureVerdicts(perPair)
 	printBreakdown(results, perPair)
+	printGateSummary(obs)
+
+	var probes []probeResult
+	if cfg.hybrid {
+		probes, err = runFreeTextProbes(ctx, cfg, emb)
+		if err != nil {
+			return err
+		}
+		printFreeTextProbes(probes, prov)
+	}
 	if cfg.verbose {
 		printMistakes(perPair)
 	}
@@ -644,6 +870,7 @@ func run(cfg config) error {
 	}
 
 	printClosingCaveat(prov)
+	printHybridClosingNote(results, obs)
 	if prov.Incomplete() {
 		return fmt.Errorf("%w (%d pair(s) failed, %d fell back to the degraded path)",
 			errIncomplete, len(prov.FailedPairs), len(prov.FallbackPairs))
@@ -835,5 +1062,95 @@ func checkSemantic(ctx context.Context, cfg config, a arm, p Pair, inputA, input
 		Similarity: ev.Similarity,
 		Latency:    elapsed,
 		Fallback:   semantic.IsFallback(ev),
+		Detail:     ev.Detail,
 	}, nil
+}
+
+// checkHybridPair drives the real semantic.Checker with the field extractor
+// configured, so what is measured is the engine's opt-in path and not a
+// reimplementation of it.
+//
+// It is the same shape as checkSemantic — side A journaled first, outside the
+// timer, because in the engine that happened during A's own commit — with two
+// differences. The checker is given semantic.ItineraryFields, which is the
+// whole switch; and the Comparison is taken a second time, outside the timed
+// section, because scoring a thirty-point sweep from one pass needs the
+// threshold-free halves of the answer: whether the gate rejected the pair, and
+// what the free text scored. Those do not move when a threshold moves.
+func checkHybridPair(ctx context.Context, cfg config, a arm, p Pair, emb core.Embedder) (outcome, semantic.Comparison, error) {
+	const (
+		shard = core.ShardID(0)
+		run   = core.RunID("run-1")
+		seqA  = core.Seq(1)
+	)
+	wf := "hybrid-pair-" + p.ID
+
+	inputA, err := toolCallJSON(cfg.activityType, p.A)
+	if err != nil {
+		return outcome{}, semantic.Comparison{}, err
+	}
+	inputB, err := toolCallJSON(cfg.activityType, p.B)
+	if err != nil {
+		return outcome{}, semantic.Comparison{}, err
+	}
+
+	store := newMemIntents()
+	textA, err := semantic.IntentText(cfg.activityType, inputA)
+	if err != nil {
+		return outcome{}, semantic.Comparison{}, err
+	}
+	// The row the engine would have written: the whole intent text and a
+	// vector of the whole intent text. The hybrid path never reads that
+	// vector — it compares remainders — and storing it anyway keeps the
+	// harness faithful to what is actually in the database.
+	vecA, err := emb.Embed(ctx, textA)
+	if err != nil {
+		return outcome{}, semantic.Comparison{}, fmt.Errorf("embed the recorded side of pair %s: %w", p.ID, err)
+	}
+	if err := store.Put(ctx, core.Intent{
+		ShardID: shard, WorkflowID: wf, RunID: run,
+		ScheduledSeq: seqA, ActivityType: cfg.activityType,
+		IntentText: textA, Embedding: vecA,
+	}); err != nil {
+		return outcome{}, semantic.Comparison{}, err
+	}
+
+	checker := semantic.NewChecker(emb, store)
+	checker.Thresholds = a.Thresholds
+	checker.Fields = semantic.ItineraryFields
+
+	start := time.Now()
+	ev, err := checker.Check(ctx, semantic.CheckRequest{
+		ShardID:      shard,
+		WorkflowID:   wf,
+		RunID:        run,
+		K:            1,
+		ActivityType: cfg.activityType,
+		Input:        inputB,
+		Thresholds:   a.Thresholds,
+		KBySeq:       map[core.Seq]int{seqA: 0},
+	})
+	elapsed := time.Since(start)
+	if err != nil {
+		return outcome{}, semantic.Comparison{}, fmt.Errorf("hybrid check of pair %s: %w", p.ID, err)
+	}
+
+	textB, err := semantic.IntentText(cfg.activityType, inputB)
+	if err != nil {
+		return outcome{}, semantic.Comparison{}, err
+	}
+	// B is the call being made and A is the candidate it might repeat, which
+	// is the direction the engine asks in.
+	cmp, err := checker.Compare(ctx, cfg.activityType, textB, textA)
+	if err != nil {
+		return outcome{}, semantic.Comparison{}, fmt.Errorf("hybrid comparison of pair %s: %w", p.ID, err)
+	}
+
+	return outcome{
+		Verdict:    ev.Verdict,
+		Similarity: ev.Similarity,
+		Latency:    elapsed,
+		Fallback:   semantic.IsFallback(ev),
+		Detail:     ev.Detail,
+	}, cmp, nil
 }
