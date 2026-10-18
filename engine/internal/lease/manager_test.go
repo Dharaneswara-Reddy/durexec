@@ -669,3 +669,212 @@ func TestReleasesIsNotConsultedBeforeRenewalIsDue(t *testing.T) {
 		t.Fatalf("handed back before renewal was due (calls=%d, owned=%d)", calls, len(m.Owned()))
 	}
 }
+
+// ---- transition counting --------------------------------------------------
+
+// recordingTransitions captures every reported transition with no Prometheus
+// registry. It is locked because Run's goroutine and the test goroutine both
+// reach it.
+type recordingTransitions struct {
+	mu   sync.Mutex
+	seen []string
+}
+
+func (r *recordingTransitions) LeaseTransition(shard core.ShardID, direction string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.seen = append(r.seen, fmt.Sprintf("%d:%s", shard, direction))
+}
+
+func (r *recordingTransitions) count(want string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := 0
+	for _, s := range r.seen {
+		if s == want {
+			n++
+		}
+	}
+	return n
+}
+
+func (r *recordingTransitions) all() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.seen...)
+}
+
+var _ TransitionObserver = (*recordingTransitions)(nil)
+
+// TestDirectionOf pins the mapping from action and outcome to label. A wrong
+// direction here does not crash anything — it produces a dashboard that reads
+// plausibly and says the wrong thing — so every case is stated.
+func TestDirectionOf(t *testing.T) {
+	held := fmt.Errorf("busy: %w", ErrLeaseHeld)
+	fenced := fmt.Errorf("fenced: %w", core.ErrLostOwnership)
+	unreachable := errors.New("connection refused")
+
+	tests := []struct {
+		name   string
+		action Action
+		out    Outcome
+		lost   bool
+		want   string
+	}{
+		{"a successful acquire is an acquisition", ActionAcquire, Outcome{Token: 7}, false, DirectionAcquired},
+		{"a successful renewal is a renewal", ActionRenew, Outcome{}, false, DirectionRenewed},
+		{"losing the race for a shard changed nothing", ActionAcquire, Outcome{Err: held}, false, ""},
+		{"a renewal that never reached the database changed nothing", ActionRenew, Outcome{Err: unreachable}, false, ""},
+		{"being fenced out mid-renewal is a loss", ActionRenew, Outcome{Err: fenced}, true, DirectionLost},
+		{"standing down after the TTL is a loss", ActionDeclareLost, Outcome{}, true, DirectionLost},
+		{"an idle pass reports nothing", ActionNone, Outcome{}, false, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := DirectionOf(tc.action, tc.out, tc.lost); got != tc.want {
+				t.Fatalf("DirectionOf(%q) = %q, want %q", tc.action, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestManagerCountsAcquisitionsAndRenewals(t *testing.T) {
+	clk := &fakeClock{now: t0}
+	store := newFakeStore(clk.Now, 0)
+	seen := &recordingTransitions{}
+	m := NewManager(store, ManagerConfig{
+		Owner: "node-a", Shards: []core.ShardID{0}, Clock: clk, Transitions: seen,
+	})
+	ctx := context.Background()
+
+	m.Step(ctx) // acquire
+	clk.advance(4 * time.Second)
+	m.Step(ctx) // renew
+	clk.advance(4 * time.Second)
+	m.Step(ctx) // renew
+
+	if got := seen.count("0:" + DirectionAcquired); got != 1 {
+		t.Fatalf("%d acquisitions counted, want 1: %v", got, seen.all())
+	}
+	// The renewal heartbeat is the baseline every other direction is read
+	// against, so a missing renewal is as wrong as a missing acquisition.
+	if got := seen.count("0:" + DirectionRenewed); got != 2 {
+		t.Fatalf("%d renewals counted, want 2: %v", got, seen.all())
+	}
+}
+
+// Being fenced out by another node is the failover case the dashboard exists to
+// show, and it must not be confused with a deliberate handback.
+func TestManagerCountsAFencedOutLeaseAsLost(t *testing.T) {
+	clk := &fakeClock{now: t0}
+	store := newFakeStore(clk.Now, 0)
+	seen := &recordingTransitions{}
+	m := NewManager(store, ManagerConfig{
+		Owner: "node-a", Shards: []core.ShardID{0}, Clock: clk, Transitions: seen,
+	})
+	ctx := context.Background()
+
+	m.Step(ctx)
+	store.steal(0, "node-b")
+	clk.advance(4 * time.Second)
+	m.Step(ctx)
+
+	if got := seen.count("0:" + DirectionLost); got != 1 {
+		t.Fatalf("%d losses counted, want 1: %v", got, seen.all())
+	}
+	if got := seen.count("0:" + DirectionReleased); got != 0 {
+		t.Fatalf("a shard taken from us was counted as released: %v", seen.all())
+	}
+}
+
+// An unreachable database is also a loss, and it is the one case where nothing
+// told us: the lease expired without a single failing call to point at.
+func TestManagerCountsAnExpiredLeaseAsLostExactlyOnce(t *testing.T) {
+	clk := &fakeClock{now: t0}
+	store := newFakeStore(clk.Now, 0)
+	seen := &recordingTransitions{}
+	m := NewManager(store, ManagerConfig{
+		Owner: "node-a", Shards: []core.ShardID{0}, Clock: clk, Transitions: seen,
+	})
+	ctx := context.Background()
+	m.Step(ctx)
+
+	store.mu.Lock()
+	store.fail = errors.New("connection refused")
+	store.mu.Unlock()
+
+	for i := 0; i < 12; i++ {
+		clk.advance(time.Second)
+		m.Step(ctx)
+	}
+
+	if got := seen.count("0:" + DirectionLost); got != 1 {
+		t.Fatalf("%d losses counted, want exactly 1: %v", got, seen.all())
+	}
+	// Renewals that never reached the database did not extend anything, so
+	// counting them would invent a healthy heartbeat for a node that has just
+	// lost its shard.
+	if got := seen.count("0:" + DirectionRenewed); got != 0 {
+		t.Fatalf("failed renewals were counted as renewals: %v", seen.all())
+	}
+}
+
+// A handback is the rebalance, not a failover. Counting it as a loss — which is
+// what counting inside OnLost did — makes a cluster evening itself out look
+// exactly like a cluster losing nodes.
+func TestManagerCountsAHandbackAsReleased(t *testing.T) {
+	clk := &fakeClock{now: t0}
+	store := newFakeStore(clk.Now, 0)
+	seen := &recordingTransitions{}
+	m := NewManager(store, ManagerConfig{
+		Owner: "node-a", Shards: []core.ShardID{0}, Clock: clk, Transitions: seen,
+		Releases: func(core.ShardID) bool { return true },
+	})
+	ctx := context.Background()
+
+	m.Step(ctx) // acquire
+	clk.advance(4 * time.Second)
+	m.Step(ctx) // renewal is due, so the handback happens instead
+
+	if got := seen.count("0:" + DirectionReleased); got != 1 {
+		t.Fatalf("%d releases counted, want 1: %v", got, seen.all())
+	}
+	if got := seen.count("0:" + DirectionLost); got != 0 {
+		t.Fatalf("a handback was counted as a lost lease: %v", seen.all())
+	}
+}
+
+func TestShutdownCountsEveryLeaseAsReleased(t *testing.T) {
+	clk := &fakeClock{now: t0}
+	store := newFakeStore(clk.Now, 0, 1)
+	seen := &recordingTransitions{}
+	m := NewManager(store, ManagerConfig{
+		Owner: "node-a", Shards: []core.ShardID{0, 1}, Clock: clk, Transitions: seen,
+	})
+
+	ctx := context.Background()
+	m.Step(ctx)
+	if len(m.Owned()) != 2 {
+		t.Fatalf("setup: owned %d shards, want 2", len(m.Owned()))
+	}
+	m.releaseAll()
+
+	for _, shard := range []string{"0", "1"} {
+		if got := seen.count(shard + ":" + DirectionReleased); got != 1 {
+			t.Fatalf("shard %s released %d times, want 1: %v", shard, got, seen.all())
+		}
+	}
+}
+
+// A nil observer is the unit-test and no-registry case, and it must be silence
+// rather than a crash.
+func TestNilTransitionsObserverIsHarmless(t *testing.T) {
+	clk := &fakeClock{now: t0}
+	store := newFakeStore(clk.Now, 0)
+	m := NewManager(store, ManagerConfig{Owner: "node-a", Shards: []core.ShardID{0}, Clock: clk})
+	ctx := context.Background()
+	m.Step(ctx)
+	clk.advance(4 * time.Second)
+	m.Step(ctx)
+	m.releaseAll()
+}

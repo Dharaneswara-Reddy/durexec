@@ -215,3 +215,51 @@ func assertCount(t *testing.T, pool *pgxpool.Pool, sql string, shard core.ShardI
 		t.Fatalf("%q gave %d, want %d", sql, n, want)
 	}
 }
+
+// The counter is what makes the fencing mechanism externally visible, so it is
+// checked against a real PostgreSQL rather than only against a fake: the two
+// commits below are indistinguishable to the caller — both report lost
+// ownership — and only one of them is the token check firing.
+func TestFencingCounterCountsOnlyTheRealRejectionAgainstPostgres(t *testing.T) {
+	pool := testPool(t)
+	shard := freshShard(t, pool)
+	setLease(t, pool, shard, 5)
+	seen := &countingObserver{}
+	c := NewFencingCounter(New(pool), seen)
+	s := New(pool)
+	ctx := context.Background()
+
+	run := core.RunID(uuid.NewString())
+	if err := s.Create(ctx, shard, "wf-fenced", run, "T"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	started := core.Event{ShardID: shard, WorkflowID: "wf-fenced", RunID: run, Seq: 1, Type: core.EvWorkflowStarted}
+
+	// A stale writer: the shard is at token 5, this one still holds 4.
+	stale := core.Decision{
+		ShardID: shard, WorkflowID: "wf-fenced", RunID: run, Token: 4,
+		Events: []core.Event{started}, Status: core.StatusRunning, LastSeq: 1,
+	}
+	if err := c.CommitDecision(ctx, stale); !errors.Is(err, core.ErrLostOwnership) {
+		t.Fatalf("stale commit: got %v, want ErrLostOwnership", err)
+	}
+	if len(seen.shards) != 1 || seen.shards[0] != shard {
+		t.Fatalf("rejections counted: %v, want exactly [%d]", seen.shards, shard)
+	}
+
+	// The duplicate-seq race reports the same error to the caller, and must not
+	// be counted: it is a lost race, not evidence that fencing fired.
+	current := core.Decision{
+		ShardID: shard, WorkflowID: "wf-fenced", RunID: run, Token: 5,
+		Events: []core.Event{started}, Status: core.StatusRunning, LastSeq: 1,
+	}
+	if err := c.CommitDecision(ctx, current); err != nil {
+		t.Fatalf("first commit with the live token: %v", err)
+	}
+	if err := c.CommitDecision(ctx, current); !errors.Is(err, core.ErrLostOwnership) {
+		t.Fatalf("replayed commit: got %v, want ErrLostOwnership", err)
+	}
+	if len(seen.shards) != 1 {
+		t.Fatalf("rejections counted: %v, want still exactly one", seen.shards)
+	}
+}

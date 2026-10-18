@@ -166,10 +166,13 @@ func (w *ActivityWorker) process(ctx context.Context, task core.Task) error {
 			// Either way our transaction was refused and the task row is
 			// untouched, so the shard's new owner will run it. Expected, not
 			// exceptional.
+			//
+			// That ambiguity is exactly why fencing_rejections_total is not
+			// incremented here: this branch cannot tell the fencing check
+			// firing from a lost race for a sequence number, and only the first
+			// is evidence the safety mechanism works. The committer counts it
+			// where the token mismatch is actually seen.
 			e.Runtime.countFailure(string(core.TaskActivity), reasonFenced)
-			if e.Metrics != nil {
-				e.Metrics.FencingRejection(w.Shard)
-			}
 			log.Debug(ctx, "activity result abandoned: fenced out")
 			return errShardGone
 		}

@@ -167,6 +167,17 @@ func (m *Metrics) SetQueueDepth(shard core.ShardID, taskType core.TaskType, dept
 	m.TaskQueueDepth.WithLabelValues(shardLabel(shard), string(taskType)).Set(depth)
 }
 
+// ClearQueueDepth forgets every series for a shard this node no longer owns.
+//
+// Setting the gauge to zero would not do. A gauge keeps its last value until it
+// is overwritten, so a shard that moved to another node would go on being
+// reported by both — and the dashboard sums across nodes, which would then
+// double-count every task in that shard's queue. Deleting the series makes this
+// node stop claiming to know a depth it is no longer sampling.
+func (m *Metrics) ClearQueueDepth(shard core.ShardID) {
+	m.TaskQueueDepth.DeletePartialMatch(prometheus.Labels{"shard": shardLabel(shard)})
+}
+
 func shardLabel(s core.ShardID) string {
 	// Small ids are the overwhelmingly common case (a cluster has tens of
 	// shards, not millions), so a lookup table avoids an allocation per

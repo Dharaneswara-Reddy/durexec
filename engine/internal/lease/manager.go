@@ -187,6 +187,40 @@ func dropped(st ShardState, now time.Time) ShardState {
 
 // ---- the manager ----------------------------------------------------------
 
+// TransitionObserver receives one call per ownership change. It is declared
+// here, as the narrowest interface the manager needs, rather than importing the
+// metrics package, so this package stays testable with no Prometheus registry
+// and keeps no dependency on another agent's wiring. internal/obs.Metrics
+// satisfies it.
+type TransitionObserver interface {
+	LeaseTransition(shard core.ShardID, direction string)
+}
+
+// The four directions one ownership change can take.
+//
+// They are spelled to match the direction label values internal/obs exports as
+// LeaseAcquired, LeaseRenewed, LeaseLost and LeaseReleased, and are restated
+// here rather than imported to keep the dependency pointing one way only.
+// manager_test.go pins the two spellings together, because a drift between them
+// would not break anything — it would quietly split one time series in two and
+// leave the dashboard looking plausible.
+const (
+	// DirectionAcquired: the database handed us the shard and a new, higher
+	// fencing token.
+	DirectionAcquired = "acquired"
+	// DirectionRenewed: we already owned the shard and pushed its expiry out.
+	// This is the heartbeat, so it is the baseline every other direction is
+	// read against: roughly one per shard per RenewEvery in steady state.
+	DirectionRenewed = "renewed"
+	// DirectionLost: ownership went away without our consent — either another
+	// node fenced us out, or we could not reach the database for a whole TTL
+	// and stood down.
+	DirectionLost = "lost"
+	// DirectionReleased: we gave the shard up deliberately, on shutdown or on a
+	// handback to its preferred owner.
+	DirectionReleased = "released"
+)
+
 // ManagerConfig configures the background ownership loop.
 type ManagerConfig struct {
 	// Owner is this node's identity, written into owner_node. It must be stable
@@ -230,6 +264,16 @@ type ManagerConfig struct {
 	OnLost func(core.ShardID)
 	// OnError observes database errors. Nil discards them.
 	OnError func(shard core.ShardID, err error)
+
+	// Transitions counts ownership changes. Nil records nothing, not a panic,
+	// because the manager has to run in a unit test with no registry.
+	//
+	// It lives on the manager rather than being left to OnLost, which is where
+	// it started: OnLost fires for a handback as well as for a real loss, so
+	// counting there reported a deliberate release as a lost lease and could
+	// never see an acquire or a renewal at all. The manager is the only place
+	// that knows which of the four actually happened.
+	Transitions TransitionObserver
 }
 
 func (c ManagerConfig) withDefaults() ManagerConfig {
@@ -356,6 +400,8 @@ func (m *Manager) stepShard(ctx context.Context, shard core.ShardID, now time.Ti
 	m.state[shard] = next
 	m.mu.Unlock()
 
+	m.count(shard, DirectionOf(action, out, lost))
+
 	// The callback runs after the lock is released. Ownership must already be
 	// recorded as gone before anyone is told, and holding the lock across a
 	// caller's code invites a deadlock.
@@ -365,6 +411,42 @@ func (m *Manager) stepShard(ctx context.Context, shard core.ShardID, now time.Ti
 	if out.Err != nil && m.cfg.OnError != nil && !errors.Is(out.Err, ErrLeaseHeld) {
 		m.cfg.OnError(shard, out.Err)
 	}
+}
+
+// DirectionOf names the transition an action and its outcome amount to, or ""
+// when ownership did not move.
+//
+// It is pure and exported for the same reason Decide and Apply are: the mapping
+// is the part with a real chance of being subtly wrong, and a wrong direction
+// label is not a crash, it is a dashboard that reads plausibly and says the
+// wrong thing. The two silent cases are the ones worth stating: an acquire that
+// found the shard already held changed nothing, and a renewal that failed to
+// reach the database changed nothing either — we still own the shard, and the
+// loss, if the trouble persists, is counted later by ActionDeclareLost.
+func DirectionOf(a Action, out Outcome, lost bool) string {
+	if lost {
+		return DirectionLost
+	}
+	if out.Err != nil {
+		return ""
+	}
+	switch a {
+	case ActionAcquire:
+		return DirectionAcquired
+	case ActionRenew:
+		return DirectionRenewed
+	default:
+		return ""
+	}
+}
+
+// count reports one transition. An empty direction is "nothing happened", so
+// every caller can hand over whatever DirectionOf returned without checking.
+func (m *Manager) count(shard core.ShardID, direction string) {
+	if direction == "" || m.cfg.Transitions == nil {
+		return
+	}
+	m.cfg.Transitions.LeaseTransition(shard, direction)
 }
 
 // releaseAll gives up every held lease on shutdown. It uses a fresh, short
@@ -386,6 +468,10 @@ func (m *Manager) handback(ctx context.Context, shard core.ShardID, st ShardStat
 	m.mu.Lock()
 	m.state[shard] = dropped(st, now)
 	m.mu.Unlock()
+	// Released, not lost: nobody took this shard from us, we handed it over. The
+	// distinction is the whole value of the label — a cluster rebalancing itself
+	// and a cluster failing over look identical without it.
+	m.count(shard, DirectionReleased)
 	if m.cfg.OnLost != nil {
 		m.cfg.OnLost(shard)
 	}
@@ -400,11 +486,20 @@ func (m *Manager) releaseAll() {
 	defer cancel()
 
 	for shard, tok := range owned {
-		if err := m.store.Release(ctx, shard, m.cfg.Owner, tok); err != nil && m.cfg.OnError != nil {
-			m.cfg.OnError(shard, err)
+		// A release that did not reach the database is not a handover: the row
+		// still names this node and the rest of the fleet has to wait out the
+		// whole TTL before the shard is claimable. That is what "lost" means
+		// everywhere else, so it is counted as that rather than flattered.
+		direction := DirectionReleased
+		if err := m.store.Release(ctx, shard, m.cfg.Owner, tok); err != nil {
+			direction = DirectionLost
+			if m.cfg.OnError != nil {
+				m.cfg.OnError(shard, err)
+			}
 		}
 		m.mu.Lock()
 		m.state[shard] = dropped(m.state[shard], m.cfg.Clock.Now())
 		m.mu.Unlock()
+		m.count(shard, direction)
 	}
 }

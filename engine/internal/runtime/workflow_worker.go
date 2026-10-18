@@ -214,10 +214,15 @@ func (w *WorkflowWorker) process(ctx context.Context, task core.Task) error {
 			// shard now, our transaction was refused, and the task row is
 			// untouched for that node to pick up. There is nothing to log as
 			// an error and nothing to retry.
+			//
+			// fencing_rejections_total is deliberately not incremented here.
+			// Lost ownership arrives from two places — the fencing check
+			// refusing the write, and the duplicate-seq race in insertEvents —
+			// and from here they are indistinguishable, so counting here
+			// inflated the one number that is supposed to be evidence that
+			// fencing fired. The committer counts it at the point the token
+			// mismatch is actually detected.
 			e.Runtime.countFailure(string(core.TaskWorkflow), reasonFenced)
-			if e.Metrics != nil {
-				e.Metrics.FencingRejection(w.Shard)
-			}
 			log.Debug(ctx, "workflow decision abandoned: fenced out")
 			return errShardGone
 		}

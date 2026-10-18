@@ -9,6 +9,9 @@ import (
 	dto "github.com/prometheus/client_model/go"
 
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/eventlog"
+	"github.com/dharaneswar339/durexec/internal/lease"
+	"github.com/dharaneswar339/durexec/internal/taskq"
 )
 
 // counterValue reads one labelled counter back out of a registry. Going
@@ -255,6 +258,77 @@ func TestMetricsSatisfiesSemanticObserver(t *testing.T) {
 	var _ interface {
 		ObserveDedup(string, core.DedupVerdict, float64)
 	} = New(prometheus.NewRegistry())
+}
+
+// TestMetricsSatisfiesItsProducers checks that the packages which actually
+// observe these mechanisms can still reach Metrics through their own narrow
+// interfaces. Those interfaces are declared in the producing packages so they
+// need no Prometheus dependency, which means nothing but a check like this
+// notices when a signature here drifts away from them.
+func TestMetricsSatisfiesItsProducers(t *testing.T) {
+	m := New(prometheus.NewRegistry())
+	var _ lease.TransitionObserver = m
+	var _ taskq.DepthObserver = m
+	var _ eventlog.FencingObserver = m
+}
+
+// TestDirectionLabelsMatchTheLeaseManager pins the direction label values to the
+// spellings the lease manager actually emits.
+//
+// The two sets are declared separately on purpose — the lease package stays free
+// of any metrics dependency — and a drift between them would not fail anything
+// at run time. It would quietly split lease_transitions_total into two half
+// series and leave the panel looking entirely reasonable.
+func TestDirectionLabelsMatchTheLeaseManager(t *testing.T) {
+	for _, tc := range []struct{ obs, emitted string }{
+		{LeaseAcquired, lease.DirectionAcquired},
+		{LeaseRenewed, lease.DirectionRenewed},
+		{LeaseLost, lease.DirectionLost},
+		{LeaseReleased, lease.DirectionReleased},
+	} {
+		if tc.obs != tc.emitted {
+			t.Errorf("direction label %q is emitted as %q", tc.obs, tc.emitted)
+		}
+	}
+}
+
+// TestClearQueueDepthDropsTheShard covers the case a gauge gets wrong by
+// default: a shard that moves to another node must stop being reported here, or
+// both nodes report it and the dashboard, which sums across nodes, doubles it.
+func TestClearQueueDepthDropsTheShard(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	m := New(reg)
+
+	m.SetQueueDepth(1, core.TaskWorkflow, 4)
+	m.SetQueueDepth(1, core.TaskActivity, 2)
+	m.SetQueueDepth(2, core.TaskWorkflow, 9)
+
+	m.ClearQueueDepth(1)
+
+	// Shard 2 is untouched, which is what makes this a per-shard delete rather
+	// than a reset.
+	if got := counterValue(t, reg, "task_queue_depth", map[string]string{"shard": "2"}); got != 9 {
+		t.Fatalf("shard 2 depth = %v, want 9", got)
+	}
+	for _, m := range gathered(t, reg, "task_queue_depth") {
+		if labelsMatch(m, map[string]string{"shard": "1"}) {
+			t.Fatalf("shard 1 still has a series after being cleared: %v", m.GetLabel())
+		}
+	}
+}
+
+func gathered(t *testing.T, reg *prometheus.Registry, name string) []*dto.Metric {
+	t.Helper()
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range families {
+		if f.GetName() == name {
+			return f.GetMetric()
+		}
+	}
+	return nil
 }
 
 // ---- logging --------------------------------------------------------------

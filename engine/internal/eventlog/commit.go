@@ -34,10 +34,80 @@ func verifyToken(ctx context.Context, tx pgx.Tx, shard core.ShardID, tok core.Fe
 	case err != nil:
 		return fmt.Errorf("eventlog: verify fencing token: %w", err)
 	case core.FencingToken(stored) != tok:
-		return fmt.Errorf("eventlog: shard %d fencing token is %d, we hold %d: %w",
-			shard, stored, tok, core.ErrLostOwnership)
+		return &FencedError{Shard: shard, Stored: core.FencingToken(stored), Held: tok}
 	}
 	return nil
+}
+
+// FencedError is the one outcome worth counting: the stored fencing token had
+// moved on, so this node's write was refused.
+//
+// It is a type rather than another wrapped sentinel because three different
+// things in this package report core.ErrLostOwnership — a token mismatch, a
+// shard with no lease row at all, and the duplicate-seq race in insertEvents —
+// and only the first is the fencing check firing. A missing lease row means
+// EnsureRows never ran, and a duplicate seq means we lost a race we should not
+// have been in; counting either as a fencing rejection would put operational
+// faults into the one number that is supposed to be evidence that split brain
+// was prevented.
+//
+// It wraps core.ErrLostOwnership, so every existing errors.Is check and the
+// error text both behave exactly as they did before.
+type FencedError struct {
+	Shard core.ShardID
+	// Stored is the token the lease row actually held; Held is the one the
+	// writer believed it had. Stored is always the higher of the two.
+	Stored core.FencingToken
+	Held   core.FencingToken
+}
+
+func (e *FencedError) Error() string {
+	return fmt.Sprintf("eventlog: shard %d fencing token is %d, we hold %d: %v",
+		e.Shard, e.Stored, e.Held, core.ErrLostOwnership)
+}
+
+func (e *FencedError) Unwrap() error { return core.ErrLostOwnership }
+
+// FencingObserver receives one call per write the fencing check refused. It is
+// declared here, as the narrowest interface this package needs, rather than
+// importing the metrics package, so the eventlog stays testable with no
+// Prometheus registry. internal/obs.Metrics satisfies it.
+type FencingObserver interface {
+	FencingRejection(shard core.ShardID)
+}
+
+// FencingCounter wraps a Committer and counts the commits the fencing check
+// refused. Without it, a run in which no split brain ever happened is
+// indistinguishable from one in which fencing was silently broken all along.
+//
+// It is a wrapper rather than a field on Store because counting belongs to the
+// observability layer and not to the schema: the store keeps working with no
+// metrics at all, and this wrapper can be unit-tested against a fake committer
+// with no database.
+type FencingCounter struct {
+	Committer core.Committer
+	Observer  FencingObserver
+}
+
+var _ core.Committer = (*FencingCounter)(nil)
+
+// NewFencingCounter wraps c. A nil observer counts nothing rather than
+// panicking, so the wrapper can be installed unconditionally.
+func NewFencingCounter(c core.Committer, o FencingObserver) *FencingCounter {
+	return &FencingCounter{Committer: c, Observer: o}
+}
+
+// CommitDecision commits and returns the error untouched. Observing must never
+// change what the caller sees: the fenced-out worker has to stop either way.
+func (f *FencingCounter) CommitDecision(ctx context.Context, d core.Decision) error {
+	err := f.Committer.CommitDecision(ctx, d)
+	var fenced *FencedError
+	if f.Observer != nil && errors.As(err, &fenced) {
+		// The shard comes from the error, not from the decision, so a rejection
+		// can never be attributed to a shard it did not happen on.
+		f.Observer.FencingRejection(fenced.Shard)
+	}
+	return err
 }
 
 // ---- the statements the commit runs ---------------------------------------

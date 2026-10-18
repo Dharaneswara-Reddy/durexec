@@ -180,3 +180,52 @@ func TestConcurrentPollsDoNotCollide(t *testing.T) {
 		}
 	}
 }
+
+// The depth query is raw SQL that no unit test executes, so this is the only
+// place its predicate is actually checked against PostgreSQL — including that
+// the shard list really does arrive as an int4[].
+func TestDepthSamplerCountsOnlyWhatAWorkerCouldPollNow(t *testing.T) {
+	pool := testPool(t)
+	shard := freshShard(t, pool)
+	q := New(pool, Config{LockDuration: 30 * time.Second})
+	ctx := context.Background()
+
+	run := core.RunID(uuid.NewString())
+	later := time.Now().Add(time.Hour)
+	if err := q.Enqueue(ctx, []core.Task{
+		{ShardID: shard, Type: core.TaskWorkflow, WorkflowID: "wf-1", RunID: run},
+		{ShardID: shard, Type: core.TaskWorkflow, WorkflowID: "wf-2", RunID: run},
+		{ShardID: shard, Type: core.TaskActivity, WorkflowID: "wf-3", RunID: run},
+		// Backing off after a failure: queued, but not waiting for a worker.
+		{ShardID: shard, Type: core.TaskActivity, WorkflowID: "wf-4", RunID: run, VisibleAt: later},
+	}); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+
+	obs := newRecordingDepths()
+	s := NewDepthSampler(q, DepthConfig{
+		Shards:   func() []core.ShardID { return []core.ShardID{shard} },
+		Observer: obs,
+	})
+	if err := s.Sample(ctx); err != nil {
+		t.Fatalf("sample: %v", err)
+	}
+	if got, _ := obs.depth(shard, core.TaskWorkflow); got != 2 {
+		t.Fatalf("workflow depth = %v, want 2", got)
+	}
+	if got, _ := obs.depth(shard, core.TaskActivity); got != 1 {
+		t.Fatalf("activity depth = %v, want 1: a task backing off is not waiting", got)
+	}
+
+	// A task under a live lock is in flight, not queued. Counting it would make
+	// an engine that is keeping up look like one falling behind.
+	if _, err := q.Poll(ctx, shard, core.TaskWorkflow); err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	if err := s.Sample(ctx); err != nil {
+		t.Fatalf("sample: %v", err)
+	}
+	if got, _ := obs.depth(shard, core.TaskWorkflow); got != 1 {
+		t.Fatalf("workflow depth = %v after one task was locked, want 1", got)
+	}
+}
