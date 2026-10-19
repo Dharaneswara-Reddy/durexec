@@ -117,7 +117,17 @@ type ShardsResponse struct {
 type HealthResponse struct {
 	Status string `json:"status"`
 	Node   string `json:"node"`
-	Shards int    `json:"owned_shards"`
+	// Shards is how many shards this node holds a lease on right now, which
+	// is normally a fraction of the cluster's total and is zero on a node that
+	// has just started or has been fenced out of everything. It is not a
+	// health verdict: a node owning nothing is still serving, still forwarding
+	// and still a candidate for the next lease.
+	Shards int `json:"owned_shards"`
+	// ClusterShards is the total the cluster is configured for, so a reader
+	// can see 2-of-16 for what it is without a second request. The two were
+	// the same number for every node until owned_shards started being
+	// measured rather than assumed.
+	ClusterShards int `json:"cluster_shards"`
 }
 
 // ---- workflow lifecycle ---------------------------------------------------
@@ -538,10 +548,19 @@ func (s *Server) handleShards(w http.ResponseWriter, r *http.Request) {
 // and another node will take the shard over, which is the designed response.
 // Restarting the process as well would only lengthen the outage.
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	// OwnedNow, not OwnedShards: the latter is every shard in the cluster, on
+	// purpose (see api.Deps), so reporting its length told every reader that
+	// every node owned everything. A node with no leases at all answered the
+	// same as a node carrying the whole workload.
+	owned := len(s.deps.OwnedShards)
+	if s.deps.OwnedNow != nil {
+		owned = len(s.deps.OwnedNow())
+	}
 	writeJSON(w, http.StatusOK, HealthResponse{
-		Status: "ok",
-		Node:   s.deps.NodeID,
-		Shards: len(s.deps.OwnedShards),
+		Status:        "ok",
+		Node:          s.deps.NodeID,
+		Shards:        owned,
+		ClusterShards: len(s.deps.OwnedShards),
 	})
 }
 

@@ -1,5 +1,10 @@
--- One database per shard. Six tables; every mechanism in the engine is these
--- tables plus the code that manipulates them.
+-- One shared database for the whole cluster. Sharding is a shard_id column on
+-- every table, not a database per shard: all three nodes connect to the same
+-- PostgreSQL, and a node is confined to its shards by the lease it holds and by
+-- the shard_id in every statement, not by which database it is pointed at.
+--
+-- Six tables; every mechanism in the engine is these tables plus the code that
+-- manipulates them.
 
 CREATE EXTENSION IF NOT EXISTS vector;
 

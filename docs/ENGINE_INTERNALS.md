@@ -31,7 +31,7 @@ The workflow never does I/O. The activity never makes orchestration decisions. I
 
 ## 1. Level 1 — What is actually on disk
 
-Five tables per shard. Every mechanism in this engine is these five tables plus the code that manipulates them. Postgres, one database per shard.
+Six tables, shared by every shard. Every mechanism in this engine is these six tables plus the code that manipulates them. One PostgreSQL database for the whole cluster, **not** one database per shard: sharding is the `shard_id` column that every table carries, and what confines a node to its shards is the lease it holds plus the `shard_id` in every statement it issues.
 
 ### 1.1 `events` — the event log
 

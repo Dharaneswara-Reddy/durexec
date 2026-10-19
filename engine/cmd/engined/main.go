@@ -40,6 +40,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dharaneswar339/durexec/app/agent"
+	"github.com/dharaneswar339/durexec/app/agent/llm"
 	"github.com/dharaneswar339/durexec/app/delivery"
 	"github.com/dharaneswar339/durexec/internal/activity"
 	"github.com/dharaneswar339/durexec/internal/api"
@@ -202,6 +203,11 @@ func run() error {
 		Runtime:          runtimeMetrics,
 		EscalationBlocks: cfg.EscalationBlocks,
 		Backoff:          queue.Config().Backoff,
+		// Taken from the queue rather than from cfg so the engine and the queue
+		// cannot end up with two different ideas of how long a claim lasts: the
+		// activity worker renews its claim on this number, and the queue grants
+		// it on the same one, already defaulted.
+		TaskLock: queue.Config().LockDuration,
 	}
 
 	pool2 := runtime.NewWorkerPool(engine, cfg.WorkflowWorkers, cfg.ActivityWorkers)
@@ -336,9 +342,14 @@ func run() error {
 			return "", false
 		},
 		OwnedShards: shard.All(int32(cfg.ShardCount)),
-		Gatherer:    registry,
-		Log:         log,
-		Clock:       core.SystemClock{},
+		// What /healthz reports. It has to be the lease manager's live answer:
+		// OwnedShards above is every shard in the cluster, so serving health
+		// from it made all three nodes claim all sixteen shards no matter what
+		// they held.
+		OwnedNow: func() []core.ShardID { return ownedShards(manager) },
+		Gatherer: registry,
+		Log:      log,
+		Clock:    core.SystemClock{},
 	})
 
 	// The API owns its own routes; the dashboard takes whatever is left. Go's
@@ -529,8 +540,19 @@ func registerActivities(r *activity.Registry, faults *faultinj.Injector) (intent
 		}
 	}
 
+	// A real model when one is configured, the scripted planner otherwise.
+	//
+	// The scripted planner cannot evidence the project's claim: it replays the
+	// wording we wrote, so any rephrasing a duplicate check then catches is a
+	// rephrasing we supplied. With GROQ_API_KEY set the words come from the
+	// model instead, which is the situation the contribution is about.
+	var planner agent.Planner = demoPlanner{}
+	if g := llm.NewGroqPlanner(); g != nil {
+		planner = g
+	}
+
 	agentActs := agent.NewActivities(agent.Options{
-		Planner: demoPlanner{},
+		Planner: planner,
 		Faults:  faults,
 	})
 	for _, reg := range agentActs.Registrations() {

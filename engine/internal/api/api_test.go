@@ -439,6 +439,60 @@ func TestHealthz(t *testing.T) {
 	}
 }
 
+// TestHealthzReportsWhatIsOwnedNotWhatExists is a regression guard.
+//
+// /healthz used to report len(OwnedShards), and engined sets OwnedShards to
+// EVERY shard in the cluster on purpose, so all three nodes answered
+// owned_shards=16 whatever they actually held. A cluster with four dead shards
+// and half its start requests failing reported three healthy nodes each owning
+// everything. owned_shards now comes from the lease manager.
+func TestHealthzReportsWhatIsOwnedNotWhatExists(t *testing.T) {
+	tests := []struct {
+		name              string
+		ownedNow          []core.ShardID
+		wantOwned         int
+		wantClusterShards int
+	}{
+		{
+			name:     "a node holding two of sixteen says two",
+			ownedNow: []core.ShardID{3, 11},
+			// Sixteen shards exist; this node has leases on two of them.
+			wantOwned: 2, wantClusterShards: 16,
+		},
+		{
+			// The case that was invisible before. A node fenced out of
+			// everything, or one that has only just started, owns nothing —
+			// and must say so rather than claiming the whole cluster.
+			name:     "a node holding nothing says nothing",
+			ownedNow: []core.ShardID{},
+			// Still "ok": owning no shard is not a reason to be restarted.
+			wantOwned: 0, wantClusterShards: 16,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			deps := ownedDeps()
+			deps.OwnedShards = make([]core.ShardID, 16)
+			for i := range deps.OwnedShards {
+				deps.OwnedShards[i] = core.ShardID(i)
+			}
+			owned := tc.ownedNow
+			deps.OwnedNow = func() []core.ShardID { return owned }
+
+			got := decode[HealthResponse](t, do(t, deps, http.MethodGet, "/healthz", ""))
+			if got.Status != "ok" {
+				t.Errorf("status = %q, want ok: owning no shard is not unhealthy", got.Status)
+			}
+			if got.Shards != tc.wantOwned {
+				t.Errorf("owned_shards = %d, want %d", got.Shards, tc.wantOwned)
+			}
+			if got.ClusterShards != tc.wantClusterShards {
+				t.Errorf("cluster_shards = %d, want %d", got.ClusterShards, tc.wantClusterShards)
+			}
+		})
+	}
+}
+
 // TestHealthzIgnoresStorage: health drives restarts, and a node that cannot
 // momentarily reach Postgres must not be killed for it — the lease expiring
 // and another node taking over is the designed response.

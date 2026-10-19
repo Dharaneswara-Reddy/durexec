@@ -138,10 +138,29 @@ type Deps struct {
 	// Routing.
 	NodeID string
 	Shards ShardResolver
-	// OwnedShards is the set this node serves, used by the collection
-	// endpoints that have no workflow id to hash. It is a plain slice rather
-	// than an interface because it is data, not behaviour.
+	// OwnedShards is the set of shards the collection endpoints read when the
+	// request names none. It is a plain slice rather than an interface because
+	// it is data, not behaviour, and engined deliberately sets it to EVERY
+	// shard: a listing that silently omitted a shard this node happens not to
+	// hold would make the dashboard's own contents depend on which node
+	// answered. Over-reading is the safe direction there.
+	//
+	// It is therefore NOT the answer to "what does this node own", and must
+	// never be used as one. See OwnedNow.
 	OwnedShards []core.ShardID
+
+	// OwnedNow reports the shards this node holds a lease on AT THIS MOMENT.
+	// It is a function because the answer changes as leases come and go, which
+	// is the whole reason /healthz cannot be served from OwnedShards.
+	//
+	// This exists because it was missing. /healthz reported len(OwnedShards),
+	// i.e. the cluster's shard count, so every node answered
+	// {"status":"ok","owned_shards":16} whatever it actually held. A cluster
+	// in which four shards had no lease row at all, and half of all start
+	// requests were being refused, reported three healthy nodes each owning
+	// all sixteen. Nil keeps the old behaviour for callers that have no lease
+	// manager, such as the API's own tests.
+	OwnedNow func() []core.ShardID
 
 	// ---- forwarding -------------------------------------------------------
 
