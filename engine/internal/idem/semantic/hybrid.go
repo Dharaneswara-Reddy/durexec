@@ -191,6 +191,22 @@ func (f *Fields) sortDeciding() {
 	sort.Slice(f.Deciding, func(i, j int) bool { return f.Deciding[i].Name < f.Deciding[j].Name })
 }
 
+// NewFields assembles a Fields from outside this package, sorting the
+// deciding fields and setting Recognised from whether there are any.
+//
+// It exists because an extractor does not have to live in this package. The
+// LLM-backed extractor is in app/agent/llm, since that is where the model
+// client is, and without this it could not produce a Fields whose deciding
+// order matches what every other extractor produces — which would make its
+// journaled signatures sort differently and two explanations of one verdict
+// incomparable.
+func NewFields(deciding []Field, remainder string) Fields {
+	f := Fields{Deciding: deciding, Remainder: remainder}
+	f.sortDeciding()
+	f.Recognised = len(f.Deciding) > 0
+	return f
+}
+
 // absentValue is what a missing field is reported as in an explanation. It is
 // not a value an extractor can produce, so it cannot be confused with one.
 const absentValue = "(absent)"
@@ -334,13 +350,22 @@ func (c *Checker) checkHybrid(
 	ev := base
 	ev.Similarity = bestCmp.Similarity
 	ev.Verdict = th.Classify(bestCmp.Similarity)
+	if c.GateDecides && ev.Verdict == core.VerdictDistinct {
+		// Every deciding field agreed and only the leftover prose disagreed.
+		// That is doubt, not evidence of a different action, so it is
+		// escalated rather than run again. See Checker.GateDecides.
+		ev.Verdict = core.VerdictEscalate
+	}
 	matched := req.matchedK(best.ScheduledSeq)
 	if ev.Verdict != core.VerdictDistinct {
 		ev.MatchedK = matched
 	}
 
 	how := "over the free text that remained"
-	if !bestCmp.ModelUsed {
+	if c.GateOnly {
+		how = "without consulting the model at all: this comparator is configured to let the " +
+			"deciding fields decide, so the free text was never compared"
+	} else if !bestCmp.ModelUsed {
 		how = "without consulting the model: nothing but the deciding fields was left to compare, " +
 			"so the free text cannot disagree"
 	}
@@ -394,6 +419,13 @@ type Comparison struct {
 	// field extractor. The evaluation counts it for exactly that reason.
 	ModelUsed bool
 
+	// AgreeingFields is how many deciding fields both sides stated and
+	// agreed on. It is the gate's positive evidence, and it is recorded
+	// because under GateNeutral a pair can pass with none: a verdict reached
+	// that way is a similarity verdict wearing a gate's clothes, and the
+	// evaluation has to be able to count how often that happened.
+	AgreeingFields int
+
 	MineFields   Fields
 	TheirsFields Fields
 }
@@ -444,9 +476,18 @@ func (c *Checker) compareAgainst(
 	}
 	cmp.TheirsReadable, cmp.TheirsFields = true, tf
 
-	if name, mine, theirsValue, differs := FirstDifference(mf, tf); differs {
+	cmp.AgreeingFields = CountAgreeing(mf, tf)
+	if name, mine, theirsValue, closed := c.gateFailure(mf, tf); closed {
 		cmp.Gated = true
 		cmp.DifferingField, cmp.MineValue, cmp.TheirsValue = name, mine, theirsValue
+		return cmp, nil
+	}
+
+	if c.GateOnly {
+		// Every deciding field agreed and the comparator has been told that
+		// is the whole question. Nothing is embedded: see Checker.GateOnly
+		// for what this configuration is and is not.
+		cmp.Similarity, cmp.ModelUsed = 1, false
 		return cmp, nil
 	}
 

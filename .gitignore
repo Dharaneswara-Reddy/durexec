@@ -33,3 +33,5 @@ coverage*
 .vscode/
 .DS_Store
 *.swp
+CLAUDE.md
+engine/fieldeval

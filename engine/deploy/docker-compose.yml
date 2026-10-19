@@ -57,6 +57,11 @@ x-engine-common: &engine-common
     LEASE_RENEW: 3s
     LISTEN_ADDR: ":8080"
     FAULT_INJECTION: "true"
+    # Passed through from the shell, so the key lives in engine/.env (which is
+    # gitignored) and never in this file. Empty is a supported state: the agent
+    # then falls back to its scripted planner.
+    GROQ_API_KEY: "${GROQ_API_KEY:-}"
+    GROQ_MODEL: "${GROQ_MODEL:-}"
   depends_on:
     postgres-leader:
       condition: service_healthy

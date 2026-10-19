@@ -1,4 +1,12 @@
-package main
+// Package evalcorpus holds the labelled retry pairs the evaluations score.
+//
+// It is a package rather than a file inside cmd/experiment because two
+// harnesses now read the same pairs: cmd/experiment measures thresholds over
+// the flight corpus, and cmd/fieldeval measures three field extractors over
+// that corpus AND over six further domains. If the two held two copies of the
+// pairs, a difference between their result files could be a difference in the
+// corpus, and nothing in either file would say so.
+package evalcorpus
 
 import (
 	"fmt"
@@ -79,6 +87,20 @@ func (l Label) String() string {
 type Pair struct {
 	// ID is stable across runs so a row in the CSV can be traced back here.
 	ID string
+
+	// Domain is the kind of action this pair is about: "flight", "payment",
+	// "refund" and so on. It is on the pair rather than inferred from the id
+	// because the headline question cmd/fieldeval asks is per domain — how
+	// far does a field extractor travel beyond the domain it was written for
+	// — and a per-domain figure assembled by pattern-matching identifiers
+	// would silently mis-file any pair whose id convention drifted.
+	Domain string
+
+	// Activity is the activity type the pair is scheduled under. It matters
+	// because the engine scopes its candidate set by activity type, and
+	// because an extractor is handed the type and may strip words that
+	// restate it.
+	Activity string
 
 	// Category says how the pair was made, so results can be broken down by
 	// how hard the pair is rather than reported as one undifferentiated number.
@@ -479,11 +501,22 @@ func Corpus() ([]Pair, error) {
 		})
 	}
 
+	// Every pair in this file is one domain and one activity. They are
+	// stamped in one place rather than repeated in five literals above, so a
+	// pair cannot be emitted with the field left empty.
+	for i := range pairs {
+		pairs[i].Domain = DomainFlight
+		pairs[i].Activity = agent.ActivityBookFlight
+	}
+
 	if err := validate(pairs); err != nil {
 		return nil, err
 	}
 	return pairs, nil
 }
+
+// DomainFlight is the name every pair in this file carries.
+const DomainFlight = "flight"
 
 // wordOverlap is the Jaccard overlap of two requests' word sets after
 // canonicalisation and after punctuation is stripped.

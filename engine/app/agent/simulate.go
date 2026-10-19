@@ -24,6 +24,17 @@ import (
 // stands in for the process simply vanishing.
 var ErrSimulatedCrash = errors.New("simulated crash")
 
+// ErrNeverReachedCrash means the first incarnation finished, or ran out of
+// steps, without ever performing the tool call whose repeat the scenario is
+// about — so there was no crash to recover from and no repeat to look for.
+//
+// It is a sentinel rather than a plain error because with a live planner it is
+// an ordinary thing for the model to do, and a caller measuring the model has
+// to be able to count it separately from a genuine malfunction. With a
+// scripted planner it cannot happen, and if it does the script has drifted
+// from the scenario.
+var ErrNeverReachedCrash = errors.New("the crashing incarnation never reached the crash point")
+
 // journalEntry is one completed activity, the way the events table would hold
 // it: what ran, and what it returned.
 type journalEntry struct {
@@ -93,7 +104,13 @@ func (c *replayCtx) ExecuteActivity(activityType string, input any) Future {
 		return simFuture{err: err}
 	}
 
-	isTool := activityType == ActivityBookFlight || activityType == ActivitySearchFlights
+	// Which activities count as "tool calls" is defined by exclusion rather
+	// than by a list of names, because the scenario may be driven with tools
+	// the simulator has never heard of — a payment, a refund, a message. Plan
+	// and Finalize are the only two activities the workflow schedules itself;
+	// everything else is something the planner chose to do to the world, and
+	// is therefore exactly what has to be recorded.
+	isTool := activityType != ActivityPlan && activityType != ActivityFinalize
 	record := func(replayed bool) {
 		if !isTool {
 			return
@@ -184,6 +201,30 @@ func dispatch(a *Activities) executeFn {
 // noLatency spends no time at all, so a simulated run is instant.
 func noLatency(context.Context, time.Duration) error { return nil }
 
+// lastCall finds the most recent invocation of one tool, replayed or not.
+//
+// Replayed calls are included deliberately: the question it answers is "what
+// did this incarnation ask for", and an incarnation that replayed a booking
+// asked for that booking as surely as one that executed it.
+func lastCall(calls []RecordedCall, tool string) (ToolCall, bool) {
+	for i := len(calls) - 1; i >= 0; i-- {
+		if calls[i].Call.Tool == tool {
+			return calls[i].Call, true
+		}
+	}
+	return ToolCall{}, false
+}
+
+// firstCall finds the earliest invocation of one tool in a plain list.
+func firstCall(calls []ToolCall, tool string) (ToolCall, bool) {
+	for _, c := range calls {
+		if c.Tool == tool {
+			return c, true
+		}
+	}
+	return ToolCall{}, false
+}
+
 // Simulate runs the double-booking scenario end to end with no database.
 //
 // It runs the workflow twice. The first incarnation books a flight and is then
@@ -197,23 +238,76 @@ func noLatency(context.Context, time.Duration) error { return nil }
 func (f *DoubleBooking) Simulate() (Trace, []Booking, error) {
 	var trace Trace
 
+	// A tool that shadows one of the workflow's own activities would disable
+	// planning or finalising and then look like a model failure, so it is
+	// refused here rather than discovered three screens of output later.
+	for _, t := range f.Tools {
+		switch t.Type {
+		case "":
+			return trace, nil, fmt.Errorf("fixture: a supplied tool has no Type")
+		case ActivityPlan, ActivityFinalize, ActivitySearchFlights, ActivityBookFlight:
+			return trace, nil, fmt.Errorf(
+				"fixture: supplied tool %q collides with one of the agent's own activities", t.Type)
+		}
+	}
+
+	// watched is the tool whose repeat the scenario is about. Every decision
+	// below — where the crash fires, which call is "before" and which is
+	// "after" — is about this one tool, so it is resolved once.
+	watched := f.CrashAfterTool
+	if watched == "" {
+		watched = ActivityBookFlight
+	}
+
 	// Incarnation one: plans, books, then dies before the next plan lands.
-	first := NewActivities(Options{Planner: f.BeforeCrash, Sleep: noLatency})
-	c1 := newReplayCtx(nil, dispatch(first), func(activityType string, liveIndex int) bool {
-		return activityType == ActivityPlan && liveIndex > f.CrashAfterLivePlanCalls
+	//
+	// The crash predicate reads the context it is about to kill, which is why
+	// the variable is declared before the context that holds it. Both
+	// conditions have to hold: enough plan calls have completed, AND the tool
+	// whose repeat matters has actually taken a seat. Counting plan calls
+	// alone would let the crash fire after a search.
+	first := NewActivities(Options{Planner: f.BeforeCrash, Sleep: noLatency, Tools: f.Tools})
+	var c1 *replayCtx
+	c1 = newReplayCtx(nil, dispatch(first), func(activityType string, liveIndex int) bool {
+		return activityType == ActivityPlan &&
+			liveIndex > f.CrashAfterLivePlanCalls &&
+			c1.liveByType[watched] > 0
 	})
 
 	if _, err := Run(c1, f.Request("double-booking-demo")); !errors.Is(err, ErrSimulatedCrash) {
+		if _, booked := lastCall(c1.ToolCalls, watched); !booked {
+			// The crash never fired because its precondition never held: the
+			// planner spent its whole step budget without calling the watched
+			// tool. Nothing malfunctioned.
+			return trace, nil, fmt.Errorf("%w: it never called %s (last error: %v)",
+				ErrNeverReachedCrash, watched, err)
+		}
 		return trace, nil, fmt.Errorf("fixture: first incarnation should have crashed, got %v", err)
 	}
-	if len(c1.ToolCalls) != 1 {
-		return trace, nil, fmt.Errorf("fixture: first incarnation made %d tool calls, want 1", len(c1.ToolCalls))
-	}
-	trace.Before = c1.ToolCalls[0].Call
 
-	// Incarnation two: a different process, a fresh planner, the same journal.
-	second := NewActivities(Options{Planner: f.AfterCrash, Sleep: noLatency})
-	c2 := newReplayCtx(c1.Journal, dispatch(second), nil)
+	// The LAST call to the watched tool, not the first: it is the one the
+	// interrupted plan was following on from, and therefore the one the
+	// recovered incarnation might repeat.
+	before, ok := lastCall(c1.ToolCalls, watched)
+	if !ok {
+		return trace, nil, fmt.Errorf("%w: it never called %s", ErrNeverReachedCrash, watched)
+	}
+	trace.Before = before
+
+	// Incarnation two: a different process, a fresh planner, and whatever of
+	// the first incarnation's history actually survived the crash.
+	//
+	// LoseUncommittedJournal decides what that is. Inheriting the journal
+	// models a crash after the work was committed; discarding it models a
+	// worker that took the seat and died before committing anything about it,
+	// which is the only version of this crash in which a live model is asked
+	// the same question twice. See the field's comment in fixture.go.
+	inherited := c1.Journal
+	if f.LoseUncommittedJournal {
+		inherited = nil
+	}
+	second := NewActivities(Options{Planner: f.AfterCrash, Sleep: noLatency, Tools: f.Tools})
+	c2 := newReplayCtx(inherited, dispatch(second), nil)
 	approval, err := json.Marshal(Approval{Approved: true, Reviewer: "demo-reviewer"})
 	if err != nil {
 		return trace, nil, err
@@ -231,11 +325,17 @@ func (f *DoubleBooking) Simulate() (Trace, []Booking, error) {
 			live = append(live, rc.Call)
 		}
 	}
-	if len(live) != 1 {
-		return trace, nil, fmt.Errorf("fixture: recovered incarnation made %d new tool calls, want 1", len(live))
-	}
 
-	trace.After = live[0]
+	// How many new tool calls the recovered incarnation made is reported, not
+	// asserted. A scripted planner makes exactly one, and the fixture tests
+	// still check that by checking the wording it produced. A live planner may
+	// make none — the honest answer when the transcript already shows the
+	// booking — and failing the run for that would throw away the measurement
+	// instead of recording it.
+	trace.AfterCalls = live
+	if after, ok := firstCall(live, watched); ok {
+		trace.After = after
+	}
 	trace.Result = res
 	trace.ReplayedCalls = c2.Replayed
 	trace.LiveCalls = c2.Live

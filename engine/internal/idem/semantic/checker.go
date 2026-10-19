@@ -101,6 +101,69 @@ type Checker struct {
 	// because the measured behaviour of the default is published. See
 	// hybrid.go for the design and for what the field extraction costs.
 	Fields FieldExtractor
+
+	// GateMode selects how the gate reads a deciding field only one side
+	// stated. The zero value is GateStrict, which is the rule every
+	// published hybrid figure was measured under; see gate.go for what the
+	// live run measured it costing and what the alternative costs.
+	GateMode GateMode
+
+	// MinAgreeing is how many deciding fields the two sides must both state
+	// and agree on before the gate will pass them. It applies only under
+	// GateNeutral, where absence no longer closes the gate and a pair could
+	// otherwise be passed with no field evidence at all. Zero means no
+	// minimum.
+	MinAgreeing int
+
+	// GateDecides changes what a DISSIMILAR REMAINDER is allowed to do.
+	//
+	// The comparator as first built gives the remainder a veto: every
+	// deciding field can agree and the pair is still DISTINCT — the activity
+	// runs again — if the leftover prose does not clear the same threshold a
+	// whole intent would have to clear. Measured on the ten-domain corpus
+	// that is catastrophic, and for a reason that is obvious once seen: the
+	// remainder is what is left after the values are removed, so it is short,
+	// and two short pieces of prose that mean the same thing routinely score
+	// below 0.90. The gate caught 90% of duplicates on its own and the
+	// remainder threshold threw almost all of them away.
+	//
+	// With GateDecides on, the gate's answer stands and the remainder can
+	// only express doubt: a pair whose fields all agree becomes DUPLICATE
+	// when the remainder is similar and ESCALATE when it is not — never
+	// DISTINCT. What happens to an ESCALATE is then the deployment's
+	// decision, which the engine already has a setting for
+	// (ESCALATION_BLOCKS), so the uncertain case becomes a question for a
+	// person rather than a silent second charge.
+	//
+	// It is off by default. The published hybrid measurements were taken
+	// without it, and a default that changed would make two result files
+	// incomparable without saying so.
+	GateDecides bool
+
+	// GateOnly removes the similarity half of the comparator entirely: a
+	// pair whose every deciding field agrees is a DUPLICATE, and the leftover
+	// prose is never embedded and never consulted.
+	//
+	// It is here because the ten-domain measurement says it is the strongest
+	// configuration of this mechanism, by a wide margin, once the fields are
+	// found by a general extractor rather than a flight vocabulary. The
+	// reason is not subtle: the remainder is what is left AFTER the values
+	// are removed, so it is short and its cosine is noisy, and a threshold
+	// calibrated on whole sentences rejects most phrasings of one action.
+	//
+	// WHAT IT MEANS, SAID PLAINLY: with this on, the duplicate check is
+	// EXACT MATCHING OVER EXTRACTED VALUES. There is no semantic similarity
+	// in it at all for any intent the extractor can read. That is a real
+	// finding rather than a trick — the signal turned out to be in the
+	// values, not in the prose — but a result file quoting this arm must not
+	// describe it as a measurement of semantic matching.
+	//
+	// Its cost is the other direction: a deciding word with no VALUE SHAPE —
+	// "delete" against "snapshot", "express" against "standard" — is
+	// invisible to a shape-based extractor, lands in the free text, and is
+	// then never looked at. Those are false positives, and they are
+	// suppressed actions.
+	GateOnly bool
 }
 
 // NewChecker builds a checker with the benchmarked default thresholds.

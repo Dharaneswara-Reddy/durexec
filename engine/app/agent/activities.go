@@ -48,6 +48,24 @@ type Options struct {
 
 	// Sleep is how simulated latency is spent. Tests supply a no-op.
 	Sleep func(ctx context.Context, d time.Duration) error
+
+	// Tools are extra activities registered alongside the agent's own.
+	//
+	// They exist because the failure this application demonstrates is not
+	// about flights. An agent that crashes and re-plans re-issues ITS
+	// intention in new words whatever that intention was — a payment, a
+	// refund, a message — and a measurement that only ever watched BookFlight
+	// would be measuring one domain and claiming a general result. Supplying
+	// the tools from outside lets the same workflow, the same planner and the
+	// same crash drive an action of any shape, with no second copy of the
+	// scenario and no change to what the engine registers.
+	//
+	// They are additions, not replacements: the agent's own four activities
+	// are always registered, because the workflow in workflow.go schedules
+	// Plan and Finalize by name. A tool here whose Type collides with one of
+	// those is an error rather than an override — silently shadowing Plan
+	// would disable planning and look like a model failure.
+	Tools []Registration
 }
 
 // Booking is one seat this process actually took. The demonstration counts
@@ -106,6 +124,13 @@ func DefaultLatency() map[string]time.Duration {
 // depends on. Finalize is keyed by a request id, which is an identifier, not
 // a sentence.
 func (a *Activities) Registrations() []Registration {
+	return append(a.own(), a.opts.Tools...)
+}
+
+// own is the agent's four built-in activities. Registrations appends whatever
+// Options.Tools adds, so a caller-supplied tool comes after the built-ins and
+// a reader of the list sees the engine's own set first.
+func (a *Activities) own() []Registration {
 	return []Registration{
 		{Type: ActivityPlan, Mode: core.ModeExact, Handler: a.PlanStep},
 		{
