@@ -44,12 +44,12 @@ func verifyToken(ctx context.Context, tx pgx.Tx, shard core.ShardID, tok core.Fe
 //
 // It is a type rather than another wrapped sentinel because three different
 // things in this package report core.ErrLostOwnership — a token mismatch, a
-// shard with no lease row at all, and the duplicate-seq race in insertEvents —
-// and only the first is the fencing check firing. A missing lease row means
-// EnsureRows never ran, and a duplicate seq means we lost a race we should not
-// have been in; counting either as a fencing rejection would put operational
-// faults into the one number that is supposed to be evidence that split brain
-// was prevented.
+// shard with no lease row at all, and the duplicate-seq race in insertEvents
+// (see SeqRaceError) — and only the first is the fencing check firing. A
+// missing lease row means EnsureRows never ran, and a duplicate seq means we
+// lost a race we should not have been in; counting either as a fencing
+// rejection would put operational faults into the one number that is supposed
+// to be evidence that split brain was prevented.
 //
 // It wraps core.ErrLostOwnership, so every existing errors.Is check and the
 // error text both behave exactly as they did before.
@@ -67,6 +67,40 @@ func (e *FencedError) Error() string {
 }
 
 func (e *FencedError) Unwrap() error { return core.ErrLostOwnership }
+
+// SeqRaceError is the other way a commit reports lost ownership: the events
+// primary key refused the insert because this (run, seq) was already there.
+//
+// It is a separate type from FencedError because the two mean opposite things
+// to the worker that receives one, and for a long time it could not tell them
+// apart. A FencedError means this node genuinely no longer owns the shard, so
+// it must stop working on it. A SeqRaceError means the fencing check PASSED —
+// this node does still own the shard — and another worker, usually one of this
+// node's own, simply reached the same sequence number first.
+//
+// Nothing is lost when that happens. The whole transaction rolled back, so the
+// decision this worker computed never existed; the task row was never deleted,
+// so it becomes pollable again; and the next attempt rebuilds the decision from
+// the log, which is what replay is for. The correct response is therefore to
+// hand the task back and keep polling, not to stop. Treating it as a lost shard
+// is what let four lost races retire all four of a shard's workflow workers
+// while the node went on reporting healthy and holding the lease.
+//
+// It wraps core.ErrLostOwnership, so every existing errors.Is check and the
+// error text both behave exactly as they did before.
+type SeqRaceError struct {
+	Shard core.ShardID
+	Run   core.RunID
+	// Seq is the sequence number the other writer got to first.
+	Seq core.Seq
+}
+
+func (e *SeqRaceError) Error() string {
+	return fmt.Sprintf("eventlog: seq %d for run %s already appended by another writer: %v",
+		e.Seq, e.Run, core.ErrLostOwnership)
+}
+
+func (e *SeqRaceError) Unwrap() error { return core.ErrLostOwnership }
 
 // FencingObserver receives one call per write the fencing check refused. It is
 // declared here, as the narrowest interface this package needs, rather than
@@ -187,10 +221,13 @@ func (s *Store) CommitDecision(ctx context.Context, d core.Decision) error {
 		return err
 	}
 
-	// (b) The log. A unique violation here means another node appended the same
-	// seq for this run concurrently. The token check said we owned the shard, so
-	// this is a race we lost anyway — the safe reading is that our view of
-	// ownership is stale, so we report it the same way and abandon the work.
+	// (b) The log. A unique violation here means another writer appended the
+	// same seq for this run concurrently. The token check above said we DO own
+	// the shard, so this is not a fencing rejection — it is a race between two
+	// workers that both legitimately hold it. Either way nothing lands, because
+	// the transaction rolls back; the difference is what the caller should do
+	// next, which is why the two arrive as different types (SeqRaceError and
+	// FencedError) rather than as one indistinguishable wrapped sentinel.
 	if err := s.insertEvents(ctx, tx, d.Events); err != nil {
 		return err
 	}
@@ -242,8 +279,7 @@ func (s *Store) insertEvents(ctx context.Context, tx pgx.Tx, events []core.Event
 	for i, ev := range events {
 		if _, err := res.Exec(); err != nil {
 			if isUniqueViolation(err) {
-				return fmt.Errorf("eventlog: seq %d for run %s already appended by another writer: %w",
-					ev.Seq, ev.RunID, core.ErrLostOwnership)
+				return &SeqRaceError{Shard: ev.ShardID, Run: ev.RunID, Seq: ev.Seq}
 			}
 			return fmt.Errorf("eventlog: append event %d (seq %d): %w", i, ev.Seq, err)
 		}

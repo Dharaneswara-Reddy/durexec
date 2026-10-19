@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dharaneswar339/durexec/internal/activity"
 	"github.com/dharaneswar339/durexec/internal/api"
@@ -55,6 +56,14 @@ type Engine struct {
 	// queue package's defaults.
 	Backoff taskq.Backoff
 
+	// TaskLock is how long one poll holds a task, i.e. the queue's own
+	// LockDuration. The activity worker needs it because it has to renew the
+	// claim on a task it is still working — see keepClaimed — and the renewal
+	// interval must be derived from this rather than guessed, or a deployment
+	// that shortens TASK_LOCK silently reintroduces concurrent execution.
+	// Zero takes the queue package's default.
+	TaskLock time.Duration
+
 	// TokenFor reports the fencing token this node currently holds for a
 	// shard. It is wired to lease.Manager.Token. Every Decision carries the
 	// token, and the commit re-verifies it FOR UPDATE, so a stale answer here
@@ -73,6 +82,15 @@ func (e *Engine) now() core.Clock {
 		return e.Clock
 	}
 	return core.SystemClock{}
+}
+
+// lockDuration reports how long a polled task stays claimed, defaulted the same
+// way the queue defaults it, so the two cannot disagree.
+func (e *Engine) lockDuration() time.Duration {
+	if e.TaskLock > 0 {
+		return e.TaskLock
+	}
+	return taskq.DefaultConfig().LockDuration
 }
 
 // ShardFor satisfies api.ShardResolver.

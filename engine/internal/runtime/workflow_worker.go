@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/eventlog"
 	"github.com/dharaneswar339/durexec/internal/taskq"
 	"github.com/dharaneswar339/durexec/internal/workflow"
 )
@@ -209,6 +210,29 @@ func (w *WorkflowWorker) process(ctx context.Context, task core.Task) error {
 	}
 
 	if err := e.Committer.CommitDecision(ctx, d); err != nil {
+		// Two different failures report lost ownership, and they used to be
+		// indistinguishable from here, so both ended this worker permanently.
+		// Only one of them is a reason to stop.
+		var race *eventlog.SeqRaceError
+		if errors.As(err, &race) {
+			// We still own the shard — the fencing check inside the
+			// transaction said so — and another worker merely got to this
+			// sequence number first. Our transaction rolled back, so the
+			// decision we just computed does not exist anywhere, and the task
+			// row was never deleted. Hand it back and keep polling: the next
+			// attempt rebuilds the same decision from the log, which is the
+			// point of deterministic replay.
+			//
+			// Returning errShardGone here instead was the liveness defect:
+			// four lost races retired all four of a shard's workflow workers,
+			// and WorkerPool.Start would not replace them because the shard
+			// was still in its running set.
+			e.Runtime.countFailure(string(core.TaskWorkflow), reasonSeqRace)
+			log.Debug(ctx, "workflow decision lost a sequence race, retrying task",
+				"seq", int64(race.Seq))
+			w.releaseAfterFailure(ctx, task)
+			return nil
+		}
 		if errors.Is(err, core.ErrLostOwnership) {
 			// Being fenced is expected, not exceptional. Another node owns the
 			// shard now, our transaction was refused, and the task row is
@@ -216,12 +240,9 @@ func (w *WorkflowWorker) process(ctx context.Context, task core.Task) error {
 			// an error and nothing to retry.
 			//
 			// fencing_rejections_total is deliberately not incremented here.
-			// Lost ownership arrives from two places — the fencing check
-			// refusing the write, and the duplicate-seq race in insertEvents —
-			// and from here they are indistinguishable, so counting here
-			// inflated the one number that is supposed to be evidence that
-			// fencing fired. The committer counts it at the point the token
-			// mismatch is actually detected.
+			// The committer counts it at the point the token mismatch is
+			// actually detected, so that one number stays evidence of fencing
+			// and nothing else.
 			e.Runtime.countFailure(string(core.TaskWorkflow), reasonFenced)
 			log.Debug(ctx, "workflow decision abandoned: fenced out")
 			return errShardGone
@@ -262,6 +283,13 @@ func (w *WorkflowWorker) failTerminally(
 		Status: core.StatusFailed, LastSeq: seq, CompleteTaskID: task.TaskID,
 	}
 	if err := e.Committer.CommitDecision(ctx, d); err != nil {
+		var race *eventlog.SeqRaceError
+		if errors.As(err, &race) {
+			// Same reasoning as in process: we still own the shard, the write
+			// rolled back, and the task is still there. Let it be polled again.
+			w.releaseAfterFailure(ctx, task)
+			return nil
+		}
 		if errors.Is(err, core.ErrLostOwnership) {
 			return errShardGone
 		}

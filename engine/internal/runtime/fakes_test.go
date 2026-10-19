@@ -67,6 +67,11 @@ type fakeCommitter struct {
 	mu        sync.Mutex
 	decisions []core.Decision
 	err       error
+
+	// failures counts down the commits that return failWith before the
+	// committer starts accepting them. See failTimes.
+	failures int
+	failWith error
 }
 
 func (f *fakeCommitter) CommitDecision(_ context.Context, d core.Decision) error {
@@ -75,8 +80,29 @@ func (f *fakeCommitter) CommitDecision(_ context.Context, d core.Decision) error
 	if f.err != nil {
 		return f.err
 	}
+	if f.failures > 0 {
+		f.failures--
+		return f.failWith
+	}
 	f.decisions = append(f.decisions, d)
 	return nil
+}
+
+// failTimes makes the next n commits return err and every later one succeed.
+// A sequence race is transient by nature: the loser recomputes from the log and
+// the retry lands, so a fake that fails forever cannot show the difference
+// between "kept going" and "gave up".
+func (f *fakeCommitter) failTimes(n int, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failures = n
+	f.failWith = err
+}
+
+func (f *fakeCommitter) commitCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.decisions)
 }
 
 func (f *fakeCommitter) last() (core.Decision, bool) {
@@ -101,6 +127,18 @@ type fakeQueue struct {
 	released []releaseRecord
 	enqueued []core.Task
 	pollErr  error
+
+	// extends counts claim renewals, and extendErr is what the nth renewal
+	// returns. They exist because the activity worker now has to renew the
+	// claim on a task it is still working, and "did it renew, and what did it
+	// do when told the claim was gone" is the whole behaviour under test.
+	extends   int
+	extendErr error
+
+	// requeueOnRelease puts a released task back at the end of the queue, so a
+	// test can drive the worker LOOP rather than one process call and watch it
+	// re-poll work it handed back.
+	requeueOnRelease bool
 }
 
 func (q *fakeQueue) Poll(_ context.Context, _ core.ShardID, t core.TaskType) (core.Task, error) {
@@ -119,12 +157,24 @@ func (q *fakeQueue) Poll(_ context.Context, _ core.ShardID, t core.TaskType) (co
 	return core.Task{}, core.ErrNoTask
 }
 
-func (q *fakeQueue) Extend(context.Context, core.ShardID, int64, string) error { return nil }
+func (q *fakeQueue) Extend(_ context.Context, _ core.ShardID, _ int64, _ string) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.extends++
+	return q.extendErr
+}
 
-func (q *fakeQueue) Release(_ context.Context, _ core.ShardID, taskID int64, _ string, visibleIn int64) error {
+func (q *fakeQueue) Release(_ context.Context, _ core.ShardID, taskID int64, tok string, visibleIn int64) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.released = append(q.released, releaseRecord{taskID: taskID, visibleIn: visibleIn})
+	if q.requeueOnRelease {
+		q.tasks = append(q.tasks, core.Task{
+			ShardID: 1, TaskID: taskID, Type: core.TaskWorkflow,
+			WorkflowID: "wf-1", RunID: "run-1", ScheduledEventSeq: 1,
+			LockToken: tok, Attempt: 1,
+		})
+	}
 	return nil
 }
 
@@ -139,6 +189,12 @@ func (q *fakeQueue) releaseCount() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return len(q.released)
+}
+
+func (q *fakeQueue) extendCount() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.extends
 }
 
 // ---- lease store ----------------------------------------------------------

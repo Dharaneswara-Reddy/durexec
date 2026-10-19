@@ -57,6 +57,15 @@ const (
 	reasonCommit   = "commit"
 	reasonFenced   = "fenced"
 	reasonRetry    = "released_for_retry"
+	// reasonSeqRace is a commit refused by the events primary key while this
+	// node still owned the shard: two workers reached the same sequence number
+	// and this one lost. Separate from reasonFenced because the two used to be
+	// reported as one thing, and a node whose workers keep losing races is a
+	// node with a contention problem, not one that keeps being fenced out.
+	reasonSeqRace = "seq_race"
+	// reasonLockLost is an activity whose task claim lapsed while it was still
+	// running, so its result was abandoned rather than committed.
+	reasonLockLost = "task_lock_lost"
 )
 
 // countEscalation is nil-safe so the dedup pass can call it unconditionally.

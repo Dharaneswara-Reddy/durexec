@@ -174,9 +174,27 @@ func TestEnsureRowsIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	s := New(pool)
 
+	// This test has to start from no rows at all, which is the one thing it
+	// must not LEAVE behind.
+	//
+	// DUREXEC_TEST_DSN is normally pointed at the demonstration cluster's own
+	// database — the Makefile's `test` target says to export it to include
+	// these tests — and a shard with no lease row cannot be recovered by a
+	// running node. Acquire is an UPDATE, so it matches nothing; only
+	// EnsureRows creates rows, and that runs at startup. Deleting these rows
+	// and walking away therefore killed shards 0-3 on the live cluster until
+	// somebody restarted a node, while every /healthz stayed green. So the
+	// cleanup puts the rows back, unowned, exactly as a fresh migration leaves
+	// them.
 	clean := func() { _, _ = pool.Exec(ctx, "DELETE FROM shard_leases WHERE shard_id < 4") }
+	restore := func() {
+		clean()
+		if err := New(pool).EnsureRows(ctx, 4); err != nil {
+			t.Errorf("restoring shard_leases rows 0-3: %v", err)
+		}
+	}
 	clean()
-	t.Cleanup(clean)
+	t.Cleanup(restore)
 
 	if err := s.EnsureRows(ctx, 4); err != nil {
 		t.Fatalf("EnsureRows: %v", err)

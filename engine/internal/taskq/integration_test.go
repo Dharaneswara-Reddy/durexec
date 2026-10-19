@@ -136,6 +136,117 @@ func TestExtendAndComplete(t *testing.T) {
 	}
 }
 
+// TestARenewedClaimIsNeverHandedToASecondWorker is the real-database proof of
+// the second liveness defect, and of the fix.
+//
+// The lock is deliberately short — 300ms — and the "activity" runs for four
+// times that. The left half of the test is what the engine used to do: nothing
+// renews the claim, so the lock lapses while the work is still running and a
+// second poll takes the row. Two workers then run the same activity at once,
+// and when the second one commits it collides with the first on a sequence
+// number, which is the other defect in this pair. The right half renews on a
+// third of the lock, exactly as ActivityWorker.keepClaimed does, and the second
+// poll finds nothing for as long as the work goes on.
+func TestARenewedClaimIsNeverHandedToASecondWorker(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+
+	const (
+		lock = 300 * time.Millisecond
+		work = 4 * lock
+	)
+
+	// Left half: no renewal. This is the bug, reproduced.
+	t.Run("without renewal the claim lapses and a second worker takes the task", func(t *testing.T) {
+		shard := freshShard(t, pool)
+		q := New(pool, Config{LockDuration: lock})
+		seedOne(t, q, shard)
+
+		first, err := q.Poll(ctx, shard, core.TaskActivity)
+		if err != nil {
+			t.Fatalf("first poll: %v", err)
+		}
+		time.Sleep(work) // the activity is still running
+
+		second, err := q.Poll(ctx, shard, core.TaskActivity)
+		if err != nil {
+			t.Fatalf("second poll: %v, want the same task handed out again", err)
+		}
+		if second.TaskID != first.TaskID {
+			t.Fatalf("second poll got task %d, want the same row %d", second.TaskID, first.TaskID)
+		}
+		// Two workers, one task, both believing they hold it. This is the
+		// concurrent execution the heartbeat exists to prevent.
+		if second.LockToken == first.LockToken {
+			t.Fatal("the second poll reused the first lock token")
+		}
+	})
+
+	// Right half: renewed on a third of the lock, as the activity worker does.
+	t.Run("a renewed claim is still ours when the work finishes", func(t *testing.T) {
+		shard := freshShard(t, pool)
+		q := New(pool, Config{LockDuration: lock})
+		seedOne(t, q, shard)
+
+		task, err := q.Poll(ctx, shard, core.TaskActivity)
+		if err != nil {
+			t.Fatalf("poll: %v", err)
+		}
+
+		stop := make(chan struct{})
+		renewed := make(chan error, 1)
+		go func() {
+			t := time.NewTicker(lock / 3)
+			defer t.Stop()
+			for {
+				select {
+				case <-stop:
+					renewed <- nil
+					return
+				case <-t.C:
+				}
+				if err := q.Extend(ctx, shard, task.TaskID, task.LockToken); err != nil {
+					renewed <- err
+					return
+				}
+			}
+		}()
+
+		// Poll repeatedly for the whole time the work is running: at no point
+		// may the row be handed to anyone else.
+		deadline := time.Now().Add(work)
+		for time.Now().Before(deadline) {
+			if _, err := q.Poll(ctx, shard, core.TaskActivity); !errors.Is(err, core.ErrNoTask) {
+				close(stop)
+				t.Fatalf("a renewed task was handed to a second worker: %v", err)
+			}
+			time.Sleep(lock / 4)
+		}
+
+		close(stop)
+		if err := <-renewed; err != nil {
+			t.Fatalf("renewal failed while the work was still running: %v", err)
+		}
+		// And the claim is still ours at the end, so the result can be
+		// committed and the row deleted under our own token.
+		if err := q.Complete(ctx, shard, task.TaskID, task.LockToken); err != nil {
+			t.Fatalf("complete after renewals: %v", err)
+		}
+	})
+}
+
+// seedOne enqueues a single activity task on a shard of its own.
+func seedOne(t *testing.T, q *Queue, shard core.ShardID) {
+	t.Helper()
+	err := q.Enqueue(context.Background(), []core.Task{{
+		ShardID: shard, Type: core.TaskActivity,
+		WorkflowID: "wf", RunID: core.RunID(uuid.NewString()), ScheduledEventSeq: 2,
+	}})
+	if err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+}
+
 // SKIP LOCKED is what lets concurrent workers make progress. With four tasks and
 // four simultaneous pollers, each must get a different one.
 func TestConcurrentPollsDoNotCollide(t *testing.T) {

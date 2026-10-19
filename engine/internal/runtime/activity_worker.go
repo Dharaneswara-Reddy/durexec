@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/dharaneswar339/durexec/internal/activity"
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/eventlog"
 	"github.com/dharaneswar339/durexec/internal/taskq"
 )
 
@@ -111,11 +113,29 @@ func (w *ActivityWorker) process(ctx context.Context, task core.Task) error {
 		return nil
 	}
 
-	outcome := e.Executor.Execute(ctx, activity.Request{
+	// The claim has to be renewed while the activity runs, because this is the
+	// one step in the engine that can legitimately outlast the task lock. See
+	// keepClaimed for what goes wrong without it.
+	actx, settleClaim := w.keepClaimed(ctx, task)
+	outcome := e.Executor.Execute(actx, activity.Request{
 		ActivityType: sched.ActivityType,
 		Input:        sched.Input,
 		DedupKey:     sched.DedupKey,
 	})
+	if settleClaim() {
+		// The claim lapsed while we were working, so another worker may already
+		// hold this task and may already be running the same activity. The one
+		// thing we must not do is commit: the result is no longer ours to
+		// journal, and writing it would delete a task row we do not hold.
+		//
+		// The task is left exactly as it is. Its lock has expired, so the queue
+		// will hand it to whoever polls next, and the dedup key means the call
+		// that did land is not repeated in effect.
+		e.Runtime.countFailure(string(core.TaskActivity), reasonLockLost)
+		log.Warn(ctx, "activity task claim lost while running, abandoning the result",
+			"activity", sched.ActivityType, "task_id", task.TaskID)
+		return nil
+	}
 
 	if !outcome.OK() && w.shouldRetryLater(sched.ActivityType, outcome, task) {
 		// The activity's own retry budget is spent for this attempt, but the
@@ -161,17 +181,29 @@ func (w *ActivityWorker) process(ctx context.Context, task core.Task) error {
 	}
 
 	if err := e.Committer.CommitDecision(ctx, d); err != nil {
+		// The activity worker had the same defect as the workflow worker: both
+		// causes of lost ownership ended the worker for good, and only one of
+		// them is a reason to stop.
+		var race *eventlog.SeqRaceError
+		if errors.As(err, &race) {
+			// We still own the shard; another writer just reached this sequence
+			// number first. Nothing was written, the task row is untouched, and
+			// the activity's dedup key means re-running it does not repeat the
+			// side effect. So hand the task back and keep polling.
+			e.Runtime.countFailure(string(core.TaskActivity), reasonSeqRace)
+			log.Debug(ctx, "activity result lost a sequence race, retrying task",
+				"seq", int64(race.Seq))
+			w.releaseForRetry(ctx, task)
+			return nil
+		}
 		if errors.Is(err, core.ErrLostOwnership) {
-			// Fenced out, or beaten to this sequence number by another writer.
-			// Either way our transaction was refused and the task row is
-			// untouched, so the shard's new owner will run it. Expected, not
-			// exceptional.
+			// Fenced out: another node owns the shard now. Our transaction was
+			// refused and the task row is untouched, so that node will run it.
+			// Expected, not exceptional.
 			//
-			// That ambiguity is exactly why fencing_rejections_total is not
-			// incremented here: this branch cannot tell the fencing check
-			// firing from a lost race for a sequence number, and only the first
-			// is evidence the safety mechanism works. The committer counts it
-			// where the token mismatch is actually seen.
+			// fencing_rejections_total is not incremented here; the committer
+			// counts it where the token mismatch is actually seen, so that one
+			// number stays evidence of fencing and nothing else.
 			e.Runtime.countFailure(string(core.TaskActivity), reasonFenced)
 			log.Debug(ctx, "activity result abandoned: fenced out")
 			return errShardGone
@@ -182,6 +214,109 @@ func (w *ActivityWorker) process(ctx context.Context, task core.Task) error {
 		return nil
 	}
 	return nil
+}
+
+// claimRenewalFraction is the share of the lock duration between renewals.
+//
+// A third means two consecutive renewals can fail — a brief network stall, a
+// primary failover — before the lock actually lapses, which is the point of
+// renewing early rather than at the last moment.
+const claimRenewalFraction = 3
+
+// minClaimRenewal floors the interval so a misconfigured, very short lock
+// cannot turn the heartbeat into a busy loop against PostgreSQL.
+const minClaimRenewal = 10 * time.Millisecond
+
+// claimRenewalEvery is how often a running activity renews its task claim.
+//
+// It is derived from the configured lock duration rather than written as a
+// constant on purpose: the two numbers only mean anything relative to each
+// other, and a deployment that shortens TASK_LOCK must shorten the heartbeat
+// with it or it silently gets concurrent execution back.
+func claimRenewalEvery(lock time.Duration) time.Duration {
+	every := lock / claimRenewalFraction
+	if every < minClaimRenewal {
+		every = minClaimRenewal
+	}
+	return every
+}
+
+// keepClaimed renews the task's claim for as long as the activity is running.
+//
+// This is the fix for the one place where this engine's own promise worked
+// against it. Poll takes a claim that lasts TASK_LOCK (30s by default). An
+// activity that runs longer than that — and for "long-running workflows" that
+// is the normal case, not the exceptional one, since the executor's in-process
+// retries spend the same budget — had its claim lapse while it was still
+// working. The row became pollable, a second worker claimed it, and the same
+// activity ran CONCURRENTLY on a perfectly healthy node. Queue.Extend existed
+// for exactly this and nothing outside the tests ever called it.
+//
+// Two things matter in the shape of this:
+//
+// The returned context is the one the activity must run under. When the claim
+// is definitively gone the context is cancelled, so an activity sitting in an
+// HTTP call stops there instead of returning a result this worker is no longer
+// entitled to commit. Stopping work is the conservative direction: the task is
+// already someone else's.
+//
+// Only taskq.ErrLockLost is treated as definitive. Any other error — the
+// database briefly unreachable — is transient, and giving up the activity over
+// one failed statement would turn a hiccup into abandoned work. Those are
+// logged and retried on the next tick, which is why renewing at a third of the
+// lock leaves room for two to fail.
+//
+// settleClaim must be called exactly once, before any other return from
+// process: it stops the goroutine, waits for it, and reports whether the claim
+// was lost. Waiting is what makes it leak-free — there is no path on which the
+// heartbeat outlives the activity it was renewing.
+func (w *ActivityWorker) keepClaimed(ctx context.Context, task core.Task) (context.Context, func() bool) {
+	actx, cancel := context.WithCancel(ctx)
+	if task.LockToken == "" {
+		// Nothing to renew (a fake queue in a test, or a task handed over by
+		// some path that holds no lock). Renewing would fail every tick and say
+		// nothing useful, so do not start the goroutine at all.
+		return actx, func() bool { cancel(); return false }
+	}
+
+	var lost atomic.Bool
+	done := make(chan struct{})
+	every := claimRenewalEvery(w.Engine.lockDuration())
+
+	go func() {
+		defer close(done)
+		t := time.NewTicker(every)
+		defer t.Stop()
+		for {
+			select {
+			case <-actx.Done():
+				return
+			case <-t.C:
+			}
+			err := w.Engine.Tasks.Extend(actx, w.Shard, task.TaskID, task.LockToken)
+			switch {
+			case err == nil:
+			case errors.Is(err, taskq.ErrLockLost):
+				// Definitive: the row is no longer ours. Stop the activity.
+				lost.Store(true)
+				cancel()
+				return
+			case actx.Err() != nil:
+				// The activity finished (or the node is shutting down) while
+				// the renewal was in flight. Not a lost claim.
+				return
+			default:
+				w.Engine.logger().Warn(ctx, "renew activity task claim",
+					"task_id", task.TaskID, "error", err)
+			}
+		}
+	}()
+
+	return actx, func() bool {
+		cancel()
+		<-done
+		return lost.Load()
+	}
 }
 
 // intent builds the meaning-vector row for a semantic-mode activity that just

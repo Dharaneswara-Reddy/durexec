@@ -45,6 +45,29 @@ func TestFencedErrorIsStillLostOwnership(t *testing.T) {
 	}
 }
 
+// TestSeqRaceErrorIsStillLostOwnership is the same compatibility guard for the
+// other typed error. Every caller that treats lost ownership as "stop at once"
+// still sees lost ownership; only a caller that asks for the type can tell the
+// two apart, and only the worker loops do.
+func TestSeqRaceErrorIsStillLostOwnership(t *testing.T) {
+	err := error(&SeqRaceError{Shard: 2, Run: "7c9e6679-7425-40de-944b-e07fc1f90ae7", Seq: 9})
+	if !errors.Is(err, core.ErrLostOwnership) {
+		t.Fatal("a lost sequence race no longer reports lost ownership")
+	}
+	// The text an operator reads in the logs is the one it said before.
+	for _, want := range []string{"seq 9", "7c9e6679", "already appended by another writer", "lost shard ownership"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error text %q is missing %q", err.Error(), want)
+		}
+	}
+	// And it must NOT be mistaken for a fencing rejection, which is the whole
+	// reason it is a separate type.
+	var fenced *FencedError
+	if errors.As(err, &fenced) {
+		t.Fatal("a sequence race reads as a fencing rejection; the worker would stop for good")
+	}
+}
+
 // TestFencingCounterCountsExactlyTheRejections is the point of the whole
 // wrapper. Three different failures in this package report lost ownership and
 // only one of them is the fencing check firing; counting the others would put
@@ -72,8 +95,13 @@ func TestFencingCounterCountsExactlyTheRejections(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "nor is the duplicate-seq race, though it also means ownership is stale",
-			err:  fmt.Errorf("eventlog: seq 9 already appended: %w", core.ErrLostOwnership),
+			name: "nor is the duplicate-seq race, now that it has a type of its own",
+			err:  &SeqRaceError{Shard: 4, Run: "run-x", Seq: 9},
+			want: nil,
+		},
+		{
+			name: "and not when a caller has wrapped that either",
+			err:  fmt.Errorf("worker: %w", &SeqRaceError{Shard: 4, Run: "run-x", Seq: 9}),
 			want: nil,
 		},
 		{

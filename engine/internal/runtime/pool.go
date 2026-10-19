@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dharaneswar339/durexec/internal/core"
@@ -60,7 +61,18 @@ type WorkerPool struct {
 }
 
 type shardWorkers struct {
+	// ctx is the context every worker for this shard runs under, kept so a
+	// replacement worker can be started under the same cancellation as the
+	// ones it joins. Stop cancels it, which stops originals and replacements
+	// alike.
+	ctx    context.Context
 	cancel context.CancelFunc
+
+	// liveWorkflow and liveActivity count the worker goroutines still running.
+	// Each goroutine decrements its own on the way out, which is what lets
+	// Start tell "already running" from "running, but short of some".
+	liveWorkflow atomic.Int64
+	liveActivity atomic.Int64
 }
 
 // NewWorkerPool builds a pool. Counts below one are raised to one, because a
@@ -80,42 +92,115 @@ func NewWorkerPool(e *Engine, workflowWorkers, activityWorkers int) *WorkerPool 
 	}
 }
 
-// Start begins work on a shard. Calling it for a shard already running is a
-// no-op, which is what lets the supervisor loop call it on every tick without
-// having to remember anything.
+// Start begins work on a shard, and tops it back up to strength if some of its
+// workers have since exited.
+//
+// Calling it for a shard that is already at strength is a no-op, which is what
+// lets the supervisor loop call it on every tick without having to remember
+// anything.
+//
+// # Why it replaces workers at all
+//
+// A worker returns from Run and is gone. Before this, nothing ever replaced
+// one: the shard stayed in p.running, so every later Start saw "already
+// running" and did nothing, and a shard could end up in the running set with
+// no workers in it — reporting healthy, holding the lease, making no progress.
+// That is the shape the sequence-race defect took, and the specific bug is
+// fixed in workflow_worker.go, but "a worker exited and was never replaced"
+// is a hole worth closing once rather than once per cause.
+//
+// # Why this cannot fight the lease manager
+//
+// Three things, and all three are needed:
+//
+//  1. The only caller is Supervise, which iterates the lease manager's own
+//     owned set. A shard this node has legitimately lost is not in that set,
+//     so it is never topped up — the pool can only ever replace workers for a
+//     shard the manager says we still hold.
+//  2. Replacements run under the shard's EXISTING context, not a fresh one, so
+//     a Stop that lands a moment later cancels them exactly as it cancels the
+//     originals.
+//  3. If that context is already cancelled, nothing is started. Stop deletes
+//     the map entry before cancelling, so the ordinary path never gets here;
+//     this is the belt for a parent context that ended underneath us.
+//
+// The shortfall is computed and claimed under p.mu, so two concurrent Starts
+// cannot both decide to replace the same missing worker.
 func (p *WorkerPool) Start(ctx context.Context, shard core.ShardID) {
 	p.mu.Lock()
 	if p.stopped {
 		p.mu.Unlock()
 		return
 	}
-	if _, ok := p.running[shard]; ok {
+	sw, existing := p.running[shard]
+	if !existing {
+		sctx, cancel := context.WithCancel(ctx)
+		sw = &shardWorkers{ctx: sctx, cancel: cancel}
+		p.running[shard] = sw
+	}
+	if sw.ctx.Err() != nil {
 		p.mu.Unlock()
 		return
 	}
-	sctx, cancel := context.WithCancel(ctx)
-	p.running[shard] = &shardWorkers{cancel: cancel}
+	// Claim the shortfall while still holding the lock. Each goroutine gives
+	// its count back as it exits, so these two numbers stay honest.
+	wantWorkflow := p.WorkflowWorkers - int(sw.liveWorkflow.Load())
+	wantActivity := p.ActivityWorkers - int(sw.liveActivity.Load())
+	if wantWorkflow < 0 {
+		wantWorkflow = 0
+	}
+	if wantActivity < 0 {
+		wantActivity = 0
+	}
+	sw.liveWorkflow.Add(int64(wantWorkflow))
+	sw.liveActivity.Add(int64(wantActivity))
+	sctx := sw.ctx
 	p.mu.Unlock()
 
-	p.Engine.logger().Info(ctx, "starting shard workers",
-		"shard", int(shard), "workflow_workers", p.WorkflowWorkers, "activity_workers", p.ActivityWorkers)
+	if wantWorkflow == 0 && wantActivity == 0 {
+		return
+	}
+	if existing {
+		// Worth an Info, not a Debug: in steady state this never happens, so a
+		// node logging it is a node whose workers are dying for some reason.
+		p.Engine.logger().Info(ctx, "replacing exited shard workers",
+			"shard", int(shard), "workflow_workers", wantWorkflow, "activity_workers", wantActivity)
+	} else {
+		p.Engine.logger().Info(ctx, "starting shard workers",
+			"shard", int(shard), "workflow_workers", wantWorkflow, "activity_workers", wantActivity)
+	}
 
-	for i := 0; i < p.WorkflowWorkers; i++ {
+	for i := 0; i < wantWorkflow; i++ {
 		w := &WorkflowWorker{Engine: p.Engine, Shard: shard}
 		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
+			defer sw.liveWorkflow.Add(-1)
 			w.Run(sctx)
 		}()
 	}
-	for i := 0; i < p.ActivityWorkers; i++ {
+	for i := 0; i < wantActivity; i++ {
 		w := &ActivityWorker{Engine: p.Engine, Shard: shard}
 		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
+			defer sw.liveActivity.Add(-1)
 			w.Run(sctx)
 		}()
 	}
+}
+
+// LiveWorkers reports how many workers of each kind are still running for a
+// shard. It exists for the supervision test and for a health check that wants
+// to know the difference between "owns the shard" and "is working on it".
+func (p *WorkerPool) LiveWorkers(shard core.ShardID) (workflow, activity int) {
+	p.mu.Lock()
+	sw, ok := p.running[shard]
+	p.mu.Unlock()
+	if !ok {
+		return 0, 0
+	}
+	return int(sw.liveWorkflow.Load()), int(sw.liveActivity.Load())
 }
 
 // Stop ends work on one shard.
@@ -165,13 +250,20 @@ func (p *WorkerPool) StopAll() {
 	p.wg.Wait()
 }
 
-// Supervise keeps the running set equal to the owned set.
+// Supervise keeps the running set equal to the owned set, and keeps each owned
+// shard at full worker strength.
 //
 // It is a reconciliation loop rather than an event feed on purpose. The lease
 // manager already tells us the moment a shard is LOST, which is the urgent
 // direction — work must stop immediately. Acquisition is not urgent, and
 // polling for it means the pool's state is derived from ownership rather than
 // accumulated from a stream of events that could be missed.
+//
+// Because it is a reconciliation loop, replacing a worker that exited costs
+// nothing extra: Start already runs on every tick for every owned shard, and
+// it now tops the shard up instead of returning early. A shard whose workers
+// all died is back at strength within one tick. A shard this node no longer
+// owns is not in owned(), so it is never restarted.
 func (p *WorkerPool) Supervise(ctx context.Context, owned func() map[core.ShardID]core.FencingToken, every time.Duration) {
 	if every <= 0 {
 		every = time.Second
