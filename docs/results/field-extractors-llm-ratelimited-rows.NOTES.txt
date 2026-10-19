@@ -1,0 +1,26 @@
+Why these rows are here and not in field-extractors.csv
+================================================================================
+
+These are the first 110 rows of the LLM-extractor arms, from the first attempt
+at that part of the run. They are kept because nothing measured is deleted,
+and they are NOT part of the result, for a reason worth recording.
+
+The provider's free tier limits TOKENS per minute, not requests: 8,000 TPM
+against a ~700-token extraction prompt, so about eleven intents a minute. The
+run was paced at twenty-two calls a minute, so a large share of calls came back
+429. The harness as written then cached the empty reply, and a rate-limited
+call became a permanent row saying "the extractor could not read this intent".
+Twenty of these 110 rows say exactly that, and all twenty are wrong: the
+extractor was never asked.
+
+That is the failure mode this project's own rules warn about — a defect that
+passes every check while being silently wrong — so it was fixed rather than
+footnoted:
+
+  - an empty reply is no longer cached, because it is an absence of
+    information and not a measurement;
+  - the row is written with an ERROR note instead, and a resume retries it;
+  - the run was re-paced to nine calls a minute, inside the token budget.
+
+The corrected LLM arms are in field-extractors.csv with every other arm. These
+rows are evidence of the bug, not evidence about the extractor.

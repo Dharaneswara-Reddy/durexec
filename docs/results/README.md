@@ -14,6 +14,15 @@ real `all-MiniLM-L6-v2` encoder. Nothing is estimated.
 | `semantic-experiment-minilm.html` | Precision–recall of semantic idempotency, real encoder | Labels generated, not hand-assigned |
 | `semantic-experiment-minilm.csv` | Per-arm numbers behind the report | As above |
 | `semantic-experiment-minilm.txt` | Full terminal output of that run | As above |
+| `LIVENESS_FIX_BEFORE_AFTER.md` | The one-page before/after for the two liveness fixes — read this first, the four files below are its evidence | **Published figures still stand.** Safety unchanged, throughput unchanged |
+| `scaling-saturated-after-liveness-fix.txt` | NFR-5 re-run after the fixes, same commands, c=64 and c=128, six sweeps in all | **Valid, and it reproduces the published run twice on two different builds**: 12.80 / 24.10 / 47.15 and 12.80 / 24.50 / 47.40 wf/s at c=128, against the published 12.80 / 23.15 / 46.30. The other sweeps are much lower — that is this desktop's background load, which the file records beside each sweep. Ignore any sweep whose load figure is above about 4 |
+| `scaling-after-liveness-fix-15s-window.txt` | The first attempt at the above | **Not comparable.** loadgen's window is (duration − warmup), so `-duration 20s` gave 15s windows where the published file has 20s. Kept as a second data point |
+| `duplicates-under-failure-after-liveness-fix.txt` | NFR-3 re-run after the fixes: 1,000 workflows, node-b killed at 8 s and node-c 12 s later | **Valid.** 0 duplicated steps in 3,052 completions across 763 runs. More admission failures than the published run (237 vs 122), which is kill timing, not safety |
+| `acceptance-matrix-final-image.txt` / `.csv` | The matrix again on the image that also carries the `/healthz` and lease-test fixes, because `cmd/acceptance` reads `/healthz` and that endpoint changed | 0 FAIL, **all 36 rows the same outcome as the published run** |
+| `acceptance-matrix-after-liveness-fix.txt` / `.csv` | The whole FR/NFR matrix re-run after the fixes | 0 FAIL, and **every one of the 36 rows has the same outcome as before the change** |
+| `acceptance-matrix-after-liveness-fix-pre-load.txt` / `.csv` | The same matrix run before the load tests, when the event log held only 7 runs | **Weak.** Kept only because it is the run that revealed the log had been emptied; the row above is the one to read |
+| `green-but-wrong-findings.txt` | Two more defects found while re-running the above: the test suite deleting four shards' lease rows from the live cluster, and `/healthz` reporting `owned_shards=16` on every node whatever it held | **Valid, both fixed.** Same class as the hash ring and the three different builds — green by every signal, silently wrong |
+| `liveness-fix-demonstrations.txt` | The targeted tests for each defect, including the same tests failing against the old code | **Valid.** Both defects reproduce on demand and no longer happen |
 | `semantic-experiment-hybrid-minilm.txt` / `.csv` / `.html` | The same sweep with the **opt-in hybrid comparator** added: deciding fields (route, date, daypart, passengers) compared exactly, similarity reserved for the free text. Same 213 pairs, same encoder, same cached vectors | **Does not replace the file above.** The hybrid arms score 1.000 on this corpus; the gate answered every pair and the model was never consulted, so those rows measure a hand-written field extractor and not semantic similarity — see below |
 
 ## Why the concurrency-16 run is kept
@@ -140,3 +149,43 @@ directory (started again afterwards, read only) to count what was lost.
 - **The workflow data from each drill is discarded** by the restore step, which
   re-clones the standby from the old leader. The old leader keeps its own copy
   of everything it committed, including the events the promoted standby lacked.
+
+## The two liveness defects, and why the numbers here did not move
+
+Two defects were found by reading the source, not by any test failing, and both
+were liveness only — nothing was corrupted and no side effect ever happened
+twice:
+
+1. A lost race for an event sequence number was reported as lost shard
+   ownership, and a worker that is told it lost the shard exits for good. Four
+   such races retired all four of a shard's workflow workers, and the pool
+   would not replace them, so that shard stopped making progress while the node
+   went on reporting healthy and holding the lease.
+2. A task claim lasts `TASK_LOCK` (30 s) and nothing renewed it. An activity
+   that ran longer — including its in-process retries — had its claim lapse and
+   a second worker ran it concurrently, on a healthy node. `Queue.Extend`
+   existed for exactly this and nothing outside the tests called it.
+
+Both are fixed, with tests that fail against the old code
+(`liveness-fix-demonstrations.txt`). The safety numbers here are unchanged, as
+they should be: neither defect could produce a duplicate side effect, because
+the losing writer's transaction rolls back and the dedup key covers the
+activity. The throughput numbers are unchanged too — see
+`LIVENESS_FIX_BEFORE_AFTER.md` for why that answers the "the published figures
+may have been understated" worry rather than dodging it.
+
+Neither defect was observed firing on the live cluster during these re-runs,
+across about 8,900 workflow runs and two node kills: `seq_race`,
+`task_lock_lost` and the "replacing exited shard workers" log line all stayed
+at zero. That is expected rather than reassuring, and
+`liveness-fix-demonstrations.txt` says why.
+
+Two further defects turned up while doing the re-runs, and they are worth more
+than the ones they were found alongside, because they are the fourth and fifth
+time this project has caught a signal lying about a broken cluster. Running the
+test suite the way the Makefile tells you to deleted four shards' lease rows
+from the live database and left them deleted, which stopped those shards
+permanently; and `/healthz` answered `owned_shards=16` on all three nodes
+throughout, because it was reporting the cluster's shard count under the name
+of the owned set. Both are fixed and written up in
+`green-but-wrong-findings.txt`.

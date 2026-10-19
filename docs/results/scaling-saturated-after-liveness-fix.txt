@@ -1,0 +1,294 @@
+Throughput scaling at 1, 2 and 4 shards, re-run AFTER the two liveness fixes.
+Compare against docs/results/scaling-saturated.txt, which is NOT replaced.
+
+Parameters matched to the published run. loadgen's measurement window is
+(duration - warmup), so -duration 25s is what produces the published file's
+20.000s windows:
+  go run ./cmd/loadgen -mode scaling -sweep 1,2,4 -concurrency 64  -duration 25s
+  go run ./cmd/loadgen -mode scaling -sweep 1,2,4 -concurrency 128 -duration 25s
+
+concurrency 128 is run TWICE. A single 20s window at one shard count is one
+sample, and the first attempt at this (scaling-after-liveness-fix-15s-window.txt)
+produced a 2-shard figure well below the published one. Two samples is still
+not many, but it is enough to say whether that was the engine or the run.
+
+resume: either command above, on its own; each shard count is an independent
+        window and the file is appended as each finishes.
+
+Why this run was done at all: if workflow workers were dying during the
+published load tests, the published throughput would have been UNDERSTATED,
+because a shard with fewer workers processes less. This re-run is what decides
+whether the published figures still stand.
+
+Published figures this is being compared against:
+  concurrency 64:   13.50 / 26.50 / 32.10 wf/s at 1 / 2 / 4 shards
+  concurrency 128:  12.80 / 23.15 / 46.30 wf/s at 1 / 2 / 4 shards
+                    1 -> 2 = 1.81x,  2 -> 4 = 2.00x
+
+=== concurrency 64 ===
+cluster: node-a=http://localhost:8081 node-b=http://localhost:8082 node-c=http://localhost:8083
+
+--- throughput: 1 shard(s) [0] owned by [node-b] ---
+    window 20s (after 5s warm-up), concurrency 64, poll 100ms, prep 50ms
+    completed 177 in 20.000s = 8.85 wf/s (started 256, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+--- throughput: 2 shard(s) [0,2] owned by [node-b node-c] ---
+    window 20s (after 5s warm-up), concurrency 64, poll 100ms, prep 50ms
+    completed 147 in 20.000s = 7.35 wf/s (started 211, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+--- throughput: 4 shard(s) [0,2,4,1] owned by [node-b node-c node-a] ---
+    window 20s (after 5s warm-up), concurrency 64, poll 100ms, prep 50ms
+    completed 339 in 20.000s = 16.95 wf/s (started 433, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+NFR    METRIC                       VALUE          TARGET                                   VERDICT  KIND
+---    ------                       -----          ------                                   -------  ----
+NFR-5  completed_per_sec @1shard    8.850 wf/s     no absolute target; NFR-5 is a ratio     -        measured
+NFR-5  completed @1shard            177 workflows  -                                        -        measured
+NFR-5  latency_p50 @1shard          5.6366 s       -                                        -        measured
+NFR-5  latency_p95 @1shard          10.4074 s      -                                        -        measured
+NFR-5  latency_p99 @1shard          10.5307 s      -                                        -        measured
+NFR-5  workload @1shard             DeliveryOrder  -                                        -        assumed
+-      routing_409_follows @1shard  0 requests     -                                        -        measured
+NFR-5  completed_per_sec @2shard    7.350 wf/s     no absolute target; NFR-5 is a ratio     -        measured
+NFR-5  completed @2shard            147 workflows  -                                        -        measured
+NFR-5  latency_p50 @2shard          6.9076 s       -                                        -        measured
+NFR-5  latency_p95 @2shard          18.2904 s      -                                        -        measured
+NFR-5  latency_p99 @2shard          18.5183 s      -                                        -        measured
+NFR-5  workload @2shard             DeliveryOrder  -                                        -        assumed
+-      routing_409_follows @2shard  0 requests     -                                        -        measured
+NFR-5  completed_per_sec @4shard    16.950 wf/s    no absolute target; NFR-5 is a ratio     -        measured
+NFR-5  completed @4shard            339 workflows  -                                        -        measured
+NFR-5  latency_p50 @4shard          2.3771 s       -                                        -        measured
+NFR-5  latency_p95 @4shard          9.8796 s       -                                        -        measured
+NFR-5  latency_p99 @4shard          11.3995 s      -                                        -        measured
+NFR-5  workload @4shard             DeliveryOrder  -                                        -        assumed
+-      routing_409_follows @4shard  0 requests     -                                        -        measured
+NFR-5  scaling_1_to_2               0.831 x        >= 1.7x from 1 to 2 shards               NOT MET  derived
+NFR-5  scaling_1_to_4               1.915 x        no target stated in the design document  -        derived
+
+notes
+  completed_per_sec @1shard          shards 0 owned by 1 node(s): [node-b]
+  completed @1shard                  status COMPLETED observed inside the 20.000s window; 256 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @1shard                end to end, start request to terminal status; 177 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @1shard                177 samples
+  workload @1shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 64; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @1shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 1 failed at the transport
+  completed_per_sec @2shard          shards 0,2 owned by 2 node(s): [node-b node-c]
+  completed @2shard                  status COMPLETED observed inside the 20.000s window; 211 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @2shard                end to end, start request to terminal status; 147 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @2shard                147 samples
+  workload @2shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 64; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @2shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 2 failed at the transport
+  completed_per_sec @4shard          shards 0,2,4,1 owned by 3 node(s): [node-b node-c node-a]; fewer owners than shards, so this point measures one machine more than once and is NOT evidence of horizontal scaling
+  completed @4shard                  status COMPLETED observed inside the 20.000s window; 433 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @4shard                end to end, start request to terminal status; 339 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @4shard                339 samples
+  workload @4shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 64; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @4shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 6 failed at the transport
+  scaling_1_to_2                     7.350 wf/s at 2 shards over 8.850 wf/s at 1 shard; 2 vs 1 distinct owner node(s)
+  scaling_1_to_4                     16.950 wf/s at 4 shards over 8.850 wf/s at 1 shard; 3 vs 1 distinct owner node(s)
+
+how to read the 'kind' column
+  measured      an observation taken from the running cluster in this run
+  derived       arithmetic over this run's measurements (a ratio, a percentile)
+  assumed       a value this tool was told, not something it checked
+  not-measured  this run produced no evidence; the target column still shows
+                what the design document asks for, and the value column is empty
+=== concurrency 128, run 1 ===
+cluster: node-a=http://localhost:8081 node-b=http://localhost:8082 node-c=http://localhost:8083
+
+--- throughput: 1 shard(s) [0] owned by [node-b] ---
+    window 20s (after 5s warm-up), concurrency 128, poll 100ms, prep 50ms
+    completed 0 in 20.000s = 0.00 wf/s (started 128, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+--- throughput: 2 shard(s) [0,2] owned by [node-b node-c] ---
+    window 20s (after 5s warm-up), concurrency 128, poll 100ms, prep 50ms
+    completed 160 in 20.000s = 8.00 wf/s (started 288, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+--- throughput: 4 shard(s) [0,2,4,1] owned by [node-b node-c node-a] ---
+    window 20s (after 5s warm-up), concurrency 128, poll 100ms, prep 50ms
+    completed 295 in 20.000s = 14.75 wf/s (started 423, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+NFR    METRIC                       VALUE           TARGET                                VERDICT      KIND
+---    ------                       -----           ------                                -------      ----
+NFR-5  completed_per_sec @1shard    0.000 wf/s      no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @1shard            0 workflows     -                                     -            measured
+NFR-5  latency_p50 @1shard          0.0000 s        -                                     -            measured
+NFR-5  latency_p95 @1shard          0.0000 s        -                                     -            measured
+NFR-5  latency_p99 @1shard          0.0000 s        -                                     -            measured
+NFR-5  workload @1shard             DeliveryOrder   -                                     -            assumed
+-      routing_409_follows @1shard  0 requests      -                                     -            measured
+NFR-5  completed_per_sec @2shard    8.000 wf/s      no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @2shard            160 workflows   -                                     -            measured
+NFR-5  latency_p50 @2shard          13.9027 s       -                                     -            measured
+NFR-5  latency_p95 @2shard          20.6046 s       -                                     -            measured
+NFR-5  latency_p99 @2shard          20.8654 s       -                                     -            measured
+NFR-5  workload @2shard             DeliveryOrder   -                                     -            assumed
+-      routing_409_follows @2shard  0 requests      -                                     -            measured
+NFR-5  completed_per_sec @4shard    14.750 wf/s     no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @4shard            295 workflows   -                                     -            measured
+NFR-5  latency_p50 @4shard          6.7205 s        -                                     -            measured
+NFR-5  latency_p95 @4shard          21.6509 s       -                                     -            measured
+NFR-5  latency_p99 @4shard          22.0369 s       -                                     -            measured
+NFR-5  workload @4shard             DeliveryOrder   -                                     -            assumed
+-      routing_409_follows @4shard  0 requests      -                                     -            measured
+NFR-5  scaling_1_to_2               (not measured)  >= 1.7x from 1 to 2 shards            NO EVIDENCE  not-measured
+
+notes
+  completed_per_sec @1shard          shards 0 owned by 1 node(s): [node-b]
+  completed @1shard                  status COMPLETED observed inside the 20.000s window; 128 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @1shard                end to end, start request to terminal status; no samples; upper bound by up to one 100ms poll interval
+  latency_p99 @1shard                no samples
+  workload @1shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 128; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @1shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 2 failed at the transport
+  completed_per_sec @2shard          shards 0,2 owned by 2 node(s): [node-b node-c]
+  completed @2shard                  status COMPLETED observed inside the 20.000s window; 288 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @2shard                end to end, start request to terminal status; 160 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @2shard                160 samples
+  workload @2shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 128; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @2shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 4 failed at the transport
+  completed_per_sec @4shard          shards 0,2,4,1 owned by 3 node(s): [node-b node-c node-a]; fewer owners than shards, so this point measures one machine more than once and is NOT evidence of horizontal scaling
+  completed @4shard                  status COMPLETED observed inside the 20.000s window; 423 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @4shard                end to end, start request to terminal status; 295 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @4shard                295 samples
+  workload @4shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 128; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @4shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 7 failed at the transport
+  scaling_1_to_2                     the 1-shard run produced no completions, so there is no baseline to divide by
+
+how to read the 'kind' column
+  measured      an observation taken from the running cluster in this run
+  derived       arithmetic over this run's measurements (a ratio, a percentile)
+  assumed       a value this tool was told, not something it checked
+  not-measured  this run produced no evidence; the target column still shows
+                what the design document asks for, and the value column is empty
+=== concurrency 128, run 2 ===
+cluster: node-a=http://localhost:8081 node-b=http://localhost:8082 node-c=http://localhost:8083
+
+--- throughput: 1 shard(s) [0] owned by [node-b] ---
+    window 20s (after 5s warm-up), concurrency 128, poll 100ms, prep 50ms
+    completed 0 in 20.000s = 0.00 wf/s (started 128, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+--- throughput: 2 shard(s) [0,2] owned by [node-b node-c] ---
+    window 20s (after 5s warm-up), concurrency 128, poll 100ms, prep 50ms
+    completed 111 in 20.000s = 5.55 wf/s (started 239, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+--- throughput: 4 shard(s) [0,2,4,1] owned by [node-b node-c node-a] ---
+    window 20s (after 5s warm-up), concurrency 128, poll 100ms, prep 50ms
+    completed 337 in 20.000s = 16.85 wf/s (started 465, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+NFR    METRIC                       VALUE           TARGET                                VERDICT      KIND
+---    ------                       -----           ------                                -------      ----
+NFR-5  completed_per_sec @1shard    0.000 wf/s      no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @1shard            0 workflows     -                                     -            measured
+NFR-5  latency_p50 @1shard          0.0000 s        -                                     -            measured
+NFR-5  latency_p95 @1shard          0.0000 s        -                                     -            measured
+NFR-5  latency_p99 @1shard          0.0000 s        -                                     -            measured
+NFR-5  workload @1shard             DeliveryOrder   -                                     -            assumed
+-      routing_409_follows @1shard  0 requests      -                                     -            measured
+NFR-5  completed_per_sec @2shard    5.550 wf/s      no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @2shard            111 workflows   -                                     -            measured
+NFR-5  latency_p50 @2shard          12.5119 s       -                                     -            measured
+NFR-5  latency_p95 @2shard          14.3962 s       -                                     -            measured
+NFR-5  latency_p99 @2shard          14.6719 s       -                                     -            measured
+NFR-5  workload @2shard             DeliveryOrder   -                                     -            assumed
+-      routing_409_follows @2shard  0 requests      -                                     -            measured
+NFR-5  completed_per_sec @4shard    16.850 wf/s     no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @4shard            337 workflows   -                                     -            measured
+NFR-5  latency_p50 @4shard          5.4180 s        -                                     -            measured
+NFR-5  latency_p95 @4shard          22.2928 s       -                                     -            measured
+NFR-5  latency_p99 @4shard          23.0418 s       -                                     -            measured
+NFR-5  workload @4shard             DeliveryOrder   -                                     -            assumed
+-      routing_409_follows @4shard  0 requests      -                                     -            measured
+NFR-5  scaling_1_to_2               (not measured)  >= 1.7x from 1 to 2 shards            NO EVIDENCE  not-measured
+
+notes
+  completed_per_sec @1shard          shards 0 owned by 1 node(s): [node-b]
+  completed @1shard                  status COMPLETED observed inside the 20.000s window; 128 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @1shard                end to end, start request to terminal status; no samples; upper bound by up to one 100ms poll interval
+  latency_p99 @1shard                no samples
+  workload @1shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 128; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @1shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 1 failed at the transport
+  completed_per_sec @2shard          shards 0,2 owned by 2 node(s): [node-b node-c]
+  completed @2shard                  status COMPLETED observed inside the 20.000s window; 239 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @2shard                end to end, start request to terminal status; 111 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @2shard                111 samples
+  workload @2shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 128; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @2shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 4 failed at the transport
+  completed_per_sec @4shard          shards 0,2,4,1 owned by 3 node(s): [node-b node-c node-a]; fewer owners than shards, so this point measures one machine more than once and is NOT evidence of horizontal scaling
+  completed @4shard                  status COMPLETED observed inside the 20.000s window; 465 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @4shard                end to end, start request to terminal status; 337 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @4shard                337 samples
+  workload @4shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 128; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @4shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 8 failed at the transport
+  scaling_1_to_2                     the 1-shard run produced no completions, so there is no baseline to divide by
+
+how to read the 'kind' column
+  measured      an observation taken from the running cluster in this run
+  derived       arithmetic over this run's measurements (a ratio, a percentile)
+  assumed       a value this tool was told, not something it checked
+  not-measured  this run produced no evidence; the target column still shows
+                what the design document asks for, and the value column is empty
+[scaling run complete, exit code 0]
+
+=== repeat sweeps, same binary, to measure how much the HOST drifts ===
+The sweeps above ran while this desktop was busy (1-min load average 5.4).
+These two repeat the same measurements on the same unchanged binary once
+the load had fallen, so the spread between them is host variance and not
+anything about the engine.
+
+=== concurrency 128, run 3 (loadavg at start: 3.11 4.94 3.72) ===
+--- throughput: 1 shard(s) [0] owned by [node-b] ---
+    completed 256 in 20.000s = 12.80 wf/s (started 384, failed 0, ended non-COMPLETED 0, 409 follows 0)
+--- throughput: 2 shard(s) [0,2] owned by [node-b node-c] ---
+    completed 490 in 20.000s = 24.50 wf/s (started 642, failed 0, ended non-COMPLETED 0, 409 follows 0)
+--- throughput: 4 shard(s) [0,2,4,1] owned by [node-b node-c node-a] ---
+    completed 948 in 20.000s = 47.40 wf/s (started 1191, failed 0, ended non-COMPLETED 0, 409 follows 0)
+NFR-5  latency_p50 @1shard          9.5189 s       -                                        -        measured
+NFR-5  latency_p50 @2shard          5.7249 s       -                                        -        measured
+NFR-5  latency_p50 @4shard          2.0137 s       -                                        -        measured
+NFR-5  scaling_1_to_2               1.914 x        >= 1.7x from 1 to 2 shards               MET      derived
+NFR-5  scaling_1_to_4               3.703 x        no target stated in the design document  -        derived
+  latency_p50 @1shard                end to end, start request to terminal status; 256 samples; upper bound by up to one 100ms poll interval
+  latency_p50 @2shard                end to end, start request to terminal status; 490 samples; upper bound by up to one 100ms poll interval
+  latency_p50 @4shard                end to end, start request to terminal status; 948 samples; upper bound by up to one 100ms poll interval
+  scaling_1_to_2                     24.500 wf/s at 2 shards over 12.800 wf/s at 1 shard; 2 vs 1 distinct owner node(s)
+  scaling_1_to_4                     47.400 wf/s at 4 shards over 12.800 wf/s at 1 shard; 3 vs 1 distinct owner node(s)
+=== concurrency 64, run 2 (loadavg at start: 7.94 5.87 4.13) ===
+--- throughput: 1 shard(s) [0] owned by [node-b] ---
+    completed 191 in 20.000s = 9.55 wf/s (started 255, failed 0, ended non-COMPLETED 0, 409 follows 0)
+--- throughput: 2 shard(s) [0,2] owned by [node-b node-c] ---
+    completed 132 in 20.000s = 6.60 wf/s (started 196, failed 0, ended non-COMPLETED 0, 409 follows 0)
+--- throughput: 4 shard(s) [0,2,4,1] owned by [node-b node-c node-a] ---
+    completed 321 in 20.000s = 16.05 wf/s (started 416, failed 0, ended non-COMPLETED 0, 409 follows 0)
+NFR-5  latency_p50 @1shard          6.1191 s       -                                        -        measured
+NFR-5  latency_p50 @2shard          7.1823 s       -                                        -        measured
+NFR-5  latency_p50 @4shard          2.5004 s       -                                        -        measured
+NFR-5  scaling_1_to_2               0.691 x        >= 1.7x from 1 to 2 shards               NOT MET  derived
+NFR-5  scaling_1_to_4               1.681 x        no target stated in the design document  -        derived
+  latency_p50 @1shard                end to end, start request to terminal status; 191 samples; upper bound by up to one 100ms poll interval
+  latency_p50 @2shard                end to end, start request to terminal status; 132 samples; upper bound by up to one 100ms poll interval
+  latency_p50 @4shard                end to end, start request to terminal status; 321 samples; upper bound by up to one 100ms poll interval
+  scaling_1_to_2                     6.600 wf/s at 2 shards over 9.550 wf/s at 1 shard; 2 vs 1 distinct owner node(s)
+  scaling_1_to_4                     16.050 wf/s at 4 shards over 9.550 wf/s at 1 shard; 3 vs 1 distinct owner node(s)
+[repeat sweeps complete]
+
+=== concurrency 128, run 4 — on the FINAL image, loadavg 1.27 1.34 1.62 ===
+The image now also carries the healthz and lease-test fixes. Neither is on
+the workflow execution path, so this is a confirmation, not a new claim.
+--- throughput: 1 shard(s) [0] owned by [node-b] ---
+    completed 256 in 20.000s = 12.80 wf/s (started 384, failed 0, ended non-COMPLETED 0, 409 follows 0)
+--- throughput: 2 shard(s) [0,2] owned by [node-b node-c] ---
+    completed 482 in 20.000s = 24.10 wf/s (started 626, failed 0, ended non-COMPLETED 0, 409 follows 0)
+--- throughput: 4 shard(s) [0,2,4,1] owned by [node-b node-c node-a] ---
+    completed 943 in 20.000s = 47.15 wf/s (started 1193, failed 0, ended non-COMPLETED 0, 409 follows 0)
+NFR-5  latency_p50 @1shard          9.5198 s       -                                        -        measured
+NFR-5  latency_p50 @2shard          5.3898 s       -                                        -        measured
+NFR-5  latency_p50 @4shard          2.0121 s       -                                        -        measured
+NFR-5  scaling_1_to_2               1.883 x        >= 1.7x from 1 to 2 shards               MET      derived
+NFR-5  scaling_1_to_4               3.684 x        no target stated in the design document  -        derived
+  latency_p50 @1shard                end to end, start request to terminal status; 256 samples; upper bound by up to one 100ms poll interval
+  latency_p50 @2shard                end to end, start request to terminal status; 482 samples; upper bound by up to one 100ms poll interval
+  latency_p50 @4shard                end to end, start request to terminal status; 943 samples; upper bound by up to one 100ms poll interval
+  scaling_1_to_2                     24.100 wf/s at 2 shards over 12.800 wf/s at 1 shard; 2 vs 1 distinct owner node(s)
+  scaling_1_to_4                     47.150 wf/s at 4 shards over 12.800 wf/s at 1 shard; 3 vs 1 distinct owner node(s)
+[final-image scaling sweep complete]
