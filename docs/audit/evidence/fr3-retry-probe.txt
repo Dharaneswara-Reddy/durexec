@@ -1,0 +1,9 @@
+arm ChargePayment x3 retryable for a03-retry-1792607403
+{"accepted":true,"workflow_id":"a03-retry-1792607403","shard_id":6}
+
+{"workflow_id":"a03-retry-1792607403","run_id":"1b021244-7e8e-43ce-ae82-1e80c89758f7","shard_id":6,"workflow_type":"DeliveryOrder","status":"RUNNING","last_seq":0}
+
+{"workflow_id":"a03-retry-1792607403","run_id":"1b021244-7e8e-43ce-ae82-1e80c89758f7","shard_id":6,"workflow_type":"DeliveryOrder","status":"COMPLETED","last_seq":12}
+
+[(1, 'WorkflowExecutionStarted'), (2, 'ActivityTaskScheduled'), (3, 'ActivityTaskCompleted'), (4, 'ActivityTaskScheduled'), (5, 'ActivityTaskCompleted'), (6, 'ActivityTaskScheduled'), (7, 'ActivityTaskCompleted'), (8, 'TimerStarted'), (9, 'TimerFired'), (10, 'ActivityTaskScheduled'), (11, 'ActivityTaskCompleted'), (12, 'WorkflowExecutionCompleted')]
+{"time":"2026-10-21T18:30:10.833770857Z","level":"INFO","msg":"workflow finished","shard":6,"workflow_id":"a03-retry-1792607403","run_id":"1b021244-7e8e-43ce-ae82-1e80c89758f7","status":"COMPLETED","last_seq":12}
