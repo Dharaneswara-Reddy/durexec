@@ -68,6 +68,27 @@ type shardWorkers struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	// drain is closed to tell this shard's workers to STOP POLLING while
+	// leaving whatever they are already doing alone.
+	//
+	// It is a second signal, separate from cancelling ctx, because the two mean
+	// different things and the pool used to have only the harsher one.
+	// Cancelling ctx cancels the context the activity itself is running under,
+	// so Executor.Execute returns at its ctx.Err() check and the task is handed
+	// back — which means every in-flight activity was RE-INVOKED after the
+	// restart, on every rolling deployment, by design rather than by accident.
+	// Closing drain lets the current task finish and commit, and only then does
+	// the worker return.
+	//
+	// Losing a lease still uses cancel, and must: a shard this node no longer
+	// owns has to be dropped at once, and the fencing check refuses the writes
+	// anyway. Draining is for shutdown, where this node still owns everything
+	// and simply wants to stop taking new work.
+	drain chan struct{}
+
+	// drainOnce guards the close, so StopAll is safe to call twice.
+	drainOnce sync.Once
+
 	// liveWorkflow and liveActivity count the worker goroutines still running.
 	// Each goroutine decrements its own on the way out, which is what lets
 	// Start tell "already running" from "running, but short of some".
@@ -135,7 +156,7 @@ func (p *WorkerPool) Start(ctx context.Context, shard core.ShardID) {
 	sw, existing := p.running[shard]
 	if !existing {
 		sctx, cancel := context.WithCancel(ctx)
-		sw = &shardWorkers{ctx: sctx, cancel: cancel}
+		sw = &shardWorkers{ctx: sctx, cancel: cancel, drain: make(chan struct{})}
 		p.running[shard] = sw
 	}
 	if sw.ctx.Err() != nil {
@@ -171,7 +192,7 @@ func (p *WorkerPool) Start(ctx context.Context, shard core.ShardID) {
 	}
 
 	for i := 0; i < wantWorkflow; i++ {
-		w := &WorkflowWorker{Engine: p.Engine, Shard: shard}
+		w := &WorkflowWorker{Engine: p.Engine, Shard: shard, Drain: sw.drain}
 		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
@@ -180,7 +201,7 @@ func (p *WorkerPool) Start(ctx context.Context, shard core.ShardID) {
 		}()
 	}
 	for i := 0; i < wantActivity; i++ {
-		w := &ActivityWorker{Engine: p.Engine, Shard: shard}
+		w := &ActivityWorker{Engine: p.Engine, Shard: shard, Drain: sw.drain}
 		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
@@ -235,19 +256,109 @@ func (p *WorkerPool) Owned() []core.ShardID {
 	return out
 }
 
-// StopAll ends every shard's workers and waits for them, which is the "drain
-// in-flight tasks" half of a graceful shutdown: a worker that is mid-decision
-// finishes its commit, and one that is merely idle returns at once.
-func (p *WorkerPool) StopAll() {
+// DefaultDrainBudget is how long StopAll lets in-flight work finish before it
+// resorts to cancelling.
+//
+// It has to be shorter than the process's own shutdown grace, or the drain
+// would be cut off by the supervisor killing the container instead of by this
+// code, and the cancel-and-wait step below would never run. Ten seconds
+// comfortably covers a decision commit and a typical activity while staying
+// inside a 30-second grace.
+const DefaultDrainBudget = 10 * time.Second
+
+// StopAll drains every shard's workers, then stops them.
+//
+// It used to be a cancel dressed up as a drain. The comment claimed "a worker
+// that is mid-decision finishes its commit", but it cancelled each shard's
+// context, which is the context the ACTIVITY runs under: Executor.Execute
+// returned at its ctx.Err() check and the task was released for retry. So
+// every in-flight activity was re-invoked after the restart — on every rolling
+// deployment, not merely on a crash. With at-least-once invocation that is
+// allowed, but it is the engine's own guarantee being spent routinely for no
+// reason, and nothing downstream absorbed it.
+//
+// The drain is three steps, in this order:
+//
+//  1. Stop polling, immediately. No worker takes a new task, so the amount of
+//     work left to finish stops growing the instant shutdown begins.
+//  2. Wait for what is already running, up to the budget. A worker returns
+//     once its current task has been committed — or released, if that is what
+//     the task's own logic decided — so nothing is half-done.
+//  3. Only then cancel. A budget that expires means something is genuinely
+//     stuck, and at that point an abandoned task is better than a node that
+//     will not shut down. Anything cut off here is re-invoked exactly as it
+//     was before, which is the old behaviour as a LAST resort rather than the
+//     first.
+//
+// StopAll keeps the no-argument signature so existing callers are unchanged and
+// get the default budget; StopAllWithin is for a caller that knows its own
+// grace period.
+func (p *WorkerPool) StopAll() { p.StopAllWithin(DefaultDrainBudget) }
+
+// StopAllWithin is StopAll with an explicit drain budget. A budget of zero or
+// less skips the drain and cancels at once, which is the old behaviour and is
+// what a caller that is already out of time should ask for.
+func (p *WorkerPool) StopAllWithin(budget time.Duration) {
 	p.mu.Lock()
 	p.stopped = true
+	workers := make([]*shardWorkers, 0, len(p.running))
 	for _, sw := range p.running {
-		sw.cancel()
+		workers = append(workers, sw)
 	}
 	p.running = make(map[core.ShardID]*shardWorkers)
 	p.mu.Unlock()
 
+	log := p.Engine.logger()
+
+	if budget <= 0 {
+		for _, sw := range workers {
+			sw.cancel()
+		}
+		p.wg.Wait()
+		return
+	}
+
+	// (1) Stop polling. Nothing in flight is disturbed.
+	for _, sw := range workers {
+		sw.stopPolling()
+	}
+
+	// (2) Wait for in-flight work, up to the budget.
+	drained := make(chan struct{})
+	go func() {
+		p.wg.Wait()
+		close(drained)
+	}()
+
+	timer := time.NewTimer(budget)
+	defer timer.Stop()
+	select {
+	case <-drained:
+		// Everything finished what it was doing. Cancelling now is tidy-up
+		// only: no goroutine is left to notice.
+		for _, sw := range workers {
+			sw.cancel()
+		}
+		return
+	case <-timer.C:
+	}
+
+	// (3) The budget expired, so something is stuck. Cancel, and say so —
+	// loudly, because anything cut off here WILL be invoked again after the
+	// restart and an operator should know that happened.
+	log.Warn(context.Background(),
+		"drain budget expired on shutdown, cancelling in-flight work",
+		"budget", budget.String(),
+		"consequence", "activities cut off here are re-invoked after the restart, under the same dedup key")
+	for _, sw := range workers {
+		sw.cancel()
+	}
 	p.wg.Wait()
+}
+
+// stopPolling closes the drain channel once.
+func (sw *shardWorkers) stopPolling() {
+	sw.drainOnce.Do(func() { close(sw.drain) })
 }
 
 // Supervise keeps the running set equal to the owned set, and keeps each owned

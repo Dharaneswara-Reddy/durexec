@@ -10,6 +10,7 @@ import (
 	"github.com/dharaneswar339/durexec/internal/activity"
 	"github.com/dharaneswar339/durexec/internal/core"
 	"github.com/dharaneswar339/durexec/internal/eventlog"
+	"github.com/dharaneswar339/durexec/internal/faultinj"
 	"github.com/dharaneswar339/durexec/internal/taskq"
 )
 
@@ -28,6 +29,13 @@ import (
 type ActivityWorker struct {
 	Engine *Engine
 	Shard  core.ShardID
+
+	// Drain, when closed, stops this worker POLLING while leaving the activity
+	// it is currently running alone. It matters most here: cancelling an
+	// activity's context mid-call abandons an external effect whose outcome
+	// nobody knows and guarantees it is invoked again after the restart, which
+	// is what every rolling deployment used to do. It may be nil.
+	Drain <-chan struct{}
 }
 
 // Run polls until ctx is cancelled or the shard is lost.
@@ -35,6 +43,14 @@ func (w *ActivityWorker) Run(ctx context.Context) {
 	idle := taskq.IdleMin
 	for {
 		if ctx.Err() != nil {
+			return
+		}
+		// Immediately before the poll, so a drain can only ever stop this
+		// worker between activities and never in the middle of one. That is
+		// the whole difference between draining and cancelling: an activity
+		// cut off mid-call has performed an unknown amount of the world's
+		// work and will be invoked again after the restart.
+		if draining(w.Drain) {
 			return
 		}
 
@@ -213,8 +229,31 @@ func (w *ActivityWorker) process(ctx context.Context, task core.Task) error {
 		w.releaseForRetry(ctx, task)
 		return nil
 	}
+
+	// AfterActivityJournaled. DURABLE AT THIS POINT, all in the one transaction
+	// that just committed: the activity's result event, the workflow wake-up
+	// task that will deliver it, and the DELETION of this activity task row.
+	// NOT durable: anything the workflow decides next.
+	//
+	// A process that dies here must therefore lose nothing and must not call
+	// the activity again. Recovery is the wake-up task: another worker polls
+	// it, replays, and resolvedAt finds the result already in history. This is
+	// the seam that proves that, and it had never been called from production
+	// code — which is why the start-path orphan survived the whole test suite:
+	// the tests killed nodes, not transactions.
+	//
+	// Inert unless explicitly armed; see internal/faultinj.
+	if w.Engine.Faults.ShouldCrash(faultinj.AfterActivityJournaled) {
+		log.Warn(ctx, "injected crash after the activity result was journaled",
+			"activity", sched.ActivityType, "seq", int64(seq))
+		return errCrashInjected
+	}
 	return nil
 }
+
+// errCrashInjected is how an armed crash point leaves a worker loop. It is the
+// loop's private signal, like errShardGone, and it never escapes the package.
+var errCrashInjected = errors.New("runtime: injected crash")
 
 // claimRenewalFraction is the share of the lock duration between renewals.
 //

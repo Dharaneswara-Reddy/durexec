@@ -3,7 +3,6 @@ package timers
 import (
 	"context"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -11,21 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/testdb"
 )
 
-// Skipped unless DUREXEC_TEST_DSN names a PostgreSQL with the schema applied.
+// Creates its own schema; fails (not skips) when DUREXEC_REQUIRE_DB is set and
+// no database is available. See internal/testdb.
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("DUREXEC_TEST_DSN")
-	if dsn == "" {
-		t.Skip("set DUREXEC_TEST_DSN to run the PostgreSQL tests")
-	}
-	pool, err := pgxpool.New(context.Background(), dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
+	return testdb.Pool(t)
 }
 
 func TestDueOnlyReturnsRipeTimersOldestFirst(t *testing.T) {
