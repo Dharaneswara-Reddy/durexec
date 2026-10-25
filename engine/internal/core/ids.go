@@ -29,9 +29,37 @@ const (
 )
 
 // IsTerminal reports whether no further work will ever be scheduled.
+//
+// StatusCompensatingFailed is terminal, and deliberately stays so: real-world
+// state is known to be inconsistent and nothing automatic should touch it. What
+// changed is that it is no longer a DEAD END — SignalResumeCompensation is
+// accepted on it, which records a human's decision to retry the compensations
+// the run still owes and moves it to StatusCompensating. See Engine.Signal.
 func (s ExecutionStatus) IsTerminal() bool {
 	return s == StatusCompleted || s == StatusFailed || s == StatusCompensatingFailed
 }
+
+// Reserved signal names. They travel through exactly the same durable path as
+// any application signal — appended to history before any workflow code runs —
+// rather than being second mechanisms that would each have to be made
+// crash-safe on their own.
+const (
+	// SignalCancel asks a running workflow to stop.
+	SignalCancel = "__cancel"
+
+	// SignalResumeCompensation is the only way back from
+	// COMPENSATING_FAILED, and the only engine API that accepts a terminal run.
+	//
+	// It exists because a failed rollback used to be unreachable. The status is
+	// terminal, Signal refused every terminal run, Cancel went through Signal,
+	// and a fresh start was answered "already open" — so the compensations the
+	// run still owed were owed and unreachable, and recovery meant hand-written
+	// SQL against the one table the design declares append-only. The machinery
+	// to finish the rollback already existed: the compensation stack is a pure
+	// function of history and resumes at the step that failed. Only the door
+	// was locked.
+	SignalResumeCompensation = "__resume_compensation"
+)
 
 // TaskType distinguishes the two queues that share the tasks table.
 type TaskType string

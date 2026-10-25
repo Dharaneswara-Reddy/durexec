@@ -10,7 +10,26 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/faultinj"
 )
+
+// CrashInjectedError reports that an armed fault stopped a commit at a named
+// seam. It is deliberately NOT wrapped in core.ErrLostOwnership or any other
+// sentinel the engine reacts to: an injected crash must travel as an ordinary
+// unexpected commit failure, because the point of the seam is to find out what
+// the engine does when a commit does not land for a reason it cannot classify.
+//
+// It can only ever be produced by an Injector that configuration switched on;
+// see the construction rules in internal/faultinj.
+type CrashInjectedError struct {
+	// Point is the faultinj.CrashPoint that fired, kept as a string so this
+	// error can be formatted without the reader having to look the constant up.
+	Point string
+}
+
+func (e *CrashInjectedError) Error() string {
+	return fmt.Sprintf("eventlog: injected crash at %s: the decision was rolled back and nothing is durable", e.Point)
+}
 
 // ---- the fencing check ----------------------------------------------------
 
@@ -170,12 +189,35 @@ INSERT INTO activity_intents
 VALUES ($1, $2, $3::uuid, $4, $5, $6, $7::vector)
 ON CONFLICT (shard_id, workflow_id, run_id, scheduled_seq) DO NOTHING`
 
+// createExecutionSQL opens the executions row from inside CommitDecision.
+//
+// It is the same statement as ExecutionStore.Create issues, repeated here
+// rather than shared, because the two run in deliberately different places:
+// Create is an autocommit statement on the pool and this one runs inside the
+// fenced decision transaction. Sharing one helper would have invited a future
+// change to route the start path back through the pool, which is the defect
+// this statement exists to close.
+const createExecutionSQL = `
+INSERT INTO executions (shard_id, workflow_id, run_id, workflow_type, status, last_seq)
+VALUES ($1, $2, $3::uuid, $4, $5, 0)`
+
 // NULLIF lets a Decision that only advances last_seq leave the status alone,
 // rather than forcing every caller to restate a status it did not change.
+//
+// GREATEST makes the pointer monotone, which it has to be: it indexes into an
+// append-only log, so a lower value can only ever be stale. Two callers pass a
+// last_seq they read in an earlier, separate statement — clear() in the activity
+// worker and complete() in the workflow worker — and an unconditional
+// assignment let either of them move the pointer backwards if history had
+// advanced in between. Most readers survive that because they take
+// max(pointer, history); Engine.Signal does not, and a regressed pointer makes
+// every subsequent signal collide on the events primary key, which strands a
+// workflow parked on WaitForSignal permanently. No instance was found in 11,807
+// live executions, so this closes a reachable path rather than a observed one.
 const updateExecutionSQL = `
 UPDATE executions
    SET status = COALESCE(NULLIF($3, ''), status),
-       last_seq = $4,
+       last_seq = GREATEST(executions.last_seq, $4),
        updated_at = now()
  WHERE shard_id = $1 AND workflow_id = $2`
 
@@ -202,11 +244,20 @@ const deleteTaskSQL = `DELETE FROM tasks WHERE shard_id = $1 AND task_id = $2`
 // Order:
 //
 //	a. verify the fencing token FOR UPDATE      — nothing else happens if this fails
+//	a2. open the executions row, for a start     — so a start is one transaction
 //	b. append the events                        — the PK is the second line of defence
 //	c. insert new tasks and timers
 //	d. insert activity intents (pgvector)
 //	e. update the execution status pointer
 //	f. delete the workflow task row we just completed
+//
+// Step (a2) is where a workflow is admitted. It sits after the fencing check
+// and before the events on purpose. After, because admitting a workflow is a
+// mutation of shard state and a fenced-out node must not be able to do it — the
+// start path had no fencing check at all while the insert lived on the pool.
+// Before, because the executions primary key is the engine's front-door
+// idempotency: two concurrent starts of the same business key must be decided
+// by that key, and deciding it first means the loser does no other work.
 func (s *Store) CommitDecision(ctx context.Context, d core.Decision) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -219,6 +270,17 @@ func (s *Store) CommitDecision(ctx context.Context, d core.Decision) error {
 	// (a) Ownership first. Everything after this line depends on it.
 	if err := verifyToken(ctx, tx, d.ShardID, d.Token); err != nil {
 		return err
+	}
+
+	// (a2) Admission, for a start. A unique violation is the front-door
+	// idempotency check firing, not a fault: some other request already opened
+	// this business key. Reporting it as ErrWorkflowAlreadyOpen leaves the
+	// caller to read the existing row and decide, and rolls this transaction
+	// back whole — so a losing start writes no event and schedules no task.
+	if d.CreateExecution != nil {
+		if err := s.createExecution(ctx, tx, d); err != nil {
+			return err
+		}
 	}
 
 	// (b) The log. A unique violation here means another writer appended the
@@ -258,8 +320,45 @@ func (s *Store) CommitDecision(ctx context.Context, d core.Decision) error {
 		}
 	}
 
+	// The last seam at which nothing this decision did is durable. Every write
+	// above is staged inside tx and visible to nobody; returning here leaves the
+	// database exactly as it was before Begin, which is precisely the state a
+	// process that died at this instant would leave behind. Inert unless a fault
+	// was explicitly armed — see the contract on Store.Faults.
+	if s.faults.ShouldCrash(faultinj.BeforeDecisionCommit) {
+		return &CrashInjectedError{Point: string(faultinj.BeforeDecisionCommit)}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
+		// The outcome of a failed Commit is genuinely unknown: the server may
+		// have committed and then lost the connection carrying the
+		// acknowledgement. Callers must therefore treat this as ambiguous and
+		// never as either success or definite failure. The start path is safe
+		// under that ambiguity because the whole start is this one transaction:
+		// a retry either finds the business key taken, which means the commit
+		// did land, or opens it, which means it did not.
 		return fmt.Errorf("eventlog: commit decision: %w", err)
+	}
+	return nil
+}
+
+// createExecution opens the executions row for a starting workflow, inside the
+// decision transaction. The identity comes from the Decision rather than from
+// the NewExecution payload so the row and the start event beside it cannot
+// describe different runs.
+func (s *Store) createExecution(ctx context.Context, tx pgx.Tx, d core.Decision) error {
+	status := d.Status
+	if status == "" {
+		status = core.StatusRunning
+	}
+	_, err := tx.Exec(ctx, createExecutionSQL,
+		int32(d.ShardID), d.WorkflowID, string(d.RunID),
+		d.CreateExecution.WorkflowType, string(status))
+	if isUniqueViolation(err) {
+		return core.ErrWorkflowAlreadyOpen
+	}
+	if err != nil {
+		return fmt.Errorf("eventlog: create execution %q: %w", d.WorkflowID, err)
 	}
 	return nil
 }

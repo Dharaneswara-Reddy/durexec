@@ -15,6 +15,20 @@ var (
 	ErrWorkflowAlreadyOpen = errors.New("workflow already open")
 	// ErrWorkflowNotFound is returned by query paths.
 	ErrWorkflowNotFound = errors.New("workflow not found")
+	// ErrWorkflowOrphaned means the executions row for a business key exists but
+	// its run never became durable: RUNNING with last_seq 0, so no start event
+	// and no first task were ever written.
+	//
+	// Since the executions row is now opened inside the same transaction as the
+	// start event, the fixed engine cannot create this state. It survives only
+	// as rows written by the two-transaction start path that preceded the fix.
+	// It is a separate sentinel from ErrWorkflowAlreadyOpen because the two are
+	// opposites to a caller: "already open" means someone else's identical
+	// request succeeded and may be awaited, whereas this means nobody's did and
+	// the request must not be reported as success. Answering a retry with
+	// "already open, RUNNING" for one of these is exactly how the defect stayed
+	// invisible for two days.
+	ErrWorkflowOrphaned = errors.New("workflow execution row exists but its run was never started")
 	// ErrNoTask means the queue poll found nothing; back off and retry.
 	ErrNoTask = errors.New("no task available")
 	// ErrEmbeddingUnavailable makes the semantic check fall back to exact
@@ -46,6 +60,37 @@ type NonDeterminismError struct {
 func (e *NonDeterminismError) Error() string {
 	return fmt.Sprintf("non-determinism at k=%d (seq %d): history recorded %q but code requested %q",
 		e.K, e.Seq, e.Recorded, e.Requested)
+}
+
+// VersionIncompatibleError says that this binary declines to replay a run that
+// was started by code it does not claim to be compatible with.
+//
+// It is a REFUSAL TO DECIDE, not a failure of the run, and that distinction is
+// the whole point of the type. The engine has no way to know whether the newer
+// code would reach the same decisions as the code that wrote this history, so
+// it does not guess and it does not journal anything: the run keeps its history
+// exactly as found, its task goes back on the queue, and either a node running
+// compatible code picks it up or an operator redeploys the old version. A
+// terminal failure here would strand whatever the forward steps already did,
+// because a status set from outside the workflow never runs its compensations.
+type VersionIncompatibleError struct {
+	WorkflowID string
+	// Recorded is the code version in the run's start event; Running is what
+	// this binary declares. Either may be empty, which means "unversioned".
+	Recorded string
+	Running  string
+}
+
+func (e *VersionIncompatibleError) Error() string {
+	recorded, running := e.Recorded, e.Running
+	if recorded == "" {
+		recorded = "(unversioned)"
+	}
+	if running == "" {
+		running = "(unversioned)"
+	}
+	return fmt.Sprintf("workflow %s was started by code version %s, which this binary (%s) does not accept",
+		e.WorkflowID, recorded, running)
 }
 
 // CompensationFailedError is terminal and requires human intervention. We

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/testdb"
 )
 
 // Everything in this file needs a real PostgreSQL with the pgvector extension
@@ -21,10 +21,7 @@ import (
 // still pass on a laptop with no database at all.
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("DUREXEC_TEST_DSN")
-	if dsn == "" {
-		t.Skip("set DUREXEC_TEST_DSN to run the PostgreSQL tests")
-	}
+	dsn := testdb.DSN(t)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -72,21 +69,136 @@ func setLease(t *testing.T, pool *pgxpool.Pool, shard core.ShardID, tok core.Fen
 	}
 }
 
-func TestCreateIsIdempotentOnDuplicateStart(t *testing.T) {
+// seedExecution writes an executions row with raw SQL.
+//
+// The production code has no such path any more — an execution is only ever
+// opened inside CommitDecision — so the tests below, which care about the
+// commit's OTHER properties and merely need a row to update, say so in SQL
+// rather than borrowing a production method that should not exist.
+func seedExecution(t *testing.T, pool *pgxpool.Pool, shard core.ShardID, wfID string, run core.RunID, wfType string) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(),
+		`INSERT INTO executions (shard_id, workflow_id, run_id, workflow_type, status, last_seq)
+		 VALUES ($1, $2, $3::uuid, $4, 'RUNNING', 0)`,
+		int32(shard), wfID, string(run), wfType)
+	if err != nil {
+		t.Fatalf("seed execution: %v", err)
+	}
+}
+
+// startDecision is the shape StartWorkflow commits: open the row, write the
+// start event and enqueue the first workflow task, all in one transaction.
+func startDecision(shard core.ShardID, wfID string, run core.RunID, tok core.FencingToken) core.Decision {
+	return core.Decision{
+		ShardID: shard, WorkflowID: wfID, RunID: run, Token: tok,
+		CreateExecution: &core.NewExecution{WorkflowType: "OrderWorkflow"},
+		Events: []core.Event{{
+			ShardID: shard, WorkflowID: wfID, RunID: run, Seq: 1,
+			Type: core.EvWorkflowStarted, Payload: json.RawMessage(`{"input":null}`),
+		}},
+		NewTasks: []core.Task{{
+			ShardID: shard, Type: core.TaskWorkflow, WorkflowID: wfID,
+			RunID: run, ScheduledEventSeq: 1,
+		}},
+		Status: core.StatusRunning, LastSeq: 1,
+	}
+}
+
+// A start is now one transaction, so the second start of the same business key
+// must lose the primary-key race and leave NOTHING behind: no second row, and
+// crucially no second event and no second task. Before the fix the losing start
+// had already committed its executions row in a transaction of its own.
+func TestStartIsOneTransactionAndADuplicateStartWritesNothing(t *testing.T) {
 	pool := testPool(t)
 	shard := freshShard(t, pool)
+	setLease(t, pool, shard, 3)
+	s := New(pool)
+	ctx := context.Background()
+
+	first := core.RunID(uuid.NewString())
+	if err := s.CommitDecision(ctx, startDecision(shard, "order-1", first, 3)); err != nil {
+		t.Fatalf("first start: %v", err)
+	}
+
+	second := core.RunID(uuid.NewString())
+	err := s.CommitDecision(ctx, startDecision(shard, "order-1", second, 3))
+	if !errors.Is(err, core.ErrWorkflowAlreadyOpen) {
+		t.Fatalf("second start: got %v, want ErrWorkflowAlreadyOpen", err)
+	}
+
+	assertCount(t, pool, "SELECT count(*) FROM executions WHERE shard_id=$1", shard, 1)
+	assertCount(t, pool, "SELECT count(*) FROM events WHERE shard_id=$1", shard, 1)
+	assertCount(t, pool, "SELECT count(*) FROM tasks WHERE shard_id=$1", shard, 1)
+
+	ex, err := s.Get(ctx, shard, "order-1")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if ex.RunID != first {
+		t.Fatalf("run id = %s, want the first run %s", ex.RunID, first)
+	}
+	// last_seq 1, not 0: the row and its first event became durable together,
+	// which is the property that makes an orphan impossible to create.
+	if ex.LastSeq != 1 {
+		t.Fatalf("last_seq = %d, want 1", ex.LastSeq)
+	}
+}
+
+// A start by a node holding a stale fencing token must be refused. The start
+// path had no fencing check at all before the fix, because the executions
+// insert ran on the pool rather than inside the decision transaction.
+func TestStartByAStaleOwnerWritesNothing(t *testing.T) {
+	pool := testPool(t)
+	shard := freshShard(t, pool)
+	setLease(t, pool, shard, 12) // the shard has moved on to token 12
+	s := New(pool)
+	ctx := context.Background()
+
+	err := s.CommitDecision(context.Background(),
+		startDecision(shard, "order-stale", core.RunID(uuid.NewString()), 11))
+	if !errors.Is(err, core.ErrLostOwnership) {
+		t.Fatalf("stale start: got %v, want ErrLostOwnership", err)
+	}
+	var fenced *FencedError
+	if !errors.As(err, &fenced) {
+		t.Fatalf("stale start: got %T, want *FencedError so the rejection is counted", err)
+	}
+	assertCount(t, pool, "SELECT count(*) FROM executions WHERE shard_id=$1", shard, 0)
+	assertCount(t, pool, "SELECT count(*) FROM events WHERE shard_id=$1", shard, 0)
+	assertCount(t, pool, "SELECT count(*) FROM tasks WHERE shard_id=$1", shard, 0)
+	_ = ctx
+}
+
+// last_seq indexes into an append-only log, so it must never go backwards. Two
+// callers pass a pointer they read in an earlier statement, and an
+// unconditional assignment let either of them regress it, which strands any
+// workflow parked on WaitForSignal.
+func TestLastSeqNeverGoesBackwards(t *testing.T) {
+	pool := testPool(t)
+	shard := freshShard(t, pool)
+	setLease(t, pool, shard, 4)
 	s := New(pool)
 	ctx := context.Background()
 
 	run := core.RunID(uuid.NewString())
-	if err := s.Create(ctx, shard, "order-1", run, "OrderWorkflow"); err != nil {
-		t.Fatalf("first create: %v", err)
+	if err := s.CommitDecision(ctx, startDecision(shard, "wf-mono", run, 4)); err != nil {
+		t.Fatalf("start: %v", err)
 	}
-	// A second start for the same business key must be reported as already open,
-	// which the caller treats as success rather than as a failure.
-	err := s.Create(ctx, shard, "order-1", core.RunID(uuid.NewString()), "OrderWorkflow")
-	if !errors.Is(err, core.ErrWorkflowAlreadyOpen) {
-		t.Fatalf("second create: got %v, want ErrWorkflowAlreadyOpen", err)
+	// A decision carrying a stale pointer and no events at all — the shape
+	// clear() and complete() commit.
+	stale := core.Decision{
+		ShardID: shard, WorkflowID: "wf-mono", RunID: run, Token: 4,
+		Status: core.StatusRunning, LastSeq: 0,
+	}
+	if err := s.CommitDecision(ctx, stale); err != nil {
+		t.Fatalf("stale-pointer commit: %v", err)
+	}
+	ex, err := s.Get(ctx, shard, "wf-mono")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if ex.LastSeq != 1 {
+		t.Fatalf("last_seq regressed to %d, want it held at 1", ex.LastSeq)
 	}
 }
 
@@ -98,9 +210,7 @@ func TestCommitDecisionAppliesEverything(t *testing.T) {
 	ctx := context.Background()
 
 	run := core.RunID(uuid.NewString())
-	if err := s.Create(ctx, shard, "wf-1", run, "T"); err != nil {
-		t.Fatalf("create: %v", err)
-	}
+	seedExecution(t, pool, shard, "wf-1", run, "T")
 
 	// A task to complete, standing in for the workflow task that produced this
 	// decision.
@@ -161,9 +271,7 @@ func TestCommitDecisionRejectsStaleToken(t *testing.T) {
 	ctx := context.Background()
 
 	run := core.RunID(uuid.NewString())
-	if err := s.Create(ctx, shard, "wf-2", run, "T"); err != nil {
-		t.Fatalf("create: %v", err)
-	}
+	seedExecution(t, pool, shard, "wf-2", run, "T")
 
 	d := core.Decision{
 		ShardID: shard, WorkflowID: "wf-2", RunID: run, Token: 8, // we still hold 8
@@ -188,9 +296,7 @@ func TestCommitDecisionRejectsDuplicateSeq(t *testing.T) {
 	ctx := context.Background()
 
 	run := core.RunID(uuid.NewString())
-	if err := s.Create(ctx, shard, "wf-3", run, "T"); err != nil {
-		t.Fatalf("create: %v", err)
-	}
+	seedExecution(t, pool, shard, "wf-3", run, "T")
 	d := core.Decision{
 		ShardID: shard, WorkflowID: "wf-3", RunID: run, Token: 1,
 		Events: []core.Event{{ShardID: shard, WorkflowID: "wf-3", RunID: run, Seq: 1, Type: core.EvWorkflowStarted}},
@@ -226,13 +332,10 @@ func TestFencingCounterCountsOnlyTheRealRejectionAgainstPostgres(t *testing.T) {
 	setLease(t, pool, shard, 5)
 	seen := &countingObserver{}
 	c := NewFencingCounter(New(pool), seen)
-	s := New(pool)
 	ctx := context.Background()
 
 	run := core.RunID(uuid.NewString())
-	if err := s.Create(ctx, shard, "wf-fenced", run, "T"); err != nil {
-		t.Fatalf("create: %v", err)
-	}
+	seedExecution(t, pool, shard, "wf-fenced", run, "T")
 	started := core.Event{ShardID: shard, WorkflowID: "wf-fenced", RunID: run, Seq: 1, Type: core.EvWorkflowStarted}
 
 	// A stale writer: the shard is at token 5, this one still holds 4.

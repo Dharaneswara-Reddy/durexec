@@ -73,9 +73,21 @@ type Embedder interface {
 	Dim() int
 }
 
-// ExecutionStore is the mutable status pointer derived from the log.
+// ExecutionStore is the mutable status pointer derived from the log. It is
+// READ-ONLY on purpose.
+//
+// There used to be a Create method here, and it was the engine's only durable
+// write that the fencing token did not guard: it ran as an autocommit statement
+// on the pool, outside any decision transaction. A start was therefore two
+// transactions, and a crash, a lost lease or a failed commit between them left
+// an executions row with no history behind it — accepted, acknowledged and
+// permanently abandoned. Opening an execution is now a field on Decision
+// (CreateExecution), so the only way to admit a workflow is through
+// Committer.CommitDecision, which checks the token FOR UPDATE first. Removing
+// the method rather than commenting on it is deliberate: an unfenced
+// "open an execution" entry point on this port is how the defect happened, and
+// nothing can call one that does not exist.
 type ExecutionStore interface {
-	Create(ctx context.Context, shard ShardID, workflowID string, run RunID, wfType string) error
 	Get(ctx context.Context, shard ShardID, workflowID string) (Execution, error)
 	List(ctx context.Context, shard ShardID, status ExecutionStatus, limit int) ([]Execution, error)
 }

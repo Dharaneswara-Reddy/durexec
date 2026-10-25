@@ -28,6 +28,19 @@ const (
 	EvCompensationScheduled EventType = "CompensationScheduled"
 	EvCompensationCompleted EventType = "CompensationCompleted"
 	EvCompensationFailed    EventType = "CompensationFailed"
+
+	// EvCompensationResumed reopens a run that ended in
+	// COMPENSATING_FAILED, so the compensations it still owes can be retried.
+	//
+	// It is an EVENT rather than an update to the status column because the log
+	// is the authority and the status is only a pointer derived from it. A
+	// half-rolled-back saga is a run whose history says it failed and whose
+	// remaining compensations are still owed; without a recorded fact that says
+	// "a human decided to try again", replay would read the failure event,
+	// report the run terminal, and refuse to continue — which is exactly the
+	// dead end this closes. Indexing history treats it as clearing the terminal
+	// state, and nothing is rewritten or deleted to achieve that.
+	EvCompensationResumed EventType = "CompensationResumed"
 )
 
 // Event is one immutable row of history.

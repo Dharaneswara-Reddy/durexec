@@ -1,51 +1,44 @@
 package runtime
 
-// AUDIT 03 EVIDENCE (added by the production-readiness audit, not part of the
-// original suite).
+// AUDIT 03 EVIDENCE, now a regression test.
 //
-// CHARACTERISATION TEST: it asserts the CURRENT behaviour of
-// Engine.StartWorkflow, which is a defect. Engine.StartWorkflow's comment says
-// "all in one Decision, so a start either fully happens or does not happen at
-// all", but Executions.Create is a separate, already-committed statement that
-// runs BEFORE the fencing-checked CommitDecision. If this node does not hold
-// the shard's lease at that moment (TokenFor returns false), or the commit is
-// fenced out, the executions row stays behind: status RUNNING, last_seq 0, no
-// event, no task. A retry of the same workflow_id then gets AlreadyOpen
-// (HTTP 200) and the workflow never runs.
+// This file arrived from the production-readiness audit as a CHARACTERISATION
+// test: it asserted the defective behaviour of Engine.StartWorkflow on purpose,
+// and its own header said "when the defect is fixed this test will FAIL on the
+// first assertion; flip it into a regression test at that point." That has
+// happened, so the assertions below are inverted — same scenario, opposite
+// expectation — and the original wording is kept so the two can be compared.
 //
-// When the defect is fixed this test will FAIL on the first assertion; flip it
-// into a regression test at that point.
+// The scenario: a node accepts POST /v1/workflows for a shard it does not own.
+// The old engine had already committed the executions row by then, on the pool,
+// outside any transaction and with no fencing check, so the row survived as
+// RUNNING with last_seq 0, no event and no task. A retry of the same
+// workflow_id was answered AlreadyOpen (HTTP 200) and the workflow never ran.
 //
-// Needs a real PostgreSQL: DUREXEC_TEST_DSN must be set. Use a THROWAWAY
-// database, never the demonstration cluster's.
+// What must happen now: ownership is checked BEFORE anything is written, the
+// row is opened inside the fenced decision transaction, and the retry produces
+// a real run. The fuller set of start-path failure modes is in
+// start_atomicity_test.go; this one is kept because it is the independent
+// reproduction a second auditor reached without shared context.
+//
+// Needs a real PostgreSQL. internal/testdb supplies the DSN and refuses to let
+// it be the demonstration cluster's.
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+	"errors"
 	"testing"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dharaneswar339/durexec/internal/api"
 	"github.com/dharaneswar339/durexec/internal/core"
 	"github.com/dharaneswar339/durexec/internal/eventlog"
+	"github.com/dharaneswar339/durexec/internal/testdb"
 )
 
-func TestAudit03StartWorkflowLeavesAnOrphanWhenTheShardIsNotOwned(t *testing.T) {
-	dsn := os.Getenv("DUREXEC_TEST_DSN")
-	if dsn == "" {
-		t.Skip("set DUREXEC_TEST_DSN (a throwaway database) to run")
-	}
+func TestAudit03StartWorkflowLeavesNoOrphanWhenTheShardIsNotOwned(t *testing.T) {
+	pool := testdb.Pool(t)
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
-	if err := eventlog.Migrate(ctx, pool, filepath.Join("..", "..", "migrations")); err != nil {
-		t.Fatal(err)
-	}
+
 	const shardID = core.ShardID(777001)
 	const wf = "audit03-orphan-wf"
 	cleanup := func() {
@@ -55,6 +48,16 @@ func TestAudit03StartWorkflowLeavesAnOrphanWhenTheShardIsNotOwned(t *testing.T) 
 	}
 	cleanup()
 	t.Cleanup(cleanup)
+
+	// The lease row has to exist for the commit's fencing check to pass once
+	// this node does own the shard. Under the old code the start path never
+	// consulted it at all.
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO shard_leases (shard_id, owner_node, fencing_token, expires_at)
+		 VALUES ($1, 'node-test', 1, now() + interval '1 hour')
+		 ON CONFLICT (shard_id) DO UPDATE SET fencing_token = 1`, int32(shardID)); err != nil {
+		t.Fatalf("seed lease: %v", err)
+	}
 
 	store := eventlog.New(pool)
 	owned := false
@@ -66,34 +69,50 @@ func TestAudit03StartWorkflowLeavesAnOrphanWhenTheShardIsNotOwned(t *testing.T) 
 	}
 	req := api.StartRequest{ShardID: shardID, WorkflowID: wf, WorkflowType: "DeliveryOrder"}
 
+	count := func(table string) int {
+		var n int
+		if err := pool.QueryRow(ctx,
+			"SELECT count(*) FROM "+table+" WHERE shard_id=$1 AND workflow_id=$2",
+			int32(shardID), wf).Scan(&n); err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		return n
+	}
+
 	// 1. Start while the shard is not owned: the caller is told NotOwner.
 	if _, err := e.StartWorkflow(ctx, req); err == nil {
 		t.Fatal("expected a NotOwner error")
 	}
 
-	// 2. ...but an executions row was already committed.
-	ex, err := store.Get(ctx, shardID, wf)
-	if err != nil {
-		t.Fatalf("expected the orphan execution row to exist (current, defective behaviour): %v", err)
+	// 2. ...and NOTHING was committed. This is the assertion that was inverted:
+	// the audit asserted the orphan row existed, because it did.
+	if _, err := store.Get(ctx, shardID, wf); !errors.Is(err, core.ErrWorkflowNotFound) {
+		t.Fatalf("a refused start left an executions row behind: Get returned %v, want ErrWorkflowNotFound", err)
 	}
-	var events, tasks int
-	_ = pool.QueryRow(ctx, `SELECT count(*) FROM events WHERE shard_id=$1 AND workflow_id=$2`, int32(shardID), wf).Scan(&events)
-	_ = pool.QueryRow(ctx, `SELECT count(*) FROM tasks WHERE shard_id=$1 AND workflow_id=$2`, int32(shardID), wf).Scan(&tasks)
-	if ex.Status != core.StatusRunning || ex.LastSeq != 0 || events != 0 || tasks != 0 {
-		t.Fatalf("orphan shape changed: status=%s last_seq=%d events=%d tasks=%d", ex.Status, ex.LastSeq, events, tasks)
+	if ev, tk := count("events"), count("tasks"); ev != 0 || tk != 0 {
+		t.Fatalf("a refused start wrote events=%d tasks=%d, want 0 and 0", ev, tk)
 	}
 
-	// 3. The client retries once the shard is owned. It is told the workflow is
-	// already open (a success), and still nothing will ever run it.
+	// 3. The client retries once the shard is owned. It must get a real run,
+	// not "already open" over a corpse.
 	owned = true
 	res, err := e.StartWorkflow(ctx, req)
-	if err != nil || !res.AlreadyOpen {
-		t.Fatalf("retry: res=%+v err=%v", res, err)
+	if err != nil {
+		t.Fatalf("retry: %v", err)
 	}
-	_ = pool.QueryRow(ctx, `SELECT count(*) FROM events WHERE shard_id=$1 AND workflow_id=$2`, int32(shardID), wf).Scan(&events)
-	_ = pool.QueryRow(ctx, `SELECT count(*) FROM tasks WHERE shard_id=$1 AND workflow_id=$2`, int32(shardID), wf).Scan(&tasks)
-	if events != 0 || tasks != 0 {
-		t.Fatalf("expected the workflow to stay inert after the 'already open' retry; events=%d tasks=%d", events, tasks)
+	if res.AlreadyOpen {
+		t.Fatalf("retry reported AlreadyOpen for a workflow that had never started: %+v", res)
 	}
-	t.Logf("CONFIRMED: retry returned AlreadyOpen=true (HTTP 200) for a workflow with 0 events and 0 tasks; it will never execute")
+	if ev, tk := count("events"), count("tasks"); ev != 1 || tk != 1 {
+		t.Fatalf("after the retry: events=%d tasks=%d, want 1 and 1 so a worker will run it", ev, tk)
+	}
+	ex, err := store.Get(ctx, shardID, wf)
+	if err != nil {
+		t.Fatalf("get after retry: %v", err)
+	}
+	if ex.RunID != res.RunID || ex.LastSeq != 1 {
+		t.Fatalf("execution = run %s last_seq %d, want run %s at last_seq 1", ex.RunID, ex.LastSeq, res.RunID)
+	}
+	t.Logf("FIXED: the refused start wrote nothing, and the retry produced a real run (%s) with 1 event and 1 task",
+		res.RunID)
 }

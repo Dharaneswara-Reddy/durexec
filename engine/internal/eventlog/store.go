@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/faultinj"
 )
 
 // Store is the single Postgres-backed implementation of the durable ports.
@@ -27,11 +28,26 @@ import (
 // every statement so a shared database also works.
 type Store struct {
 	pool *pgxpool.Pool
+
+	// faults is the deliberate-failure seam used by the recovery tests. A nil
+	// *faultinj.Injector is a valid disabled injector, so the zero Store never
+	// injects and the hot path costs one atomic load. Nothing can arm an
+	// injector that configuration did not switch on.
+	faults *faultinj.Injector
 }
 
 // New wraps an already-configured pool. Pool lifecycle stays with the caller,
 // because the process may share one pool across several components.
 func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
+
+// UseFaultInjector attaches the process's injector so CommitDecision can be
+// stopped at the seam where its writes are staged but nothing is durable.
+//
+// It is a setter rather than a constructor argument so that every existing
+// New(pool) call site stays correct and un-injectable by default: a node that
+// never calls this can never crash at an injected seam. Call it once, during
+// wiring, before any worker starts.
+func (s *Store) UseFaultInjector(i *faultinj.Injector) { s.faults = i }
 
 // Compile-time proof that we satisfy the ports other packages depend on.
 var (
@@ -99,26 +115,15 @@ func (s *Store) LastSeq(ctx context.Context, shard core.ShardID, workflowID stri
 
 // ---- ExecutionStore -------------------------------------------------------
 
-const insertExecutionSQL = `
-INSERT INTO executions (shard_id, workflow_id, run_id, workflow_type, status, last_seq)
-VALUES ($1, $2, $3, $4, $5, 0)`
-
-// Create opens a new execution. The executions primary key is (shard_id,
-// workflow_id) with no run_id, so at most one run can be open per business
-// key. That is what makes StartWorkflow idempotent at the front door: a
-// duplicate start loses the race on the primary key, and we report that as
-// ErrWorkflowAlreadyOpen, which callers treat as success.
-func (s *Store) Create(ctx context.Context, shard core.ShardID, workflowID string, run core.RunID, wfType string) error {
-	_, err := s.pool.Exec(ctx, insertExecutionSQL,
-		int32(shard), workflowID, string(run), wfType, string(core.StatusRunning))
-	if isUniqueViolation(err) {
-		return core.ErrWorkflowAlreadyOpen
-	}
-	if err != nil {
-		return fmt.Errorf("eventlog: create execution: %w", err)
-	}
-	return nil
-}
+// An execution is opened by CommitDecision, from createExecutionSQL in
+// commit.go, and there is deliberately no Create method here. The executions
+// primary key is (shard_id, workflow_id) with no run_id, so at most one run can
+// be open per business key, and that is what makes StartWorkflow idempotent at
+// the front door: a duplicate start loses the race on the primary key and is
+// reported as core.ErrWorkflowAlreadyOpen. What changed is only where the race
+// is run — inside the fenced transaction that also writes the start event, so
+// the winner's row and its history become durable together and the loser
+// writes nothing at all. See the note on core.ExecutionStore.
 
 const selectExecutionSQL = `
 SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at
@@ -171,6 +176,146 @@ func (s *Store) List(ctx context.Context, shard core.ShardID, status core.Execut
 		return nil, fmt.Errorf("eventlog: list executions: %w", err)
 	}
 	return out, nil
+}
+
+// ---- reconciliation -------------------------------------------------------
+
+// StuckExecution is a RUNNING workflow that nothing will ever drive again: it
+// has no pollable task and no pending timer, so no component of the engine has
+// a reason to look at it. Events is what distinguishes the two kinds.
+type StuckExecution struct {
+	ShardID    core.ShardID
+	WorkflowID string
+	RunID      core.RunID
+	LastSeq    core.Seq
+	// Events is how many events the run has. ZERO means the start itself was
+	// abandoned — there is no history, so there is nothing to resume and the
+	// row is simply garbage. NON-ZERO means a real run lost its task row, and
+	// replay can finish it, because replay is a pure function of history.
+	Events int
+	// UpdatedAt is when anything last touched the row, which is what the
+	// staleness threshold is measured against.
+	UpdatedAt time.Time
+}
+
+// stuckRunningSQL finds RUNNING executions that nothing is going to drive.
+//
+// This is the query no evidence file in the project ever ran, and it is the one
+// that found 19 abandoned starts and one workflow stuck for three days on the
+// live cluster. The conditions, in order:
+//
+//   - status RUNNING and not stale by less than the threshold, so a workflow
+//     that is merely between a commit and its next poll is never touched;
+//   - no tasks row, because a task is exactly "something will drive this";
+//   - no timers row, because a timer is a scheduled reason to come back;
+//   - NOT an unresolved escalation hold. A held activity has the same database
+//     signature as an abandoned run — RUNNING, no task, no timer — because
+//     applyOutcome deliberately writes the scheduling event WITHOUT a task
+//     while it waits for a human. Re-driving one is harmless but pointless, and
+//     counting it as stuck would make this query noisy exactly where an
+//     operator needs it to be precise. A hold is identified as an ESCALATE
+//     verdict with no later __adjudicate signal.
+const stuckRunningSQL = `
+SELECT e.shard_id, e.workflow_id, e.run_id::text, e.last_seq, e.updated_at,
+       (SELECT count(*) FROM events v
+         WHERE v.shard_id = e.shard_id AND v.workflow_id = e.workflow_id
+           AND v.run_id = e.run_id)
+  FROM executions e
+ WHERE e.shard_id = $1
+   AND e.status = 'RUNNING'
+   AND e.updated_at < now() - make_interval(secs => $2)
+   AND NOT EXISTS (SELECT 1 FROM tasks t
+                    WHERE t.shard_id = e.shard_id AND t.workflow_id = e.workflow_id)
+   AND NOT EXISTS (SELECT 1 FROM timers m
+                    WHERE m.shard_id = e.shard_id AND m.workflow_id = e.workflow_id)
+   AND NOT EXISTS (
+         SELECT 1 FROM events esc
+          WHERE esc.shard_id = e.shard_id AND esc.workflow_id = e.workflow_id
+            AND esc.run_id = e.run_id
+            AND esc.event_type = 'SemanticDedupEvaluated'
+            AND esc.payload->>'verdict' = 'ESCALATE'
+            AND NOT EXISTS (
+                  SELECT 1 FROM events adj
+                   WHERE adj.shard_id = esc.shard_id AND adj.workflow_id = esc.workflow_id
+                     AND adj.run_id = esc.run_id
+                     AND adj.event_type = 'SignalReceived'
+                     AND adj.payload->>'name' = '__adjudicate'
+                     AND adj.seq > esc.seq))
+ ORDER BY e.updated_at
+ LIMIT $3`
+
+// StuckRunning returns RUNNING executions in a shard that have no task and no
+// timer and have been untouched for at least olderThan.
+//
+// It is read-only. Deciding what to do about each row belongs to the caller,
+// because the two kinds need opposite treatment and only one of them is safe to
+// do automatically.
+func (s *Store) StuckRunning(ctx context.Context, shard core.ShardID, olderThan time.Duration, limit int) ([]StuckExecution, error) {
+	rows, err := s.pool.Query(ctx, stuckRunningSQL,
+		int32(shard), olderThan.Seconds(), clampLimit(limit))
+	if err != nil {
+		return nil, fmt.Errorf("eventlog: scan for stuck executions: %w", err)
+	}
+	defer rows.Close()
+
+	var out []StuckExecution
+	for rows.Next() {
+		var (
+			e       StuckExecution
+			runText string
+		)
+		if err := rows.Scan(&e.ShardID, &e.WorkflowID, &runText, &e.LastSeq, &e.UpdatedAt, &e.Events); err != nil {
+			return nil, fmt.Errorf("eventlog: scan stuck execution: %w", err)
+		}
+		e.RunID = core.RunID(runText)
+		out = append(out, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("eventlog: scan for stuck executions: %w", err)
+	}
+	return out, nil
+}
+
+// deleteAbandonedStartSQL removes an executions row whose run never started.
+//
+// Every condition is re-tested inside the DELETE rather than trusted from the
+// earlier SELECT, which is what makes this safe to run against a live shard: if
+// anything at all has happened to the row since it was listed — an event
+// appended, a task enqueued, the status moved, the row touched — zero rows are
+// affected and the reconciler simply does nothing. There is no window in which
+// it can delete a workflow that is actually running.
+//
+// Deleting rather than failing the run is the right repair for this one state.
+// The row has NO history, so nothing happened in the world and there is nothing
+// to compensate; it is not a workflow, it is the residue of a start that was
+// rolled back everywhere except here. Leaving it would keep the business key
+// occupied forever, which is the mechanism by which the client's retry kept
+// being told "already open, RUNNING". Removing it lets the caller start the
+// work it asked for.
+const deleteAbandonedStartSQL = `
+DELETE FROM executions e
+ WHERE e.shard_id = $1
+   AND e.workflow_id = $2
+   AND e.status = 'RUNNING'
+   AND e.last_seq = 0
+   AND e.updated_at < now() - make_interval(secs => $3)
+   AND NOT EXISTS (SELECT 1 FROM events v
+                    WHERE v.shard_id = e.shard_id AND v.workflow_id = e.workflow_id)
+   AND NOT EXISTS (SELECT 1 FROM tasks t
+                    WHERE t.shard_id = e.shard_id AND t.workflow_id = e.workflow_id)
+   AND NOT EXISTS (SELECT 1 FROM timers m
+                    WHERE m.shard_id = e.shard_id AND m.workflow_id = e.workflow_id)`
+
+// DeleteAbandonedStart removes one executions row that has no history at all.
+// It reports whether a row was actually removed, so a caller that was racing
+// something else learns it lost rather than assuming it won.
+func (s *Store) DeleteAbandonedStart(ctx context.Context, shard core.ShardID, workflowID string, olderThan time.Duration) (bool, error) {
+	tag, err := s.pool.Exec(ctx, deleteAbandonedStartSQL,
+		int32(shard), workflowID, olderThan.Seconds())
+	if err != nil {
+		return false, fmt.Errorf("eventlog: delete abandoned start %q: %w", workflowID, err)
+	}
+	return tag.RowsAffected() == 1, nil
 }
 
 // ---- small pure helpers ---------------------------------------------------
