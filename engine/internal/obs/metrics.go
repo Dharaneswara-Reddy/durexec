@@ -33,7 +33,7 @@ type Metrics struct {
 	FencingRejections *prometheus.CounterVec
 	DedupVerdicts     *prometheus.CounterVec
 	DedupLatency      prometheus.Histogram
-	TaskQueueDepth    *prometheus.GaugeVec
+	TaskQueueAge      *prometheus.GaugeVec
 }
 
 // Lease transition directions, so callers do not invent their own spellings
@@ -106,9 +106,19 @@ func New(reg prometheus.Registerer) *Metrics {
 			Buckets: prometheus.ExponentialBuckets(0.001, 2, 12),
 		}),
 
-		TaskQueueDepth: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name: "task_queue_depth",
-			Help: "Currently visible tasks waiting in a shard's queue, by task type.",
+		// Age, not depth, and the choice is measured rather than stylistic.
+		// An exact depth means counting every claimable row, which costs
+		// O(claimable rows) whatever index exists — measured 130.92 ms and
+		// 205.1 MiB of pages for one pass at 1.6M rows, against 128MB of
+		// shared_buffers, every 5 s on every node. Age needs one row per
+		// (shard, task_type) instead of all of them: measured 0.97 ms and
+		// 1.0 MiB at the same size, and flat from 16,000 rows upwards. It is
+		// also the signal that distinguishes a deep queue that is draining
+		// from one that is stuck, which a depth cannot, and it is already in
+		// the unit an SLO is written in. See taskq/depth.go ageSQL.
+		TaskQueueAge: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "task_queue_oldest_ready_seconds",
+			Help: "How long the oldest claimable task in a shard's queue has waited, by task type. Zero means nothing is claimable.",
 		}, []string{"shard", "task_type"}),
 	}
 
@@ -120,7 +130,7 @@ func New(reg prometheus.Registerer) *Metrics {
 		m.FencingRejections,
 		m.DedupVerdicts,
 		m.DedupLatency,
-		m.TaskQueueDepth,
+		m.TaskQueueAge,
 	)
 	return m
 }
@@ -162,20 +172,21 @@ func (m *Metrics) ObserveDedup(activityType string, verdict core.DedupVerdict, s
 	m.DedupLatency.Observe(seconds)
 }
 
-// SetQueueDepth reports the current depth of one shard's queue.
-func (m *Metrics) SetQueueDepth(shard core.ShardID, taskType core.TaskType, depth float64) {
-	m.TaskQueueDepth.WithLabelValues(shardLabel(shard), string(taskType)).Set(depth)
+// SetQueueAge reports how long the oldest claimable task in one shard's queue
+// has been waiting.
+func (m *Metrics) SetQueueAge(shard core.ShardID, taskType core.TaskType, seconds float64) {
+	m.TaskQueueAge.WithLabelValues(shardLabel(shard), string(taskType)).Set(seconds)
 }
 
-// ClearQueueDepth forgets every series for a shard this node no longer owns.
+// ClearQueueAge forgets every series for a shard this node no longer owns.
 //
 // Setting the gauge to zero would not do. A gauge keeps its last value until it
 // is overwritten, so a shard that moved to another node would go on being
-// reported by both — and the dashboard sums across nodes, which would then
-// double-count every task in that shard's queue. Deleting the series makes this
-// node stop claiming to know a depth it is no longer sampling.
-func (m *Metrics) ClearQueueDepth(shard core.ShardID) {
-	m.TaskQueueDepth.DeletePartialMatch(prometheus.Labels{"shard": shardLabel(shard)})
+// reported by both — and the dashboard takes a max across nodes, which would
+// then report a stale age for as long as this node ran. Deleting the series
+// makes this node stop claiming to know an age it is no longer sampling.
+func (m *Metrics) ClearQueueAge(shard core.ShardID) {
+	m.TaskQueueAge.DeletePartialMatch(prometheus.Labels{"shard": shardLabel(shard)})
 }
 
 func shardLabel(s core.ShardID) string {

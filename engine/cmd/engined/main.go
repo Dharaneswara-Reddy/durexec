@@ -28,9 +28,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -101,6 +103,32 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
+
+	// The cluster's connection budget is checked against the server's own
+	// max_connections before any worker starts. A node that starts anyway and
+	// then fails a query with "sorry, too many clients already" at whatever
+	// moment the cluster gets busy is both the worst time to find out and the
+	// hardest to attribute; the cluster was in fact already capped at three
+	// nodes by this, with nothing anywhere saying so.
+	if serverMax, serr := serverMaxConnections(ctx, pool); serr != nil {
+		log.Warn(ctx, "could not read the server's max_connections, "+
+			"so the cluster's connection budget was not checked", "error", serr)
+	} else if berr := checkConnBudget(nodeCountFromEnv(), serverMax); berr != nil {
+		return berr
+	} else {
+		log.Info(ctx, "connection budget fits",
+			"nodes", nodeCountFromEnv(), "per_node_pool", maxPoolConns,
+			"per_node_renewal", renewPoolConns,
+			"cluster_total", clusterConnBudget(nodeCountFromEnv()),
+			"server_max_connections", serverMax)
+	}
+
+	// Claim renewal gets its own small pool. See renewPoolConns.
+	renewPool, err := newRenewalPool(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer renewPool.Close()
 
 	migrations := os.Getenv(envMigrationsDir)
 	if migrations == "" {
@@ -179,7 +207,11 @@ func run() error {
 			"note", "similarity is consulted only for the free text around those fields")
 	}
 
-	queue := taskq.New(pool, taskq.Config{LockDuration: cfg.TaskLock})
+	// Claim renewal is routed to its own pool, so a saturated main pool
+	// cannot make a renewal miss the lock it is renewing. See
+	// renewPoolConns and taskq.Queue.renewDB.
+	queue := taskq.New(pool, taskq.Config{LockDuration: cfg.TaskLock}).
+		WithRenewalDB(renewPool)
 
 	engine := &runtime.Engine{
 		Events:     events,
@@ -445,9 +477,144 @@ func run() error {
 // database. It defaults to on, because the guarantee this engine exists to
 // provide is that a committed decision survives the machine losing power, and
 // turning it off trades exactly that away for throughput.
-// maxPoolConns bounds each node's connection pool. Three nodes at this size sit
-// well inside PostgreSQL's default max_connections of 100.
-const maxPoolConns int32 = 25
+// The cluster's connection budget.
+//
+// maxPoolConns is a HARD per-node ceiling. It used to be only a floor-raiser:
+// the code read `if needed > pcfg.MaxConns { pcfg.MaxConns = needed }` and
+// never lowered anything, while pgxpool defaults MaxConns to
+// max(4, runtime.NumCPU()) when the DSN carries no pool_max_conns
+// (pgxpool/pool.go:379-383 at v5.10.0, and deploy/docker-compose.yml's
+// DATABASE_URL carries none). The compose file also sets no CPU limit, so a
+// container sees every core on the host. On a 34-core machine each node would
+// therefore have taken 34 connections and three nodes 102, against a
+// max_connections of 100 — reinstating the "sorry, too many clients already"
+// failure the comment below says was fixed, on nothing but better hardware.
+//
+// 20 rather than 25 is what makes a fourth node fit. Measured on the live
+// three-node cluster: 25+25+25 of engine plus 5 background plus walreceiver
+// plus psql = 82 of 100, so a fourth node at 25 reaches 107 and fails. 20 is
+// still far above steady-state demand, because a worker holds a connection
+// only while a query runs.
+const maxPoolConns int32 = 20
+
+// minPoolConns keeps a pool usable even when the arithmetic below asks for
+// almost nothing. Below about four, one slow query stalls a whole node.
+const minPoolConns int32 = 4
+
+// renewPoolConns is the separate pool that carries lease and claim renewal.
+//
+// Renewal is the one statement in the engine with a deadline it can miss
+// destructively: if it cannot land before the task lock lapses, a completed
+// activity's result is thrown away and the work is done again. Sharing the
+// main pool means that deadline is at the mercy of however many polls and
+// commits are queued ahead of it, so overload destroyed finished work and
+// added the load of redoing it. Four is enough for every shard on a node,
+// because a renewal is one short UPDATE every TASK_LOCK/3.
+const renewPoolConns int32 = 4
+
+// The rest of the budget, stated here rather than left implicit, because the
+// failure it prevents is a cluster that starts and then cannot connect.
+const (
+	// replicationConns is the standby's walreceiver.
+	replicationConns int32 = 2
+	// monitoringConns covers Prometheus and any exporter.
+	monitoringConns int32 = 4
+	// migrationConns is the migrator, which runs briefly at startup.
+	migrationConns int32 = 2
+	// toolingConns covers psql, make verify, and cmd/loadgen during a
+	// benchmark. loadgen used bare pgxpool.New, so it took max(4, NumCPU) = 12
+	// on the measurement host: 82 + 12 = 94 of 100 while benchmarking, six
+	// spare, which is a plausible contributor to the recorded 0.00 wf/s run.
+	toolingConns int32 = 18
+)
+
+// envNodeCount is how many engine nodes the cluster will run. It is read here
+// rather than added to config.Config because it is not a property of this
+// node — it is a property of the deployment, and the only thing that uses it is
+// the budget check below.
+const envNodeCount = "NODE_COUNT"
+
+// defaultNodeCount matches deploy/docker-compose.yml, which runs node-a, -b
+// and -c.
+const defaultNodeCount int32 = 3
+
+func nodeCountFromEnv() int32 {
+	v := os.Getenv(envNodeCount)
+	if v == "" {
+		return defaultNodeCount
+	}
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil || n <= 0 {
+		return defaultNodeCount
+	}
+	return int32(n)
+}
+
+// clusterConnBudget reports how many server connections a cluster of nodeCount
+// engine nodes needs in the worst case, with everything else that connects.
+//
+// It is a pure function so it can be tested, which the old arithmetic could
+// not be: cmd/engined had no test files at all.
+func clusterConnBudget(nodeCount int32) int32 {
+	perNode := maxPoolConns + renewPoolConns
+	return nodeCount*perNode + replicationConns + monitoringConns +
+		migrationConns + toolingConns
+}
+
+// poolSize is the per-node pool size.
+//
+// Separated from newPool and made pure so it can be tested without a database,
+// which the old arithmetic could not be.
+//
+// It deliberately does NOT consult the MaxConns pgxpool.ParseConfig returned.
+// That value is indistinguishable between "the operator asked for 12" and
+// "the host happens to have 12 cores", because pgxpool fills it in with
+// max(4, runtime.NumCPU()) whenever the DSN is silent. Letting it influence
+// the answer is exactly how the pool size came to depend on the size of the
+// machine. explicitMax is non-zero only when the DSN really did carry
+// pool_max_conns, and even then the hard ceiling still applies: an operator
+// may ask for a smaller pool, not a larger one than the cluster budget allows.
+func poolSize(shardCount, wfWorkers, actWorkers int, explicitMax int32) int32 {
+	// The ideal is one connection per worker goroutine per shard, plus a few
+	// for the background loops. It is almost always far above the ceiling, and
+	// that is fine — see the note in newPool on why a small pool
+	// back-pressures rather than deadlocks.
+	want := int32(shardCount*(wfWorkers+actWorkers)) + 8
+	if explicitMax > 0 {
+		want = explicitMax
+	}
+	if want > maxPoolConns {
+		want = maxPoolConns
+	}
+	if want < minPoolConns {
+		want = minPoolConns
+	}
+	return want
+}
+
+// dsnPoolMaxConns reports an explicit pool_max_conns from the DSN, or 0.
+//
+// pgxpool parses it into Config.MaxConns, but by then it is mixed in with the
+// NumCPU default and cannot be told apart from it, so it is read here from the
+// text instead.
+func dsnPoolMaxConns(dsn string) int32 {
+	u, err := url.Parse(dsn)
+	if err != nil {
+		// Not a URL — a keyword/value DSN. pgxpool handles those; an explicit
+		// pool size in one is rare enough to treat as absent rather than
+		// hand-parse, and the ceiling still applies either way.
+		return 0
+	}
+	v := u.Query().Get("pool_max_conns")
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return int32(n)
+}
 
 func newPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	pcfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
@@ -478,16 +645,20 @@ func newPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	// burst of workers queue briefly for a connection, which is exactly the
 	// back-pressure we want when the database is the bottleneck.
 	//
-	// PoolMaxConns keeps three nodes comfortably inside a default server, while
-	// still leaving room for psql and the monitoring stack. Raise it together
-	// with max_connections if the cluster grows.
-	needed := int32(cfg.ShardCount*(cfg.WorkflowWorkers+cfg.ActivityWorkers)) + 8
-	if needed > maxPoolConns {
-		needed = maxPoolConns
-	}
-	if needed > pcfg.MaxConns {
-		pcfg.MaxConns = needed
-	}
+	// maxPoolConns keeps the cluster inside its budget. It is a ceiling in both
+	// directions now; see the note on the constant for why only raising it was
+	// a defect that better hardware would have reintroduced.
+	pcfg.MaxConns = poolSize(cfg.ShardCount, cfg.WorkflowWorkers,
+		cfg.ActivityWorkers, dsnPoolMaxConns(cfg.DatabaseURL))
+
+	// An idle connection used to be held forever, which is why a node that was
+	// doing nothing still occupied 25 of the server's 100: the pool had needed
+	// them once. Releasing them means the budget is consumed by nodes actually
+	// working, so an idle cluster has headroom for psql, a benchmark or a
+	// migration. It does not replace the ceiling — four busy nodes still have
+	// to fit — but it removes the common case where nothing fits.
+	pcfg.MaxConnIdleTime = 30 * time.Second
+	pcfg.MaxConnLifetime = 30 * time.Minute
 
 	pool, err := pgxpool.NewWithConfig(ctx, pcfg)
 	if err != nil {
@@ -498,6 +669,85 @@ func newPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 	return pool, nil
+}
+
+// newRenewalPool opens the small, separate pool that carries claim renewal.
+//
+// See renewPoolConns for why renewal must not share the main pool. It is a
+// second pool rather than a reserved connection because pgxpool has no
+// reservation primitive, and a single dedicated connection would serialise
+// every shard's renewals behind one another.
+func newRenewalPool(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
+	pcfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
+	}
+	if pcfg.ConnConfig.RuntimeParams == nil {
+		pcfg.ConnConfig.RuntimeParams = map[string]string{}
+	}
+	// Renewal is a single-row UPDATE whose loss costs a completed activity's
+	// result, so it is worth the fsync whatever the benchmark asked for.
+	pcfg.ConnConfig.RuntimeParams["synchronous_commit"] = "on"
+	// A distinct application_name is what makes the budget auditable from
+	// pg_stat_activity, which is how the 82-of-100 figure was measured.
+	pcfg.ConnConfig.RuntimeParams["application_name"] = "durexec:" + cfg.NodeID + ":renew"
+	pcfg.MaxConns = renewPoolConns
+	// Renewal must be able to act immediately, so unlike the main pool this
+	// one keeps its connections warm. Four idle connections per node is a
+	// price the budget above already accounts for.
+	pcfg.MinConns = 1
+	pcfg.MaxConnLifetime = 30 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, pcfg)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database for claim renewal: %w", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database for claim renewal: %w", err)
+	}
+	return pool, nil
+}
+
+// checkConnBudget refuses to start when the cluster cannot fit in the server.
+//
+// It is a startup failure on purpose. The alternative is what happened before:
+// a node starts, serves traffic, and then a query fails with "sorry, too many
+// clients already" at whatever moment the cluster happens to get busy — which
+// is both the worst time to find out and the hardest to attribute. The message
+// names every term so the operator can see which one to change.
+func checkConnBudget(nodeCount int32, serverMax int32) error {
+	if serverMax <= 0 {
+		// Nothing to check against. Reported by the caller as a warning
+		// rather than a failure: a server we cannot interrogate is not a
+		// server we know is too small.
+		return nil
+	}
+	need := clusterConnBudget(nodeCount)
+	if need <= serverMax {
+		return nil
+	}
+	return fmt.Errorf(
+		"connection budget does not fit: %d nodes x (%d pool + %d renewal) "+
+			"+ %d replication + %d monitoring + %d migration + %d tooling = %d, "+
+			"but the server's max_connections is %d. "+
+			"Raise max_connections to at least %d, or lower NODE_COUNT",
+		nodeCount, maxPoolConns, renewPoolConns, replicationConns,
+		monitoringConns, migrationConns, toolingConns, need, serverMax, need)
+}
+
+// serverMaxConnections reads the server's own limit, so the budget is checked
+// against what the database actually allows rather than against an assumption.
+func serverMaxConnections(ctx context.Context, pool *pgxpool.Pool) (int32, error) {
+	var s string
+	if err := pool.QueryRow(ctx, "SHOW max_connections").Scan(&s); err != nil {
+		return 0, err
+	}
+	n, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("max_connections = %q: %w", s, err)
+	}
+	return int32(n), nil
 }
 
 // newEmbedder chooses the encoder behind the semantic duplicate check.

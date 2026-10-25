@@ -16,11 +16,12 @@ import (
 
 // ---- fakes ----------------------------------------------------------------
 
-// depthRow is one row of the GROUP BY result.
+// depthRow is one row of the sampler's result: the waiting time, in seconds,
+// of the oldest claimable task in a (shard, task_type).
 type depthRow struct {
 	shard    int32
 	taskType string
-	n        int64
+	n        float64
 }
 
 // fakeRows serves a fixed result set. pgx.Rows is embedded rather than
@@ -48,7 +49,7 @@ func (r *fakeRows) Scan(dest ...any) error {
 	}
 	*(dest[0].(*int32)) = row.shard
 	*(dest[1].(*string)) = row.taskType
-	*(dest[2].(*int64)) = row.n
+	*(dest[2].(*float64)) = row.n
 	return nil
 }
 
@@ -83,24 +84,24 @@ func (f *fakeDepthDB) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults {
 
 var _ DB = (*fakeDepthDB)(nil)
 
-// recordingDepths captures what was published, with no Prometheus registry.
-type recordingDepths struct {
+// recordingAges captures what was published, with no Prometheus registry.
+type recordingAges struct {
 	mu      sync.Mutex
 	set     map[depthKey]float64
 	cleared []core.ShardID
 }
 
-func newRecordingDepths() *recordingDepths {
-	return &recordingDepths{set: map[depthKey]float64{}}
+func newRecordingAges() *recordingAges {
+	return &recordingAges{set: map[depthKey]float64{}}
 }
 
-func (r *recordingDepths) SetQueueDepth(shard core.ShardID, tt core.TaskType, depth float64) {
+func (r *recordingAges) SetQueueAge(shard core.ShardID, tt core.TaskType, depth float64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.set[depthKey{shard, tt}] = depth
 }
 
-func (r *recordingDepths) ClearQueueDepth(shard core.ShardID) {
+func (r *recordingAges) ClearQueueAge(shard core.ShardID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.cleared = append(r.cleared, shard)
@@ -111,22 +112,22 @@ func (r *recordingDepths) ClearQueueDepth(shard core.ShardID) {
 	}
 }
 
-func (r *recordingDepths) depth(shard core.ShardID, tt core.TaskType) (float64, bool) {
+func (r *recordingAges) age(shard core.ShardID, tt core.TaskType) (float64, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	v, ok := r.set[depthKey{shard, tt}]
 	return v, ok
 }
 
-func (r *recordingDepths) published() int {
+func (r *recordingAges) published() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.set)
 }
 
-var _ DepthObserver = (*recordingDepths)(nil)
+var _ DepthObserver = (*recordingAges)(nil)
 
-func newTestSampler(db *fakeDepthDB, obs *recordingDepths, shards ...core.ShardID) *DepthSampler {
+func newTestSampler(db *fakeDepthDB, obs *recordingAges, shards ...core.ShardID) *DepthSampler {
 	owned := shards
 	return NewDepthSampler(NewWithDB(db, DefaultConfig()), DepthConfig{
 		Shards:   func() []core.ShardID { return owned },
@@ -142,18 +143,18 @@ func newTestSampler(db *fakeDepthDB, obs *recordingDepths, shards ...core.ShardI
 // backlog was at its worst.
 func TestSamplePublishesZeroForATypeWithNoTasks(t *testing.T) {
 	db := &fakeDepthDB{rows: []depthRow{{shard: 0, taskType: "WORKFLOW", n: 3}}}
-	obs := newRecordingDepths()
+	obs := newRecordingAges()
 	s := newTestSampler(db, obs, 0)
 
 	if err := s.Sample(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
-	if got, ok := obs.depth(0, core.TaskWorkflow); !ok || got != 3 {
-		t.Fatalf("workflow depth = %v (present %v), want 3", got, ok)
+	if got, ok := obs.age(0, core.TaskWorkflow); !ok || got != 3 {
+		t.Fatalf("workflow age = %v (present %v), want 3", got, ok)
 	}
-	if got, ok := obs.depth(0, core.TaskActivity); !ok || got != 0 {
-		t.Fatalf("activity depth = %v (present %v), want an explicit 0", got, ok)
+	if got, ok := obs.age(0, core.TaskActivity); !ok || got != 0 {
+		t.Fatalf("activity age = %v (present %v), want an explicit 0", got, ok)
 	}
 }
 
@@ -161,7 +162,7 @@ func TestSamplePublishesZeroForATypeWithNoTasks(t *testing.T) {
 // shard, or worse per poll — is the thing this design exists to avoid.
 func TestSampleCostsOneQueryPerPass(t *testing.T) {
 	db := &fakeDepthDB{}
-	s := newTestSampler(db, newRecordingDepths(), 0, 1, 2, 3)
+	s := newTestSampler(db, newRecordingAges(), 0, 1, 2, 3)
 
 	for i := 0; i < 3; i++ {
 		if err := s.Sample(context.Background()); err != nil {
@@ -185,7 +186,7 @@ func TestSampleClearsAShardItNoLongerOwns(t *testing.T) {
 		{shard: 0, taskType: "WORKFLOW", n: 1},
 		{shard: 1, taskType: "WORKFLOW", n: 5},
 	}}
-	obs := newRecordingDepths()
+	obs := newRecordingAges()
 	owned := []core.ShardID{0, 1}
 	s := NewDepthSampler(NewWithDB(db, DefaultConfig()), DepthConfig{
 		Shards:   func() []core.ShardID { return owned },
@@ -196,8 +197,8 @@ func TestSampleClearsAShardItNoLongerOwns(t *testing.T) {
 	if err := s.Sample(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := obs.depth(1, core.TaskWorkflow); got != 5 {
-		t.Fatalf("setup: shard 1 depth = %v, want 5", got)
+	if got, _ := obs.age(1, core.TaskWorkflow); got != 5 {
+		t.Fatalf("setup: shard 1 age = %v, want 5", got)
 	}
 
 	// Shard 1 has gone to another node.
@@ -207,10 +208,10 @@ func TestSampleClearsAShardItNoLongerOwns(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, ok := obs.depth(1, core.TaskWorkflow); ok {
+	if _, ok := obs.age(1, core.TaskWorkflow); ok {
 		t.Fatal("shard 1 is still being reported after ownership moved")
 	}
-	if _, ok := obs.depth(0, core.TaskWorkflow); !ok {
+	if _, ok := obs.age(0, core.TaskWorkflow); !ok {
 		t.Fatal("shard 0 was cleared too; only the lost shard should go")
 	}
 
@@ -226,7 +227,7 @@ func TestSampleClearsAShardItNoLongerOwns(t *testing.T) {
 // Losing every shard is the failover case, and it must clear rather than freeze.
 func TestSampleWithNothingOwnedClearsAndDoesNotQuery(t *testing.T) {
 	db := &fakeDepthDB{rows: []depthRow{{shard: 0, taskType: "WORKFLOW", n: 2}}}
-	obs := newRecordingDepths()
+	obs := newRecordingAges()
 	owned := []core.ShardID{0}
 	s := NewDepthSampler(NewWithDB(db, DefaultConfig()), DepthConfig{
 		Shards:   func() []core.ShardID { return owned },
@@ -254,7 +255,7 @@ func TestSampleWithNothingOwnedClearsAndDoesNotQuery(t *testing.T) {
 // turn a brief outage into a dashboard saying the backlog cleared.
 func TestSampleKeepsTheLastValuesWhenTheQueryFails(t *testing.T) {
 	db := &fakeDepthDB{rows: []depthRow{{shard: 0, taskType: "WORKFLOW", n: 4}}}
-	obs := newRecordingDepths()
+	obs := newRecordingAges()
 	s := newTestSampler(db, obs, 0)
 	ctx := context.Background()
 
@@ -267,8 +268,8 @@ func TestSampleKeepsTheLastValuesWhenTheQueryFails(t *testing.T) {
 	if err := s.Sample(ctx); !errors.Is(err, boom) {
 		t.Fatalf("Sample returned %v, want the query error", err)
 	}
-	if got, _ := obs.depth(0, core.TaskWorkflow); got != 4 {
-		t.Fatalf("depth = %v after a failed pass, want the previous 4 left alone", got)
+	if got, _ := obs.age(0, core.TaskWorkflow); got != 4 {
+		t.Fatalf("age = %v after a failed pass, want the previous 4 left alone", got)
 	}
 }
 
@@ -276,7 +277,7 @@ func TestSampleKeepsTheLastValuesWhenTheQueryFails(t *testing.T) {
 func TestSampleReportsAnIterationError(t *testing.T) {
 	boom := errors.New("connection reset")
 	db := &fakeDepthDB{rows: []depthRow{{shard: 0, taskType: "WORKFLOW", n: 1}}, rowsErr: boom}
-	obs := newRecordingDepths()
+	obs := newRecordingAges()
 	s := newTestSampler(db, obs, 0)
 
 	if err := s.Sample(context.Background()); !errors.Is(err, boom) {
@@ -292,14 +293,14 @@ func TestSampleReportsAnIterationError(t *testing.T) {
 // seeing.
 func TestSampleReportsAnUnknownTaskType(t *testing.T) {
 	db := &fakeDepthDB{rows: []depthRow{{shard: 0, taskType: "SAGA_COMPENSATION", n: 6}}}
-	obs := newRecordingDepths()
+	obs := newRecordingAges()
 	s := newTestSampler(db, obs, 0)
 
 	if err := s.Sample(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got, ok := obs.depth(0, core.TaskType("SAGA_COMPENSATION")); !ok || got != 6 {
-		t.Fatalf("unknown task type depth = %v (present %v), want 6", got, ok)
+	if got, ok := obs.age(0, core.TaskType("SAGA_COMPENSATION")); !ok || got != 6 {
+		t.Fatalf("unknown task type age = %v (present %v), want 6", got, ok)
 	}
 }
 
@@ -342,7 +343,7 @@ func TestDepthSamplerRunStopsOnCancellation(t *testing.T) {
 	s := NewDepthSampler(NewWithDB(db, DefaultConfig()), DepthConfig{
 		Interval: time.Millisecond,
 		Shards:   func() []core.ShardID { return []core.ShardID{0} },
-		Observer: newRecordingDepths(),
+		Observer: newRecordingAges(),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

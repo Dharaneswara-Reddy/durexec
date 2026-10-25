@@ -35,13 +35,17 @@ const DepthInterval = 5 * time.Second
 // moment.
 var depthTaskTypes = [...]core.TaskType{core.TaskWorkflow, core.TaskActivity}
 
-// DepthObserver receives the sampled depths. It is declared here, as the
-// narrowest interface the sampler needs, rather than importing the metrics
-// package, so this package stays testable with no Prometheus registry.
+// DepthObserver receives the samples. It is declared here, as the narrowest
+// interface the sampler needs, rather than importing the metrics package, so
+// this package stays testable with no Prometheus registry.
 // internal/obs.Metrics satisfies it.
 type DepthObserver interface {
-	SetQueueDepth(shard core.ShardID, taskType core.TaskType, depth float64)
-	ClearQueueDepth(shard core.ShardID)
+	// SetQueueAge publishes how long the oldest claimable task in this
+	// (shard, task_type) has been waiting, in seconds. Zero means nothing is
+	// claimable — an empty queue and a fully in-flight queue both read as
+	// zero, which is correct: in neither case is work going unstarted.
+	SetQueueAge(shard core.ShardID, taskType core.TaskType, seconds float64)
+	ClearQueueAge(shard core.ShardID)
 }
 
 // DepthConfig configures the sampling loop.
@@ -135,7 +139,7 @@ func (s *DepthSampler) Sample(ctx context.Context) error {
 		return nil
 	}
 
-	counts, err := s.count(ctx, shards)
+	ages, err := s.age(ctx, shards)
 	if err != nil {
 		// Deliberately nothing is published. A transient database error does not
 		// mean the queues are empty, and writing zeros would turn a brief outage
@@ -147,15 +151,15 @@ func (s *DepthSampler) Sample(ctx context.Context) error {
 	for _, shard := range shards {
 		for _, tt := range depthTaskTypes {
 			k := depthKey{shard, tt}
-			s.cfg.Observer.SetQueueDepth(shard, tt, float64(counts[k]))
-			delete(counts, k)
+			s.cfg.Observer.SetQueueAge(shard, tt, ages[k])
+			delete(ages, k)
 		}
 	}
 	// Anything left is a task type the schema has grown since depthTaskTypes
 	// was written. Report it rather than drop it: an unknown type with a
 	// backlog is precisely the thing worth seeing.
-	for k, n := range counts {
-		s.cfg.Observer.SetQueueDepth(k.shard, k.taskType, float64(n))
+	for k, seconds := range ages {
+		s.cfg.Observer.SetQueueAge(k.shard, k.taskType, seconds)
 	}
 
 	s.remember(shards)
@@ -168,51 +172,96 @@ type depthKey struct {
 	taskType core.TaskType
 }
 
-// countSQL counts the tasks that are pollable right now.
+// ageSQL reports how long the oldest claimable task in each owned
+// (shard, task_type) has been waiting, in seconds. NULL means nothing is
+// claimable, which the caller publishes as zero.
 //
-// The predicate is deliberately the same one pollSQL selects on. "Waiting"
-// means a worker could take this row this instant: a task whose visibility is
-// still in the future is backing off, not queued, and a task under a live lock
-// is in flight, not waiting. Counting either would make an engine that is
-// keeping up look like one falling behind.
+// It replaced a count, and the reason is measured rather than stylistic.
 //
-// One statement covers every owned shard, so the cost of a pass is one round
-// trip rather than one per shard. The tasks_pollable index covers the
-// shard_id/task_type/visible_at leg of the predicate.
-const countSQL = `
-SELECT shard_id, task_type, count(*)
-  FROM tasks
- WHERE shard_id = ANY($1)
-   AND visible_at <= now()
-   AND (locked_until IS NULL OR locked_until < now())
- GROUP BY shard_id, task_type`
+// The count was `count(*) ... WHERE visible_at <= now() AND (locked_until IS
+// NULL OR locked_until < now()) GROUP BY shard_id, task_type`, and the comment
+// above it claimed tasks_pollable covered it. It did not: the query has no
+// task_type predicate at all, so the index's second column was skipped and
+// PostgreSQL 16 has no skip scan. Measured on an isolated 16-shard database:
+//
+//	rows in tasks   this query (count)        ageSQL
+//	    16,000       2.68 ms    2.0 MiB     0.41 ms   0.8 MiB
+//	   160,000      17.43 ms   20.6 MiB     0.99 ms   1.0 MiB
+//	 1,600,000     130.92 ms  205.1 MiB     0.97 ms   1.0 MiB
+//
+// Adding the missing `task_type = ANY(...)` — the fix the audit proposed — was
+// measured and makes it WORSE, 202.74 ms and 231.8 MiB at 1,600,000 rows,
+// because the planner then builds a bitmap over every matching row. So does
+// counting through the new tasks_poll_ready index (135.45 ms, 219.8 MiB), and
+// so does capping the count (652.16 ms, 2266.1 MiB). None of that is a
+// planning mistake: counting N matching rows costs O(N) whatever the plan,
+// because every row has to be visited, and roughly a fifth of a deep queue is
+// claimable. **An exact queue depth cannot be made cheap by any index**, and
+// at 128MB of shared_buffers a 205 MiB pass every five seconds on each of
+// three nodes evicts the whole cache — precisely when the cluster is already
+// in trouble and the number is most wanted.
+//
+// Age can be made cheap, because it needs one row rather than all of them: one
+// descent of tasks_poll_ready per (shard, task_type) pair, which is why the
+// measurement above is flat from 16,000 rows to 1,600,000. It is also the
+// better signal. Depth cannot tell a deep queue that is draining from a queue
+// that is stuck, and the second is the outage; age says so directly, and it is
+// in the unit an SLO is written in. It is the same argument timers/store.go:59
+// makes for draining timers oldest-first.
+//
+// One statement still covers every owned shard, so a pass is one round trip.
+var ageSQL = `
+SELECT p.shard_id, p.task_type,
+       COALESCE(EXTRACT(EPOCH FROM (now() - (
+           SELECT ` + readyAtOf("k") + `
+             FROM tasks k
+            WHERE k.shard_id = p.shard_id AND k.task_type = p.task_type
+              AND ` + readyAtOf("k") + ` <= now()
+            ORDER BY k.shard_id, k.task_type, ` + readyAtOf("k") + `
+            LIMIT 1))), 0)
+  FROM (SELECT s, t FROM unnest($1::int[]) s, unnest($2::text[]) t)
+       AS p(shard_id, task_type)`
 
-func (s *DepthSampler) count(ctx context.Context, shards []core.ShardID) (map[depthKey]int64, error) {
+// readyAtOf qualifies the readyAt expression with a table alias. The index is
+// built on the unqualified form, and PostgreSQL matches an index expression
+// after resolving column references, so the two still match — but ageSQL joins
+// tasks to a derived table, where unqualified column names would be ambiguous.
+func readyAtOf(alias string) string {
+	return `GREATEST(` + alias + `.visible_at, COALESCE(` + alias + `.locked_until, '-infinity'::timestamptz))`
+}
+
+// age returns the waiting time of the oldest claimable task per
+// (shard, task_type), in seconds, with zero for "nothing claimable".
+func (s *DepthSampler) age(ctx context.Context, shards []core.ShardID) (map[depthKey]float64, error) {
 	ids := make([]int32, len(shards))
 	for i, sh := range shards {
 		ids[i] = int32(sh)
 	}
+	types := make([]string, 0, len(depthTaskTypes))
+	for _, tt := range depthTaskTypes {
+		types = append(types, string(tt))
+	}
 
-	rows, err := s.q.db.Query(ctx, countSQL, ids)
+	rows, err := s.q.db.Query(ctx, ageSQL, ids, types)
 	if err != nil {
-		return nil, fmt.Errorf("taskq: count queue depth: %w", err)
+		return nil, fmt.Errorf("taskq: sample queue age: %w", err)
 	}
 	defer rows.Close()
 
-	out := make(map[depthKey]int64, len(shards)*len(depthTaskTypes))
+	out := make(map[depthKey]float64, len(shards)*len(depthTaskTypes))
 	for rows.Next() {
 		var (
 			shard    int32
 			taskType string
-			n        int64
+			seconds  float64
 		)
-		if err := rows.Scan(&shard, &taskType, &n); err != nil {
-			return nil, fmt.Errorf("taskq: scan queue depth: %w", err)
+		if err := rows.Scan(&shard, &taskType, &seconds); err != nil {
+			return nil, fmt.Errorf("taskq: scan queue age: %w", err)
 		}
-		out[depthKey{core.ShardID(shard), core.TaskType(taskType)}] = n
+		out[depthKey{core.ShardID(shard), core.TaskType(taskType)}] = seconds
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("taskq: count queue depth: %w", err)
+		return nil, fmt.Errorf("taskq: sample queue age: %w", err)
 	}
 	return out, nil
 }
@@ -238,7 +287,7 @@ func (s *DepthSampler) forget(owned []core.ShardID) {
 	// Outside the lock: the observer is a caller's code, and holding a lock
 	// across it buys nothing and invites a deadlock.
 	for _, sh := range gone {
-		s.cfg.Observer.ClearQueueDepth(sh)
+		s.cfg.Observer.ClearQueueAge(sh)
 	}
 }
 

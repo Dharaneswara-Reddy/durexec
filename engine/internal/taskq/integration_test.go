@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
-	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,22 +12,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/testdb"
 )
 
-// Skipped unless DUREXEC_TEST_DSN names a PostgreSQL that already has the schema
-// applied, so the unit tests above still run on a machine with no database.
+// testPool goes through internal/testdb rather than reading DUREXEC_TEST_DSN
+// itself. testdb applies the migrations, so these tests no longer depend on
+// some other package having created the schema first, and it refuses a DSN
+// pointing at the demonstration cluster's ports. Reading the variable here
+// bypassed that guard, which is how this package once wrote 48 rows at
+// shard_id 900-911 into the live demo database.
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("DUREXEC_TEST_DSN")
-	if dsn == "" {
-		t.Skip("set DUREXEC_TEST_DSN to run the PostgreSQL tests")
-	}
-	pool, err := pgxpool.New(context.Background(), dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
+	return testdb.Pool(t)
 }
 
 func freshShard(t *testing.T, pool *pgxpool.Pool) core.ShardID {
@@ -292,10 +288,16 @@ func TestConcurrentPollsDoNotCollide(t *testing.T) {
 	}
 }
 
-// The depth query is raw SQL that no unit test executes, so this is the only
-// place its predicate is actually checked against PostgreSQL — including that
-// the shard list really does arrive as an int4[].
-func TestDepthSamplerCountsOnlyWhatAWorkerCouldPollNow(t *testing.T) {
+// ageSQL is raw SQL that no unit test executes, so this is the only place its
+// predicate is checked against PostgreSQL — including that the shard list
+// really does arrive as an int4[] and the task types as a text[].
+//
+// The property is the same one the old count had, and it is the reason the
+// gauge is worth anything: only work a worker could take RIGHT NOW registers.
+// A task backing off after a failure is queued but not waiting, and a task
+// under a live lock is in flight, not waiting. Reporting either would make an
+// engine that is keeping up look like one falling behind.
+func TestQueueAgeReportsOnlyWhatAWorkerCouldPollNow(t *testing.T) {
 	pool := testPool(t)
 	shard := freshShard(t, pool)
 	q := New(pool, Config{LockDuration: 30 * time.Second})
@@ -303,17 +305,21 @@ func TestDepthSamplerCountsOnlyWhatAWorkerCouldPollNow(t *testing.T) {
 
 	run := core.RunID(uuid.NewString())
 	later := time.Now().Add(time.Hour)
+	// Enqueued with an explicit visible_at in the past, so the age is a known
+	// quantity rather than however long this test took to get here.
+	oldest := time.Now().Add(-90 * time.Second)
+	newer := time.Now().Add(-20 * time.Second)
 	if err := q.Enqueue(ctx, []core.Task{
-		{ShardID: shard, Type: core.TaskWorkflow, WorkflowID: "wf-1", RunID: run},
-		{ShardID: shard, Type: core.TaskWorkflow, WorkflowID: "wf-2", RunID: run},
-		{ShardID: shard, Type: core.TaskActivity, WorkflowID: "wf-3", RunID: run},
+		{ShardID: shard, Type: core.TaskWorkflow, WorkflowID: "wf-1", RunID: run, VisibleAt: oldest},
+		{ShardID: shard, Type: core.TaskWorkflow, WorkflowID: "wf-2", RunID: run, VisibleAt: newer},
+		{ShardID: shard, Type: core.TaskActivity, WorkflowID: "wf-3", RunID: run, VisibleAt: newer},
 		// Backing off after a failure: queued, but not waiting for a worker.
 		{ShardID: shard, Type: core.TaskActivity, WorkflowID: "wf-4", RunID: run, VisibleAt: later},
 	}); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 
-	obs := newRecordingDepths()
+	obs := newRecordingAges()
 	s := NewDepthSampler(q, DepthConfig{
 		Shards:   func() []core.ShardID { return []core.ShardID{shard} },
 		Observer: obs,
@@ -321,22 +327,125 @@ func TestDepthSamplerCountsOnlyWhatAWorkerCouldPollNow(t *testing.T) {
 	if err := s.Sample(ctx); err != nil {
 		t.Fatalf("sample: %v", err)
 	}
-	if got, _ := obs.depth(shard, core.TaskWorkflow); got != 2 {
-		t.Fatalf("workflow depth = %v, want 2", got)
+
+	// The OLDEST claimable task sets the gauge, not the newest and not the
+	// count: 90s, within a generous tolerance for how long the test took.
+	got, ok := obs.age(shard, core.TaskWorkflow)
+	if !ok {
+		t.Fatal("no workflow age was published")
 	}
-	if got, _ := obs.depth(shard, core.TaskActivity); got != 1 {
-		t.Fatalf("activity depth = %v, want 1: a task backing off is not waiting", got)
+	if got < 85 || got > 120 {
+		t.Fatalf("workflow age = %vs, want about 90 (the oldest claimable task)", got)
+	}
+	// The activity queue's only claimable task is 20s old; the one backing off
+	// for an hour must not be what is reported.
+	got, ok = obs.age(shard, core.TaskActivity)
+	if !ok {
+		t.Fatal("no activity age was published")
+	}
+	if got < 15 || got > 50 {
+		t.Fatalf("activity age = %vs, want about 20: a task backing off is not waiting", got)
 	}
 
-	// A task under a live lock is in flight, not queued. Counting it would make
-	// an engine that is keeping up look like one falling behind.
+	// Polling locks the oldest workflow task, so the gauge must fall back to
+	// the next claimable one — 20s, not 90s. A task under a live lock is in
+	// flight, not waiting.
 	if _, err := q.Poll(ctx, shard, core.TaskWorkflow); err != nil {
 		t.Fatalf("poll: %v", err)
 	}
 	if err := s.Sample(ctx); err != nil {
 		t.Fatalf("sample: %v", err)
 	}
-	if got, _ := obs.depth(shard, core.TaskWorkflow); got != 1 {
-		t.Fatalf("workflow depth = %v after one task was locked, want 1", got)
+	got, _ = obs.age(shard, core.TaskWorkflow)
+	if got < 15 || got > 50 {
+		t.Fatalf("workflow age = %vs after the oldest task was locked, want about 20", got)
+	}
+
+	// With both workflow tasks in flight, nothing is waiting, and the gauge
+	// must say exactly that rather than keeping its last value.
+	if _, err := q.Poll(ctx, shard, core.TaskWorkflow); err != nil {
+		t.Fatalf("poll: %v", err)
+	}
+	if err := s.Sample(ctx); err != nil {
+		t.Fatalf("sample: %v", err)
+	}
+	if got, _ := obs.age(shard, core.TaskWorkflow); got != 0 {
+		t.Fatalf("workflow age = %v with every task in flight, want an explicit 0", got)
+	}
+}
+
+// TestPollUsesTheReadyIndex is the guard against the one failure mode that no
+// behavioural test can see: the statement and the index drifting apart. If
+// readyAt in queue.go and the expression in
+// migrations/0002_poll_ready_index.up.sql stop matching exactly, the poll
+// still returns the right task — it just goes back to reading and discarding
+// every unclaimable row at the head of the queue, which measured 95ms and
+// 208 MiB of pages for one poll at 100,000 rows per shard.
+func TestPollUsesTheReadyIndex(t *testing.T) {
+	pool := testPool(t)
+	shard := freshShard(t, pool)
+	ctx := context.Background()
+
+	run := core.RunID(uuid.NewString())
+	q := New(pool, DefaultConfig())
+	// Enough rows that an index scan is plainly cheaper than a sequential
+	// scan, so the plan is chosen on cost rather than on the table being tiny.
+	tasks := make([]core.Task, 0, 2000)
+	for i := 0; i < 2000; i++ {
+		tasks = append(tasks, core.Task{
+			ShardID: shard, Type: core.TaskActivity,
+			WorkflowID: "wf-" + uuid.NewString(), RunID: run,
+		})
+	}
+	if err := q.Enqueue(ctx, tasks); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "ANALYZE tasks"); err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+
+	// EXPLAIN only. The pick CTE is what chooses a row, so it is what the
+	// plan has to be checked on; the UPDATE half is a primary-key lookup of
+	// one row and costs the same whatever index exists.
+	//
+	// EXPLAIN returns one row per plan line, so every row has to be read —
+	// scanning only the first gets "Limit" and nothing else, which silently
+	// passes or fails on the wrong evidence.
+	rows, err := pool.Query(ctx, `
+EXPLAIN (FORMAT TEXT)
+SELECT shard_id, task_id FROM tasks
+ WHERE shard_id=$1 AND task_type=$2
+   AND `+readyAt+` <= now()
+ ORDER BY shard_id, task_type, `+readyAt+`
+ FOR UPDATE SKIP LOCKED LIMIT 1`, int32(shard), string(core.TaskActivity))
+	if err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	var lines []string
+	for rows.Next() {
+		var line string
+		if err := rows.Scan(&line); err != nil {
+			rows.Close()
+			t.Fatalf("scan plan line: %v", err)
+		}
+		lines = append(lines, line)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		t.Fatalf("explain: %v", err)
+	}
+	plan := strings.Join(lines, "\n")
+	t.Logf("plan:\n%s", plan)
+
+	if !strings.Contains(plan, "tasks_poll_ready") {
+		t.Fatalf("the poll is not using tasks_poll_ready, so readyAt and the "+
+			"migration have drifted apart:\n%s", plan)
+	}
+	if strings.Contains(plan, "Sort") {
+		t.Fatalf("the poll plan has a Sort, so the index no longer serves the "+
+			"ordering:\n%s", plan)
+	}
+	if strings.Contains(plan, "Seq Scan") {
+		t.Fatalf("the poll plan has a Seq Scan:\n%s", plan)
 	}
 }

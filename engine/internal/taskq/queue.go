@@ -45,16 +45,51 @@ type Config struct {
 	LockDuration time.Duration
 	// Backoff is used by Poller to space out retries of a failing task.
 	Backoff Backoff
+	// RenewTimeout bounds one Extend call, including the wait for a
+	// connection. Zero takes the default, which is one renewal interval. See
+	// the note on Extend and on withDefaults.
+	RenewTimeout time.Duration
 }
+
+// minRenewTimeout floors RenewTimeout so a very short lock — which only a test
+// configures — cannot produce a bound shorter than a round trip to the
+// database. A single localhost query under a parallel test run comfortably
+// exceeds a few tens of milliseconds.
+const minRenewTimeout = 100 * time.Millisecond
 
 // DefaultConfig is a 30s lock with the default jittered backoff.
 func DefaultConfig() Config {
-	return Config{LockDuration: 30 * time.Second, Backoff: DefaultBackoff()}
+	return Config{
+		LockDuration: 30 * time.Second,
+		Backoff:      DefaultBackoff(),
+		RenewTimeout: 10 * time.Second,
+	}
 }
 
 func (c Config) withDefaults() Config {
 	if c.LockDuration <= 0 {
 		c.LockDuration = DefaultConfig().LockDuration
+	}
+	if c.RenewTimeout <= 0 {
+		// One renewal interval, which is a third of the lock.
+		//
+		// The point of the bound is that a renewal which blocks must not
+		// silently consume the attempts that exist to cover a slow one: a
+		// caller renewing on a ticker loses every tick it spends waiting. One
+		// interval makes a timed-out attempt cost exactly what a failed
+		// attempt costs — one of the three the lock lifetime allows — which is
+		// the margin activity_worker.go's comment already describes.
+		//
+		// It was briefly a ninth of the lock, which is wrong in a way worth
+		// recording: an integration test using a 300ms lock then got a 33ms
+		// timeout, well below what a query takes on a loaded host, so renewals
+		// began timing out under nothing worse than a parallel test run. A
+		// bound tight enough to fire on healthy behaviour is not a safety
+		// margin, it is a new failure mode.
+		c.RenewTimeout = c.LockDuration / 3
+	}
+	if c.RenewTimeout < minRenewTimeout {
+		c.RenewTimeout = minRenewTimeout
 	}
 	c.Backoff = c.Backoff.withDefaults()
 	return c
@@ -62,8 +97,24 @@ func (c Config) withDefaults() Config {
 
 // Queue is the PostgreSQL implementation of core.TaskQueue.
 type Queue struct {
-	db  DB
-	cfg Config
+	db DB
+	// renewDB carries claim renewal only, and exists so that renewal cannot
+	// queue behind the polls and commits it is competing with.
+	//
+	// Renewal is the one statement in the engine with a deadline it can miss
+	// destructively. pgxpool.Acquire has no timeout of its own — it waits on
+	// the context — so on a saturated pool a renewal BLOCKS rather than
+	// failing. time.Ticker drops ticks while its receiver is blocked, so the
+	// two spare renewal attempts that exist to absorb a slow one are never
+	// made, the lock lapses, and activity_worker.go then throws away the
+	// result of an activity that had already finished. Overload therefore
+	// destroys completed work and adds the load of redoing it.
+	//
+	// Control-plane traffic must not queue behind data-plane traffic. Four
+	// connections are enough for every shard on a node, because a renewal is
+	// one short UPDATE every LockDuration/3.
+	renewDB DB
+	cfg     Config
 }
 
 var _ core.TaskQueue = (*Queue)(nil)
@@ -74,7 +125,22 @@ func New(pool *pgxpool.Pool, cfg Config) *Queue { return NewWithDB(pool, cfg) }
 // NewWithDB builds a Queue over anything that can run queries, which is how an
 // integration test points the queue at a single connection.
 func NewWithDB(db DB, cfg Config) *Queue {
-	return &Queue{db: db, cfg: cfg.withDefaults()}
+	return &Queue{db: db, renewDB: db, cfg: cfg.withDefaults()}
+}
+
+// WithRenewalDB returns a copy of q whose claim renewals go to renew instead
+// of the main pool. A nil argument leaves the queue sharing one pool, so a
+// caller that has not been updated keeps working.
+//
+// It returns a copy rather than mutating in place so a Queue can be handed out
+// and specialised without the caller being able to change a queue someone else
+// is already using.
+func (q *Queue) WithRenewalDB(renew DB) *Queue {
+	out := *q
+	if renew != nil {
+		out.renewDB = renew
+	}
+	return &out
 }
 
 // Config returns the effective configuration, defaults already applied.
@@ -115,12 +181,50 @@ func interval(d time.Duration) string {
 //
 // With the CTE, the lock and the skip happen once while choosing. RETURNING
 // hands back the row as it now stands, including the server-generated token.
+//
+// readyAt is the instant a task becomes claimable, and it is the whole of the
+// selection predicate.
+//
+// It used to be spelled as two conditions — `visible_at <= now()` AND
+// `(locked_until IS NULL OR locked_until < now())` — ordered by task_id. That
+// spelling cannot be served by any index. The disjunction forces the lock
+// state onto the heap, so every row still under a live lock is read and
+// discarded, and `ORDER BY task_id` cannot come from an index that has a range
+// column ahead of task_id. Measured on an isolated 16-shard database at
+// 100,000 rows per shard: 95 ms and 208 MiB of pages read for ONE poll when
+// nothing was claimable, against 128MB of shared_buffers — i.e. a single poll
+// evicting the whole cache, continuously, on every worker. See
+// migrations/0002_poll_ready_index.up.sql for the measurements.
+//
+// GREATEST(visible_at, coalesce(locked_until, '-infinity')) <= now() is the
+// same condition — it holds exactly when visible_at <= now() and the lock has
+// lapsed or was never taken — but as one range condition on one expression, so
+// tasks_poll_ready serves both the filter and the order and LIMIT 1 stops at
+// the first claimable row. Measured 0.06–0.17 ms and 3–5 pages, flat from
+// 1,000 to 100,000 rows per shard, in every queue shape tried.
+//
+// The ordering changed with it, deliberately: oldest-ready-first instead of
+// lowest-task_id-first. Nothing requires FIFO by insertion id — two tasks for
+// one run are serialised by the events primary key, not by queue order, and
+// tasks for different runs are independent — and readiness order is the better
+// discipline, for the same reason timers/store.go:59 gives for draining timers
+// by fire_at. It is also the only one of the two that can be flat: keeping
+// ORDER BY task_id measured 8.24 ms against 0.17 ms once the head of the queue
+// filled with backing-off tasks, because the scan has to walk all of them.
+// readyAt must be spelled identically here and in the index, or the index does
+// not apply — so it is written once and concatenated into every statement that
+// needs it, rather than repeated. It is kept in step with
+// migrations/0002_poll_ready_index.up.sql, and taskq's integration tests assert
+// the plan uses the index, which is what catches the two drifting apart.
+const readyAt = `GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamptz))`
+
 const pollSQL = `
 WITH pick AS (
     SELECT shard_id, task_id FROM tasks
-    WHERE shard_id=$1 AND task_type=$2 AND visible_at <= now()
-      AND (locked_until IS NULL OR locked_until < now())
-    ORDER BY task_id FOR UPDATE SKIP LOCKED LIMIT 1
+    WHERE shard_id=$1 AND task_type=$2
+      AND ` + readyAt + ` <= now()
+    ORDER BY shard_id, task_type, ` + readyAt + `
+    FOR UPDATE SKIP LOCKED LIMIT 1
 )
 UPDATE tasks t
    SET locked_until = now() + $3::interval,
@@ -193,12 +297,27 @@ WHERE shard_id=$1 AND task_id=$2 AND lock_token=$3::uuid AND locked_until > now(
 // Extend renews the lock on a task that is still being worked. It refuses to
 // renew a lock that has already lapsed: at that point another worker may hold
 // the row, and silently re-taking it would let two workers run the same task.
+//
+// The call is time-boxed, and that bound is the load-bearing part. A renewal
+// that has not landed within RenewTimeout is already useless — the next
+// renewal is due — and worse than useless if it keeps blocking, because the
+// caller's ticker drops every tick it spends waiting. Returning a plain
+// timeout error lets the caller log it and try again on the next tick, which
+// is what the renewal schedule was designed to absorb. Without the bound a
+// single saturated-pool wait silently consumes the whole lock lifetime and the
+// claim lapses while the activity is still running.
+//
+// A timeout is deliberately NOT ErrLockLost. The lock may well still be ours;
+// all we know is that we failed to say so in time, and ErrLockLost means "stop
+// working immediately", which would throw away an activity that is fine.
 func (q *Queue) Extend(ctx context.Context, shard core.ShardID, taskID int64, lockToken string) error {
 	tok, err := parseToken(lockToken)
 	if err != nil {
 		return err
 	}
-	tag, err := q.db.Exec(ctx, extendSQL, int32(shard), taskID, tok, interval(q.cfg.LockDuration))
+	ctx, cancel := context.WithTimeout(ctx, q.cfg.RenewTimeout)
+	defer cancel()
+	tag, err := q.renewDB.Exec(ctx, extendSQL, int32(shard), taskID, tok, interval(q.cfg.LockDuration))
 	if err != nil {
 		return fmt.Errorf("taskq: extend task %d: %w", taskID, err)
 	}

@@ -2,37 +2,48 @@ package taskq
 
 import (
 	"context"
-	"os"
 	"sync"
 	"testing"
 
-	"github.com/dharaneswar339/durexec/internal/core"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/dharaneswar339/durexec/internal/core"
 )
+
+// firstTestShard is the base of the shard ids this test writes. They are far
+// outside any real SHARD_COUNT so they cannot collide with live data, and they
+// are named so the cleanup below and the loop cannot drift apart.
+const firstTestShard = 900
 
 // TestConcurrentWarmPollersEachGetATask is the empirical check for the
 // EvalPlanQual defect. Four connections are warmed first, then released
 // simultaneously against four available tasks.
 func TestConcurrentWarmPollersEachGetATask(t *testing.T) {
-	dsn := os.Getenv("DUREXEC_TEST_DSN")
-	if dsn == "" {
-		t.Skip("no DUREXEC_TEST_DSN")
-	}
+	// Through testPool, so this goes via internal/testdb: it applies the
+	// migrations itself and refuses a DSN pointing at the demonstration
+	// cluster. Reading DUREXEC_TEST_DSN directly here bypassed that guard,
+	// and the shard ids below were left behind in the live demo database.
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
+	pool := testPool(t)
 
 	const workers = 4
 	const rounds = 12
+
+	// Clean up every shard this test writes, however it ends. The rounds below
+	// delete their own shard on the way IN, which leaves the last round's rows
+	// behind on success and every round's rows behind on a failure.
+	t.Cleanup(func() {
+		for r := 0; r < rounds; r++ {
+			_, _ = pool.Exec(context.Background(),
+				`DELETE FROM tasks WHERE shard_id = $1`, int32(firstTestShard+r))
+		}
+	})
 	q := New(pool, DefaultConfig())
 	won := 0
 	total := 0
 
 	for r := 0; r < rounds; r++ {
-		shard := core.ShardID(900 + r)
+		shard := core.ShardID(firstTestShard + r)
 		if _, err := pool.Exec(ctx, `DELETE FROM tasks WHERE shard_id=$1`, int32(shard)); err != nil {
 			t.Fatal(err)
 		}

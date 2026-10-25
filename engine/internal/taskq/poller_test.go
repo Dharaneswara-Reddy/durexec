@@ -96,7 +96,28 @@ func TestPollSQLKeepsItsGuarantees(t *testing.T) {
 	if !strings.Contains(pollSQL, "WITH pick AS") {
 		t.Fatal("pollSQL lost its CTE selection: concurrent pollers will starve")
 	}
-	if !strings.Contains(pollSQL, "visible_at <= now()") {
-		t.Fatal("pollSQL no longer honours visible_at, so a released task retries instantly")
+	// visible_at is honoured through readyAt rather than as its own condition.
+	// GREATEST(visible_at, coalesce(locked_until,'-infinity')) <= now() holds
+	// only when visible_at <= now(), so a released task still waits out its
+	// backoff — but as one range condition on one indexable expression, which
+	// is what lets tasks_poll_ready serve the filter and the order together.
+	// Spelling it as two conditions is what made the poll cost 95 ms and read
+	// 208 MiB of pages at 100,000 rows per shard.
+	if !strings.Contains(pollSQL, readyAt+" <= now()") {
+		t.Fatal("pollSQL no longer gates on readyAt, so a released task retries instantly " +
+			"or a live lock can be stolen")
+	}
+	if !strings.Contains(pollSQL, "ORDER BY shard_id, task_type, "+readyAt) {
+		t.Fatal("pollSQL's ORDER BY no longer matches tasks_poll_ready, so the plan " +
+			"gains a Sort over every claimable row")
+	}
+	// Regression guard for the index, not the lock. The disjunction cannot be
+	// served by any index: it forces the lock state onto the heap, so every
+	// row under a live lock is fetched and discarded. Measured 95 ms and
+	// 26,615 pages for one poll at 100,000 rows per shard, against 0.11 ms and
+	// 3 pages for the readyAt form.
+	if strings.Contains(pollSQL, "locked_until IS NULL OR") {
+		t.Fatal("pollSQL went back to the (locked_until IS NULL OR locked_until < now()) " +
+			"form, which no index can serve; use readyAt")
 	}
 }

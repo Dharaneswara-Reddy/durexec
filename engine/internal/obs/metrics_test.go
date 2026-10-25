@@ -87,7 +87,7 @@ func TestNewRegistersEveryCollector(t *testing.T) {
 	m.LeaseTransition(3, LeaseAcquired)
 	m.FencingRejection(3)
 	m.ObserveDedup("search_flights", core.VerdictDuplicate, 0.02)
-	m.SetQueueDepth(3, core.TaskWorkflow, 7)
+	m.SetQueueAge(3, core.TaskWorkflow, 7)
 
 	want := []string{
 		"workflow_completed_total",
@@ -97,7 +97,7 @@ func TestNewRegistersEveryCollector(t *testing.T) {
 		"fencing_rejections_total",
 		"dedup_verdict_total",
 		"dedup_latency_seconds",
-		"task_queue_depth",
+		"task_queue_oldest_ready_seconds",
 	}
 	families, err := reg.Gather()
 	if err != nil {
@@ -203,8 +203,8 @@ func TestCounterIncrements(t *testing.T) {
 		},
 		{
 			name:   "queue depth is a gauge, last value wins",
-			emit:   func(m *Metrics) { m.SetQueueDepth(1, core.TaskActivity, 3); m.SetQueueDepth(1, core.TaskActivity, 9) },
-			metric: "task_queue_depth",
+			emit:   func(m *Metrics) { m.SetQueueAge(1, core.TaskActivity, 3); m.SetQueueAge(1, core.TaskActivity, 9) },
+			metric: "task_queue_oldest_ready_seconds",
 			labels: map[string]string{"shard": "1", "task_type": "ACTIVITY"},
 			want:   9,
 		},
@@ -292,25 +292,25 @@ func TestDirectionLabelsMatchTheLeaseManager(t *testing.T) {
 	}
 }
 
-// TestClearQueueDepthDropsTheShard covers the case a gauge gets wrong by
+// TestClearQueueAgeDropsTheShard covers the case a gauge gets wrong by
 // default: a shard that moves to another node must stop being reported here, or
 // both nodes report it and the dashboard, which sums across nodes, doubles it.
-func TestClearQueueDepthDropsTheShard(t *testing.T) {
+func TestClearQueueAgeDropsTheShard(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	m := New(reg)
 
-	m.SetQueueDepth(1, core.TaskWorkflow, 4)
-	m.SetQueueDepth(1, core.TaskActivity, 2)
-	m.SetQueueDepth(2, core.TaskWorkflow, 9)
+	m.SetQueueAge(1, core.TaskWorkflow, 4)
+	m.SetQueueAge(1, core.TaskActivity, 2)
+	m.SetQueueAge(2, core.TaskWorkflow, 9)
 
-	m.ClearQueueDepth(1)
+	m.ClearQueueAge(1)
 
 	// Shard 2 is untouched, which is what makes this a per-shard delete rather
 	// than a reset.
-	if got := counterValue(t, reg, "task_queue_depth", map[string]string{"shard": "2"}); got != 9 {
+	if got := counterValue(t, reg, "task_queue_oldest_ready_seconds", map[string]string{"shard": "2"}); got != 9 {
 		t.Fatalf("shard 2 depth = %v, want 9", got)
 	}
-	for _, m := range gathered(t, reg, "task_queue_depth") {
+	for _, m := range gathered(t, reg, "task_queue_oldest_ready_seconds") {
 		if labelsMatch(m, map[string]string{"shard": "1"}) {
 			t.Fatalf("shard 1 still has a series after being cleared: %v", m.GetLabel())
 		}

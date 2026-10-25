@@ -175,22 +175,22 @@
     },
     {
       "id": 7,
-      "title": "Task queue depth",
-      "description": "task_queue_depth — currently visible tasks waiting in a shard's queue, by shard and task type. A gauge, not a rate: it should sit near zero and only climb when a node is down or overloaded.",
+      "title": "Oldest claimable task age",
+      "description": "task_queue_oldest_ready_seconds — how long the oldest task a worker could take right now has been waiting, by shard and task type. It replaced a depth count, which cost 205 MiB of page reads per pass at a 1.6M-row queue against 128MB of shared_buffers; an exact depth costs O(claimable rows) whatever index exists, while an age costs one index descent. Age is also the better signal: a deep queue that is draining stays near zero, a stuck one climbs without bound. max() across nodes, not sum() — each shard has one owner, and ages do not add.",
       "type": "timeseries",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 0, "y": 24, "w": 24, "h": 8 },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "stacking": { "mode": "normal" } }
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15 }
         },
         "overrides": []
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (shard, task_type) (task_queue_depth)",
+          "expr": "max by (shard, task_type) (task_queue_oldest_ready_seconds)",
           "legendFormat": "shard {{shard}} — {{task_type}}"
         }
       ]

@@ -1,0 +1,80 @@
+-- The poll query's index.
+--
+-- tasks_pollable, from 0001, is (shard_id, task_type, visible_at, task_id). It
+-- cannot serve the poll:
+--
+--   * locked_until is not in it, so every row whose lock is still live has to
+--     be fetched from the heap and discarded by a Filter;
+--   * ORDER BY task_id is unreachable in index order, because visible_at sits
+--     between the equality columns and task_id and is used as a range.
+--
+-- In practice the planner did not use it at all. It used tasks_pkey
+-- (shard_id, task_id) instead, which DOES serve ORDER BY task_id in index
+-- order under the shard_id equality, so LIMIT 1 stopped early. That made the
+-- poll look cheap on a healthy queue -- measured 0.16ms at 100,000 rows per
+-- shard -- and hid the real cost, which is not depth but SHAPE: every
+-- unclaimable row sitting at the head of the shard's task_id order is read
+-- from the heap and thrown away. Measured on an isolated 16-shard database at
+-- 100,000 rows per shard:
+--
+--   queue shape                              poll cost    pages read
+--   claimable row near the head               0.16 ms        0.04 MiB
+--   head is 90% the other task_type          77.40 ms      187.2  MiB
+--   retry storm, 99% backing off             93.96 ms      205.9  MiB
+--   nothing claimable at all                 95.12 ms      207.9  MiB
+--
+-- shared_buffers is 128MB, so one poll in the last three cases evicts the
+-- entire buffer cache, on every poll, on every worker, on every node. That is
+-- the congestion collapse: deeper queue, slower poll, less drain, deeper
+-- queue.
+--
+-- ready_at is the instant a row becomes claimable:
+--
+--   GREATEST(visible_at, coalesce(locked_until, '-infinity'))
+--
+-- and `ready_at <= now()` is exactly the predicate the poll already used --
+-- GREATEST(v,l) <= now() holds precisely when v <= now() and l <= now(), and
+-- the coalesce maps "no lock" to the lowest possible value -- but as ONE range
+-- condition on ONE column. So the scan is already in the order the query
+-- wants, every predicate is checked inside the index instead of on the heap,
+-- and LIMIT 1 stops at the first claimable row. Measured 0.06-0.17 ms and 3-5
+-- pages in every shape above, flat from 1,000 to 100,000 rows per shard.
+--
+-- The expression is immutable (GREATEST and coalesce over two columns and a
+-- literal), so it is indexable. Nothing here depends on a moving now(): a
+-- partial index predicated on now() would be wrong the instant after it was
+-- built.
+--
+-- This also replaces the ordering. The old ORDER BY task_id was strict FIFO by
+-- insertion id; this is FIFO by readiness. That is a deliberate change and the
+-- better discipline -- a task that failed and backed off should queue behind
+-- the tasks that became ready while it waited, and a lock that lapsed an hour
+-- ago should be reclaimed before a task that became visible a second ago. It
+-- is also what timers already do: timers_due is (shard_id, fire_at) and
+-- timers/store.go:59 gives this exact argument for ordering by fire_at. The
+-- two cannot both be had, measurably: keeping ORDER BY task_id forces the scan
+-- to walk every backing-off row at the head, which measured 8.24 ms against
+-- 0.17 ms in the retry-storm shape.
+-- Operational note, because this is the kind of thing that only hurts in
+-- production. CREATE INDEX takes an ACCESS EXCLUSIVE lock on tasks for the
+-- duration of the build, which blocks every poll while it runs. CONCURRENTLY
+-- would avoid that, but it cannot be used here: eventlog/migrate.go runs each
+-- migration file as a single Exec through the simple protocol, which
+-- PostgreSQL wraps in an implicit transaction, and CREATE INDEX CONCURRENTLY
+-- is not allowed inside one. On the demonstration cluster, where tasks holds
+-- tens of rows, the build is instantaneous. On a queue with millions of rows
+-- it would not be, and the right move there is to build the index by hand with
+-- CONCURRENTLY first, after which this statement becomes a no-op.
+CREATE INDEX IF NOT EXISTS tasks_poll_ready ON tasks
+    (shard_id, task_type,
+     (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamptz))));
+
+-- tasks_pollable is now dead weight: no statement in the engine can use it,
+-- and it was the largest index on the table (measured 13 MB against 1.2 MB for
+-- tasks_poll_ready on the same 160,000 rows, because it carries two
+-- timestamps and a bigint per entry). Dropping it also removes the planner's
+-- freedom to choose it: the poll was observed taking four different plans on
+-- the same statement depending only on the data, one of them a Sort over every
+-- claimable row, which is a three-order-of-magnitude cost swing with no code
+-- change and nothing in any log to say so.
+DROP INDEX IF EXISTS tasks_pollable;

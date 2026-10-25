@@ -27,6 +27,7 @@
 //
 //	-mode throughput   drive load for a fixed time against a fixed shard set
 //	-mode scaling      run throughput at several shard counts and divide
+//	-mode arrival      OPEN LOOP: offer a fixed arrival rate and find saturation
 //	-mode recovery     watch /v1/shards for handovers, time each outage
 //	-mode duplicates   run a batch, then audit the event log with SQL
 package main
@@ -96,6 +97,15 @@ type config struct {
 	probeTimeout  time.Duration
 	sweep         []int
 
+	// Open-loop mode. rates is the arrival rates to sweep; serviceFloor is
+	// the workload's own latency floor, which must be declared BEFORE a run
+	// because the saturation gate is meaningless without it; arrivalWorkers
+	// bounds the generator so its own saturation is reported rather than
+	// hidden as memory growth.
+	rates          []float64
+	serviceFloor   time.Duration
+	arrivalWorkers int
+
 	workflowType string
 	idPrefix     string
 	prep         time.Duration
@@ -123,12 +133,13 @@ func parseFlags(args []string, errOut io.Writer) (config, error) {
 		bases string
 		nodes stringList
 		sweep string
+		rates string
 	)
 
 	fs := flag.NewFlagSet("loadgen", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 
-	fs.StringVar(&cfg.mode, "mode", "throughput", "throughput | scaling | recovery | duplicates")
+	fs.StringVar(&cfg.mode, "mode", "throughput", "throughput | scaling | arrival | recovery | duplicates")
 	fs.StringVar(&bases, "base", "http://localhost:8081,http://localhost:8082,http://localhost:8083",
 		"comma-separated base URLs; load is spread over all of them")
 	fs.Var(&nodes, "node", "explicit node-id=base-url mapping, repeatable; normally discovered from /healthz")
@@ -150,6 +161,14 @@ func parseFlags(args []string, errOut io.Writer) (config, error) {
 	fs.DurationVar(&cfg.probeInterval, "probe-interval", time.Second, "gap between recovery probe workflows on one shard")
 	fs.DurationVar(&cfg.probeTimeout, "probe-timeout", 60*time.Second, "how long one recovery probe may take before it is abandoned")
 	fs.StringVar(&sweep, "sweep", "1,2,4", "shard counts to run in -mode scaling")
+	fs.StringVar(&rates, "rates", "", "arrival rates in wf/s to sweep in -mode arrival, e.g. 5,10,20,40")
+	fs.DurationVar(&cfg.serviceFloor, "service-floor", 0,
+		"the workload's own latency floor, REQUIRED in -mode arrival. For DeliveryOrder "+
+			"with -prep 50ms it is about 2.01s: 560ms of activity sleeps, the prep timer, "+
+			"the timer scanner's 1s tick and up to one status poll. A point whose p50 sits "+
+			"on this floor is an idle engine, not a saturated one")
+	fs.IntVar(&cfg.arrivalWorkers, "arrival-workers", 0,
+		"cap on concurrent in-flight starts in -mode arrival (0 derives it from -rates and -service-floor)")
 
 	fs.StringVar(&cfg.workflowType, "workflow-type", "DeliveryOrder", "workflow type to start")
 	fs.StringVar(&cfg.idPrefix, "id-prefix", "", "workflow id prefix; default is loadgen-<unix seconds>")
@@ -195,6 +214,13 @@ func parseFlags(args []string, errOut io.Writer) (config, error) {
 	if cfg.sweep, err = parseInts(sweep); err != nil {
 		return cfg, fmt.Errorf("-sweep: %w", err)
 	}
+	// Empty is allowed here and refused in runArrivalMode, so every other
+	// mode keeps working with no new required flag.
+	if rates != "" {
+		if cfg.rates, err = parseFloats(rates); err != nil {
+			return cfg, fmt.Errorf("-rates: %w", err)
+		}
+	}
 
 	if cfg.idPrefix == "" {
 		cfg.idPrefix = "loadgen-" + strconv.FormatInt(time.Now().Unix(), 10)
@@ -206,6 +232,31 @@ func parseFlags(args []string, errOut io.Writer) (config, error) {
 		return cfg, fmt.Errorf("-warmup (%s) must be shorter than -duration (%s)", cfg.warmup, cfg.duration)
 	}
 	return cfg, nil
+}
+
+// parseFloats reads a comma-separated list of arrival rates. Rates are
+// fractional on purpose: below about one workflow a second, an integer sweep
+// cannot get near a slow workload's knee.
+func parseFloats(s string) ([]float64, error) {
+	var out []float64
+	for _, f := range strings.Split(s, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		n, err := strconv.ParseFloat(f, 64)
+		if err != nil {
+			return nil, fmt.Errorf("%q is not a number", f)
+		}
+		if n <= 0 {
+			return nil, fmt.Errorf("%q is not a positive rate", f)
+		}
+		out = append(out, n)
+	}
+	if len(out) == 0 {
+		return nil, errors.New("no values")
+	}
+	return out, nil
 }
 
 func parseInts(s string) ([]int, error) {
@@ -254,8 +305,10 @@ func run(ctx context.Context, cfg config, out io.Writer) error {
 		rows, err = runRecoveryMode(ctx, client, cfg, out)
 	case "duplicates":
 		rows, err = runDuplicatesMode(ctx, client, cfg, out)
+	case "arrival":
+		rows, err = runArrivalMode(ctx, client, cfg, out)
 	default:
-		return fmt.Errorf("unknown -mode %q (throughput, scaling, recovery, duplicates)", cfg.mode)
+		return fmt.Errorf("unknown -mode %q (throughput, scaling, arrival, recovery, duplicates)", cfg.mode)
 	}
 	if err != nil {
 		return err

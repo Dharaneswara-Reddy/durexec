@@ -183,3 +183,44 @@ func TestConfigWithDefaults(t *testing.T) {
 		t.Fatalf("an explicit LockDuration was overwritten: %v", custom.LockDuration)
 	}
 }
+
+// TestRenewTimeoutIsNeverTighterThanAQueryTakes pins the bound that broke an
+// integration test when it was first written. RenewTimeout exists so a blocked
+// renewal cannot silently eat the attempts that cover a slow one — but a bound
+// that fires on healthy behaviour is not a margin, it is a new failure mode. A
+// ninth of a 300ms lock is 33ms, which a localhost query under a parallel test
+// run exceeds easily.
+func TestRenewTimeoutIsNeverTighterThanAQueryTakes(t *testing.T) {
+	cases := []struct {
+		lock time.Duration
+		want time.Duration
+	}{
+		// The production default: a third of the lock, so a timed-out renewal
+		// costs exactly one of the three attempts the lock lifetime allows.
+		{30 * time.Second, 10 * time.Second},
+		{3 * time.Second, time.Second},
+		// Short locks are floored, because below the floor the bound would
+		// fire on a healthy query rather than on a stall.
+		{300 * time.Millisecond, minRenewTimeout},
+		{30 * time.Millisecond, minRenewTimeout},
+	}
+	for _, c := range cases {
+		got := Config{LockDuration: c.lock}.withDefaults().RenewTimeout
+		if got != c.want {
+			t.Errorf("a %s lock gave a renew timeout of %s, want %s", c.lock, got, c.want)
+		}
+		if got < minRenewTimeout {
+			t.Errorf("a %s lock gave %s, below the %s floor", c.lock, got, minRenewTimeout)
+		}
+	}
+
+	// An explicit value is honoured, but still floored.
+	if got := (Config{LockDuration: time.Minute, RenewTimeout: 2 * time.Second}).
+		withDefaults().RenewTimeout; got != 2*time.Second {
+		t.Errorf("an explicit renew timeout became %s, want 2s", got)
+	}
+	if got := (Config{LockDuration: time.Minute, RenewTimeout: time.Millisecond}).
+		withDefaults().RenewTimeout; got != minRenewTimeout {
+		t.Errorf("an explicit 1ms renew timeout became %s, want the %s floor", got, minRenewTimeout)
+	}
+}
