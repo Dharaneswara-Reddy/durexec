@@ -40,3 +40,4 @@ deploy/data/
 /loadgen
 /acceptance
 /healthcheck
+tail

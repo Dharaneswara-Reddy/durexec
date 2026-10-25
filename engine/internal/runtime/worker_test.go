@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -191,10 +190,24 @@ func TestWorkflowWorkerCommitsTheFirstSchedule(t *testing.T) {
 
 // ---- non-determinism ------------------------------------------------------
 
-// Divergence is never repaired. The engine holds two accounts of what the run
-// did and cannot know which is true, so it fails the run and writes down
-// exactly what it found.
-func TestWorkflowWorkerFailsTerminallyOnNonDeterminism(t *testing.T) {
+// Divergence PARKS the run; it is never journaled as a terminal failure.
+//
+// This test asserted the opposite until the fix, and the old expectation was
+// the defect: committing EvWorkflowFailed and StatusFailed set the status from
+// outside the workflow, so the workflow's own error handling never ran and no
+// saga compensation happened. A rolling deployment therefore terminally failed
+// every in-flight run that landed on a new node and stranded whatever its
+// forward steps had already done — a charged card with no refund. It also
+// contradicted the dispatcher's own contract, which says returning the
+// divergence "leaves history untouched, which is what lets an operator deploy
+// the old code back and resume the run".
+//
+// The retry loop the old comment worried about is real: the task does come
+// back and will diverge again. That is a visible stall with a counter on it
+// (reasonDiverged) and an operator decision, which is strictly better than an
+// invisible loss of money. Nothing automatic can be correct here, because only
+// a human knows which deployment told the truth.
+func TestWorkflowWorkerParksAndDoesNotJournalOnNonDeterminism(t *testing.T) {
 	hist := append(startedHistory("Divergent"), event(2, core.EvActivityScheduled, core.ActivityScheduled{
 		K: 0, ActivityType: "Alpha", Mode: core.ModeExact,
 	}), event(3, core.EvActivityCompleted, core.ActivityCompleted{
@@ -207,35 +220,53 @@ func TestWorkflowWorkerFailsTerminallyOnNonDeterminism(t *testing.T) {
 	if err := w.process(context.Background(), workflowTask()); err != nil {
 		t.Fatalf("process: %v", err)
 	}
-	if queue.releaseCount() != 0 {
-		t.Error("a divergent run must not be retried: retrying replays the same divergence forever")
+
+	// Nothing was written. History is exactly as the old code left it, which is
+	// what makes redeploying the old binary a recovery rather than a guess.
+	if n := commits.commitCount(); n != 0 {
+		d, _ := commits.last()
+		t.Fatalf("%d decision(s) committed on divergence, want 0; last was %+v", n, d)
 	}
-	d, ok := commits.last()
-	if !ok {
-		t.Fatal("the divergence was not journaled")
+	// And the task is back, so the run is parked rather than lost.
+	if queue.releaseCount() != 1 {
+		t.Fatalf("task released %d times, want 1: a parked run must return to the queue",
+			queue.releaseCount())
 	}
-	if d.Status != core.StatusFailed {
-		t.Errorf("status = %q, want %q", d.Status, core.StatusFailed)
+	// With a backoff, so a divergent run does not spin the fleet.
+	if rel := queue.released[0]; rel.visibleIn <= 0 {
+		t.Errorf("task released with visibleIn=%dms, want a backoff", rel.visibleIn)
 	}
-	if len(d.Events) != 1 || d.Events[0].Type != core.EvWorkflowFailed {
-		t.Fatalf("want one WorkflowExecutionFailed event, got %+v", d.Events)
+}
+
+// A run this binary refuses to replay on version grounds is parked the same
+// way, and for the same reason: another node running compatible code must be
+// able to take the task, which is what makes a mixed-version rollout
+// survivable instead of destructive.
+func TestWorkflowWorkerParksARunItRefusesOnVersionGrounds(t *testing.T) {
+	hist := startedHistory("Divergent")
+	e, commits, queue := engineForWorker(t, hist, runningExecution("Divergent", 1))
+	e.Dispatcher.CodeVersion = "v2"
+	e.Dispatcher.AcceptVersion = func(recorded string) bool { return recorded == "v2" }
+
+	w := &WorkflowWorker{Engine: e, Shard: 1}
+	if err := w.process(context.Background(), workflowTask()); err != nil {
+		t.Fatalf("process: %v", err)
 	}
-	if d.Events[0].Seq != 4 {
-		t.Errorf("failure written at seq %d, want 4", d.Events[0].Seq)
+	if n := commits.commitCount(); n != 0 {
+		t.Fatalf("%d decision(s) committed for a refused version, want 0", n)
 	}
-	var p core.WorkflowFailed
-	if err := json.Unmarshal(d.Events[0].Payload, &p); err != nil {
-		t.Fatalf("decode failure: %v", err)
+	if queue.releaseCount() != 1 {
+		t.Fatalf("task released %d times, want 1", queue.releaseCount())
 	}
-	// The recorded reason must name both sides of the disagreement, or an
-	// operator cannot tell which deployment to roll back to.
-	for _, want := range []string{"non-determinism", "Alpha", "Gamma"} {
-		if !strings.Contains(p.Error, want) {
-			t.Errorf("failure reason %q does not mention %q", p.Error, want)
-		}
+
+	// Accepting the version lets the very same task proceed, so the refusal was
+	// about the version and nothing else.
+	e.Dispatcher.AcceptVersion = func(string) bool { return true }
+	if err := w.process(context.Background(), workflowTask()); err != nil {
+		t.Fatalf("process after accepting the version: %v", err)
 	}
-	if d.CompleteTaskID != 42 {
-		t.Errorf("the task row must still be cleared, got CompleteTaskID=%d", d.CompleteTaskID)
+	if commits.commitCount() != 1 {
+		t.Fatalf("%d decision(s) committed once the version is accepted, want 1", commits.commitCount())
 	}
 }
 

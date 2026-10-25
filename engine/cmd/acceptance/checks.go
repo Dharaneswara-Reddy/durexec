@@ -77,6 +77,37 @@ var Checks = []Requirement{
 		Text:       "The configuration names no external coordination service.",
 		Acceptance: "No broker, coordinator or consensus product in the compose file, in go.mod, or in any node's /metrics names.",
 	},
+	{
+		ID: "C-11", Kind: "CHECK",
+		Short:      "No started workflow left without a first event",
+		Text:       "Every execution the API accepted has at least one journaled event.",
+		Acceptance: "Zero RUNNING executions with last_seq = 0 that are older than 30 s. A started workflow always commits its first event and task together, so such a row was accepted and then abandoned (the start-path orphan). FAILS on a single one.",
+	},
+}
+
+// startOrphanMinAge is how old a RUNNING, never-journaled execution must be
+// before it counts as abandoned rather than still being started.
+const startOrphanMinAge = 30.0
+
+// startOrphans picks, out of the orphan query, the ones that are unambiguous:
+// RUNNING, not a single event, and old enough that no start is still in
+// flight. A run merely waiting on a signal has events, so it is never one.
+func startOrphans(all []Orphan) []Orphan {
+	var out []Orphan
+	for _, o := range all {
+		if o.LastSeq == 0 && o.AgeSeconds >= startOrphanMinAge {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+func orphanNames(os []Orphan) []string {
+	var out []string
+	for _, o := range os {
+		out = append(out, fmt.Sprintf("%s (shard %d, %.0fs old)", o.WorkflowID, o.ShardID, o.AgeSeconds))
+	}
+	return out
 }
 
 // AllRows is the full report, in order: FR, NFR, then the supporting checks.
@@ -206,6 +237,19 @@ func dupDetails(d []DupCompletion) []string {
 // ---- supporting checks -----------------------------------------------------
 
 func evalChecks(rec *Recorder, ev *Evidence, a analysis) {
+	// C-11: the start-path orphan. Asserts; a single violation FAILS.
+	switch {
+	case !ev.StoreRead || ev.OrphansErr != "":
+		rec.Blocked("C-11", preDB, "%s", ev.dbWhy(ev.OrphansErr))
+	case len(startOrphans(ev.Orphans)) > 0:
+		so := startOrphans(ev.Orphans)
+		rec.Fail("C-11", "%d accepted workflow(s) were never started (RUNNING, last_seq=0, no event, no task): %s",
+			len(so), firstN(orphanNames(so), 3))
+	default:
+		rec.Pass("C-11", "0 RUNNING executions older than %.0f s with no journaled event, out of %d executions read.",
+			startOrphanMinAge, len(ev.Execs))
+	}
+
 	// C-1: primary-key duplicates. Weak by construction, and labelled so.
 	switch {
 	case !ev.StoreRead || ev.SeqDupsErr != "":
@@ -788,9 +832,17 @@ func evalNFR(rec *Recorder, ev *Evidence, a analysis) {
 		byStatus, _ := TerminalCensus(ev.Execs)
 		census = censusString(byStatus)
 	}
-	rec.Manual("NFR-1",
-		"count completed steps (ActivityTaskCompleted) before and after 20 induced kills (go run ./cmd/loadgen -mode recovery) and confirm none is lost",
-		"%s; executions by status: %s.", orphans, census)
+	if so := startOrphans(ev.Orphans); ev.StoreRead && ev.OrphansErr == "" && len(so) > 0 {
+		// An automated assertion: lost accepted work is a violation of NFR-1 by
+		// definition, whatever the kill count was. It can only fail here; it
+		// cannot pass the requirement, because the kills are not induced by this tool.
+		rec.Fail("NFR-1", "accepted work was lost: %d workflow(s) are RUNNING with no event and no task: %s",
+			len(so), firstN(orphanNames(so), 3))
+	} else {
+		rec.Manual("NFR-1",
+			"count completed steps (ActivityTaskCompleted) before and after 20 induced kills (go run ./cmd/loadgen -mode recovery) and confirm none is lost",
+			"%s; executions by status: %s.", orphans, census)
+	}
 
 	// NFR-2
 	h, ok := sumHistograms(ev, "shard_recovery_seconds")

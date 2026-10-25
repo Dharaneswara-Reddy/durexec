@@ -1,5 +1,9 @@
 name: CI
 
+# Lives at the REPOSITORY ROOT (.github/workflows/). The Go module is in
+# engine/, so every job sets working-directory: engine. It used to sit at
+# engine/.github/workflows/, which GitHub never reads, so none of this ever ran.
+#
 # Stage 1 of 7: push and pull request are the only triggers. Everything below
 # runs in order — each stage only starts once the one before it is green —
 # so a failure in unit tests, say, never wastes cluster minutes on a compose
@@ -13,6 +17,10 @@ env:
   GO_VERSION: "1.25"
   DATABASE_URL: postgres://durexec:durexec@localhost:5433/durexec?sslmode=disable
 
+defaults:
+  run:
+    working-directory: engine
+
 jobs:
   # Stage 2 of 7: static checks. Cheapest possible failure, so it runs first.
   lint-and-vet:
@@ -24,6 +32,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+          cache-dependency-path: engine/go.sum
 
       - name: gofmt check
         run: |
@@ -37,10 +46,10 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-  # Stage 3 of 7: every package's own unit tests, with no database available.
-  # Anything under internal/*/integration_test.go skips itself when
-  # DUREXEC_TEST_DSN is unset, so this stage is a clean test of the engine's
-  # logic in isolation before stage 4 pays for a real Postgres.
+  # Stage 3 of 7: every package's own unit tests, with NO database. The tests
+  # that need PostgreSQL skip themselves here (each says why), so this stage
+  # only proves the engine's logic in isolation. It is NOT evidence that the
+  # database-backed tests pass: stage 4 is.
   unit-tests:
     name: Unit tests
     needs: lint-and-vet
@@ -51,15 +60,23 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+          cache-dependency-path: engine/go.sum
 
-      - name: go test (no database)
-        run: go test ./...
+      - name: go test (no database; database tests skip with a stated reason)
+        run: go test -count=1 ./...
 
-  # Stage 4 of 7: the same test suite again, this time against a real
-  # PostgreSQL with the pgvector extension, so the tests gated on
-  # DUREXEC_TEST_DSN run too.
+  # Stage 4 of 7: the whole suite against a real, empty, isolated PostgreSQL
+  # (pgvector image; the service is created fresh for this job and discarded).
+  #
+  # DUREXEC_REQUIRE_DB=1 makes a missing database a FAILURE, not a skip, and
+  # cmd/testinventory -strict fails the job if any test was skipped that is not
+  # on its short, reasoned allow-list. So a green job here means the
+  # database-backed tests (including the taskq poller-starvation regression
+  # test) actually executed. Packages run in parallel (-p 4). The schema is
+  # applied once, explicitly, before any package starts; lease, timers and
+  # eventlog also create it for themselves (internal/testdb).
   integration-tests:
-    name: Integration tests
+    name: Integration tests (PostgreSQL)
     needs: unit-tests
     runs-on: ubuntu-latest
     services:
@@ -76,24 +93,73 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+    env:
+      DUREXEC_TEST_DSN: postgres://durexec:durexec@localhost:5432/durexec?sslmode=disable
+      DUREXEC_REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+          cache-dependency-path: engine/go.sum
 
-      - name: go test (with database)
+      - name: apply the schema to the empty database
+        run: for f in migrations/*.up.sql; do psql "$DUREXEC_TEST_DSN" -v ON_ERROR_STOP=1 -q -f "$f"; done
+
+      - name: go test, packages in parallel, with executed/skipped inventory
+        run: |
+          set -o pipefail
+          go test -json -count=1 -p 4 ./... | go run ./cmd/testinventory -strict
+
+  # Stage 4b of 7: the same suite under the race detector, against a database.
+  # Every package runs under -race; none is excluded. (The timing-sensitive
+  # benchmarks in internal/bench are slower under -race but assert on
+  # correctness, not speed, and passed locally; if one ever turns flaky here,
+  # exclude it by name with a written reason rather than dropping the check.)
+  race-tests:
+    name: Race detector (PostgreSQL)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
         env:
-          DUREXEC_TEST_DSN: postgres://durexec:durexec@localhost:5432/durexec?sslmode=disable
-        run: go test ./...
+          POSTGRES_USER: durexec
+          POSTGRES_PASSWORD: durexec
+          POSTGRES_DB: durexec
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U durexec -d durexec"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DUREXEC_TEST_DSN: postgres://durexec:durexec@localhost:5432/durexec?sslmode=disable
+      DUREXEC_REQUIRE_DB: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: engine/go.sum
+
+      - name: apply the schema to the empty database
+        run: for f in migrations/*.up.sql; do psql "$DUREXEC_TEST_DSN" -v ON_ERROR_STOP=1 -q -f "$f"; done
+
+      - name: go test -race, packages in parallel, with inventory
+        run: |
+          set -o pipefail
+          go test -race -json -count=1 -p 4 ./... | go run ./cmd/testinventory -strict
 
   # Stage 5 of 7: the production image actually builds. Not pushed anywhere —
   # this stage exists to catch a broken Dockerfile or a package that compiles
   # under `go test` but not under the container's CGO_ENABLED=0 cross-build.
   build-image:
     name: Build image
-    needs: integration-tests
+    needs: [integration-tests, race-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

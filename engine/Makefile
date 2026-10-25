@@ -40,7 +40,7 @@ EXPERIMENT_ENDPOINT ?= http://localhost:8000/embed
 # is 0.
 RESTORE ?= 1
 
-.PHONY: up down logs migrate test vet fmt lint build kill-owner demo verify \
+.PHONY: up down logs migrate test test-integration test-race test-inventory vet fmt lint build kill-owner demo verify \
 	check-replication promote-drill embedder-logs experiment
 
 ## up: build and start the demonstration cluster (3 engine nodes, leader +
@@ -66,11 +66,27 @@ logs:
 migrate:
 	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f migrations/0001_init.up.sql
 
-## test: run every package's own unit tests. Tests that need a real
-## PostgreSQL skip themselves unless DUREXEC_TEST_DSN is set (see
-## internal/*/integration_test.go); export it to include them.
+## test: every package's unit tests, NO database. Tests that need PostgreSQL
+## skip, and each prints why; a skipped test has not passed. This target is
+## NOT evidence that the database-backed tests work: use test-integration.
 test:
 	go test ./...
+
+## test-integration: the whole suite against a THROWAWAY PostgreSQL container
+## (never the demo cluster), packages in parallel, fresh database each run, with
+## an executed/skipped inventory. A required test that is skipped fails the run.
+## REPEAT=3 repeats on a fresh database each time; RACE=1 adds -race.
+## Needs docker, psql. See scripts/test-integration.sh.
+test-integration:
+	scripts/test-integration.sh
+
+## test-race: test-integration under the race detector.
+test-race:
+	RACE=1 scripts/test-integration.sh
+
+## test-inventory: no database; list what ran and what skipped, and why.
+test-inventory:
+	go test -json -count=1 ./... | go run ./cmd/testinventory
 
 ## vet: go vet across the whole module.
 vet:

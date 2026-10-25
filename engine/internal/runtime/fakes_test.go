@@ -49,9 +49,9 @@ type fakeExecutions struct {
 	err error
 }
 
-func (f *fakeExecutions) Create(context.Context, core.ShardID, string, core.RunID, string) error {
-	return nil
-}
+// There is deliberately no Create method here. core.ExecutionStore is
+// read-only: an execution is opened only inside CommitDecision, so the fake
+// cannot offer a path the real store does not have.
 
 func (f *fakeExecutions) Get(context.Context, core.ShardID, string) (core.Execution, error) {
 	return f.ex, f.err

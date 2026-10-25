@@ -59,6 +59,9 @@ type Orphan struct {
 	WorkflowID string
 	Status     string
 	LastSeq    int64
+	// AgeSeconds is how long ago the execution row was created. Zero when the
+	// store cannot say, which a check must treat as "too young to judge".
+	AgeSeconds float64
 }
 
 // Store is the database half of the tool. It is an interface so the checks can
@@ -191,7 +194,8 @@ ORDER BY shard_id`
 
 func (s *pgStore) Orphans(ctx context.Context) ([]Orphan, error) {
 	const q = `
-SELECT e.shard_id, e.workflow_id, e.status, e.last_seq
+SELECT e.shard_id, e.workflow_id, e.status, e.last_seq,
+       extract(epoch FROM (now() - e.created_at))::float8
 FROM executions e
 WHERE e.status = 'RUNNING'
   AND NOT EXISTS (
@@ -210,7 +214,7 @@ ORDER BY e.shard_id, e.workflow_id`
 	var out []Orphan
 	for rows.Next() {
 		var o Orphan
-		if err := rows.Scan(&o.ShardID, &o.WorkflowID, &o.Status, &o.LastSeq); err != nil {
+		if err := rows.Scan(&o.ShardID, &o.WorkflowID, &o.Status, &o.LastSeq, &o.AgeSeconds); err != nil {
 			return nil, err
 		}
 		out = append(out, o)

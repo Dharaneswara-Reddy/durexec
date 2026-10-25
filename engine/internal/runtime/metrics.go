@@ -66,6 +66,23 @@ const (
 	// reasonLockLost is an activity whose task claim lapsed while it was still
 	// running, so its result was abandoned rather than committed.
 	reasonLockLost = "task_lock_lost"
+	// reasonDiverged is a replay whose recorded history and current code
+	// disagree about what the run did. The task is PARKED, not failed, so this
+	// counter rising is the only automatic signal that a deployment is
+	// incompatible with work in flight — it used to be journaled as a terminal
+	// workflow failure instead, which lost the information along with the run.
+	// A non-zero value here needs an operator: nothing clears it by itself.
+	reasonDiverged = "replay_diverged"
+	// reasonVersionRefused is a run this binary declines to replay because it
+	// was started by a code version it does not accept. Distinct from
+	// reasonDiverged: nothing has actually disagreed yet, the binary simply
+	// refused to find out.
+	reasonVersionRefused = "version_refused"
+	// reasonUnregistered is a task whose workflow type this binary cannot run.
+	// During a rolling deployment it is expected and transient; sustained, it
+	// means a type no binary registers any more, and the task used to be
+	// retried for the life of the cluster with no cap and no dead letter.
+	reasonUnregistered = "workflow_type_unregistered"
 )
 
 // countEscalation is nil-safe so the dedup pass can call it unconditionally.
