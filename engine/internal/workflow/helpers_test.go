@@ -39,6 +39,26 @@ func newHistory(t *testing.T) *histBuilder {
 	return b.add(core.EvWorkflowStarted, map[string]string{"workflow_type": "test"})
 }
 
+// startedAtVersion rewrites the start event to record a code version, which is
+// how a real run carries the version of the code that began it. It edits the
+// existing event rather than appending one, because a run has exactly one
+// start event and its seq must stay 1.
+func (b *histBuilder) startedAtVersion(version string) *histBuilder {
+	b.t.Helper()
+	if len(b.events) == 0 || b.events[0].Type != core.EvWorkflowStarted {
+		b.t.Fatalf("startedAtVersion: event 1 is %v, not a start event", b.events[0].Type)
+	}
+	raw, err := json.Marshal(map[string]string{
+		"workflow_type": "test",
+		"code_version":  version,
+	})
+	if err != nil {
+		b.t.Fatalf("marshalling start payload: %v", err)
+	}
+	b.events[0].Payload = raw
+	return b
+}
+
 // at returns the CreatedAt that the nth appended event was given.
 func at(n int) time.Time { return baseTime.Add(time.Duration(n) * time.Minute) }
 
@@ -61,11 +81,20 @@ func (b *histBuilder) add(typ core.EventType, payload any) *histBuilder {
 	return b
 }
 
+// activityScheduled records a call with no argument. Most tests want that;
+// the replay signature now includes a digest of the input, so one that passes
+// an argument has to say so with activityScheduledWith — a fixture recording
+// "null" for a call the code makes with an argument is a divergence, and the
+// engine is right to report it.
 func (b *histBuilder) activityScheduled(k int, activityType string) *histBuilder {
+	return b.activityScheduledWith(k, activityType, "null")
+}
+
+func (b *histBuilder) activityScheduledWith(k int, activityType, input string) *histBuilder {
 	return b.add(core.EvActivityScheduled, core.ActivityScheduled{
 		K:            k,
 		ActivityType: activityType,
-		Input:        json.RawMessage("null"),
+		Input:        json.RawMessage(input),
 		DedupKey:     "test-key",
 		Mode:         core.ModeExact,
 	})
@@ -83,9 +112,14 @@ func (b *histBuilder) activityFailed(k int, msg string, nonRetryable bool) *hist
 	})
 }
 
-// activityDone is the common case: scheduled and then completed.
+// activityDone is the common case: scheduled with no argument, then completed.
 func (b *histBuilder) activityDone(k int, activityType, result string) *histBuilder {
 	return b.activityScheduled(k, activityType).activityCompleted(k, result)
+}
+
+// activityDoneWith is activityDone for a call that carried an argument.
+func (b *histBuilder) activityDoneWith(k int, activityType, input, result string) *histBuilder {
+	return b.activityScheduledWith(k, activityType, input).activityCompleted(k, result)
 }
 
 func (b *histBuilder) timerStarted(k int, d time.Duration) *histBuilder {

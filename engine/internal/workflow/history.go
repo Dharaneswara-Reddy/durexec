@@ -27,8 +27,26 @@ const (
 	sigSideEffect = "sideEffect"
 )
 
-func sigActivity(activityType string) string { return "activity:" + activityType }
-func sigSignal(name string) string           { return "signal:" + name }
+// sigActivity names an activity call by its type AND by the identity of its
+// input.
+//
+// The input used to be left out, and that was a silent correctness defect: new
+// code calling the same activity type at the same k with different arguments
+// matched the recorded signature, so replay handed back the OLD result and the
+// workflow proceeded as if the new call had happened. A charge of 100 could
+// resolve as if 200 had been charged, with nothing in the log to show it.
+//
+// The input cannot be compared byte-wise — one side of the comparison is always
+// a fresh marshal of a live Go value, and that is not guaranteed to reproduce
+// the stored bytes — so what is compared is a digest of its canonical form.
+// canonical.go documents those rules in full, including how key order, numbers
+// and absent fields are handled; the short version is that the digest ignores
+// formatting and ignores nothing else.
+func sigActivity(activityType string, input json.RawMessage) string {
+	return "activity:" + activityType + "#" + inputDigest(input)
+}
+
+func sigSignal(name string) string { return "signal:" + name }
 
 // histEntry is everything history knows about one k.
 //
@@ -66,6 +84,12 @@ type history struct {
 	// start is the CreatedAt of WorkflowExecutionStarted. It is the workflow's
 	// notion of "now" before any other event has been replayed.
 	start time.Time
+
+	// codeVersion is the version string the start event recorded, or "" for a
+	// run started before versions were recorded at all. It is read from the
+	// log rather than carried alongside it so that a run's version is as
+	// durable as its history.
+	codeVersion string
 	// last is the CreatedAt of the newest event in the history.
 	last time.Time
 
@@ -114,6 +138,20 @@ func indexHistory(events []core.Event) (*history, error) {
 		switch ev.Type {
 		case core.EvWorkflowStarted:
 			h.start = ev.CreatedAt
+			// A start event written before versioning existed has no
+			// code_version field, and an absent field is not an error: it
+			// decodes to "", which means "unversioned" and is handled
+			// explicitly by the compatibility check.
+			var p struct {
+				CodeVersion string `json:"code_version"`
+			}
+			if len(ev.Payload) > 0 {
+				// A start payload this package cannot decode is not fatal
+				// here: the worker reads the workflow input out of the same
+				// event and reports a far better error if it is corrupt.
+				_ = json.Unmarshal(ev.Payload, &p)
+			}
+			h.codeVersion = p.CodeVersion
 
 		case core.EvActivityScheduled, core.EvCompensationScheduled:
 			var p core.ActivityScheduled
@@ -122,7 +160,11 @@ func indexHistory(events []core.Event) (*history, error) {
 			}
 			e := h.ensure(p.K)
 			e.seq = ev.Seq
-			e.signature = sigActivity(p.ActivityType)
+			// The digest is taken from the input EXACTLY AS STORED. That is the
+			// one thing this line must not get wrong: decoding the payload and
+			// re-encoding it before digesting would compare the current Go
+			// version's output against itself and prove nothing.
+			e.signature = sigActivity(p.ActivityType, p.Input)
 			e.activityType = p.ActivityType
 			e.at = ev.CreatedAt
 
@@ -226,6 +268,21 @@ func indexHistory(events []core.Event) (*history, error) {
 			}
 			h.terminal = core.StatusFailed
 			h.failure = p.Error
+
+		case core.EvCompensationResumed:
+			// A human decided to retry the compensations a half-rolled-back
+			// saga still owes. Clearing the terminal state here is what makes
+			// the run replayable again, and it is sound because events are
+			// processed in seq order: this event is always LATER than the
+			// failure it reopens, so an older failure cannot resurrect a run
+			// that has since failed again.
+			//
+			// Nothing is rewritten and nothing is deleted. The failure event is
+			// still in history and still readable, which is the whole reason
+			// this is an event rather than an UPDATE on the status column.
+			h.terminal = ""
+			h.failure = ""
+			h.output = nil
 
 		default:
 			return nil, fmt.Errorf("workflow: history contains unknown event type %q at seq %d",

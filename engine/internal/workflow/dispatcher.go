@@ -54,6 +54,45 @@ type Dispatcher struct {
 	// in-memory lookup: it runs on the replay path, so anything that could
 	// return a different answer on a later run would break determinism.
 	ModeFor func(activityType string) core.IdempotencyMode
+
+	// CodeVersion identifies the workflow code in this binary. StartWorkflow
+	// records it in the start event, so every run carries the version that
+	// began it for the rest of its life.
+	//
+	// It is a free-form string — a git sha, a build number, a semantic version
+	// — because the engine never interprets it. Only AcceptVersion does, and
+	// that is the deployer's policy, not the engine's. Leaving it empty means
+	// "unversioned", which is what every run written before this existed is.
+	CodeVersion string
+
+	// AcceptVersion decides whether this binary is willing to replay a run that
+	// was started by the given recorded version. It is called once per workflow
+	// task, before any workflow code runs.
+	//
+	// Nil means ACCEPT EVERYTHING, which is deliberately the default: turning
+	// version checking on by itself would park every run in flight at the
+	// moment of deployment, and that is a decision an operator has to take
+	// knowingly. It MUST be a pure function — it runs on the replay path — and
+	// it must accept "" if there are unversioned runs still in flight.
+	//
+	// A rejection is not a failure. See core.VersionIncompatibleError: the run
+	// is left exactly as it was so that a compatible node, or a redeployment of
+	// the old code, can carry it on. What this mechanism does NOT provide is a
+	// way for new code to take a DIFFERENT path for an old run — the
+	// ctx.Version(changeID, min, max) style of patch API that would need the
+	// chosen branch journaled at its own k. Without it, an incompatible change
+	// is a stall that needs an operator, not something the engine rides out,
+	// and that limitation is stated rather than hidden.
+	AcceptVersion func(recorded string) bool
+}
+
+// acceptsVersion reports whether this dispatcher will replay a run recorded at
+// the given version.
+func (d *Dispatcher) acceptsVersion(recorded string) bool {
+	if d.AcceptVersion == nil {
+		return true
+	}
+	return d.AcceptVersion(recorded)
 }
 
 func NewDispatcher(r *Registry) *Dispatcher { return &Dispatcher{registry: r} }
@@ -99,6 +138,10 @@ func (d *Dispatcher) Execute(history []core.Event, wfType string, input json.Raw
 	// crash after committing the completion but before deleting its task row,
 	// and the task then becomes visible again. Produce no commands and report
 	// the status history already records.
+	//
+	// This is checked BEFORE the version gate on purpose: clearing the task row
+	// of a finished run needs no workflow code to run, so refusing it over a
+	// version mismatch would leave rows behind for no benefit.
 	if h.terminal != "" {
 		return Result{
 			Status: h.terminal,
@@ -106,6 +149,16 @@ func (d *Dispatcher) Execute(history []core.Event, wfType string, input json.Raw
 			Err:    h.failure,
 			Now:    h.last,
 		}, nil
+	}
+
+	// The version gate. Refusing here, before the workflow function is even
+	// looked up, is what keeps history untouched: no events, no commands, and
+	// the caller is expected to put the task back.
+	if !d.acceptsVersion(h.codeVersion) {
+		return Result{}, &core.VersionIncompatibleError{
+			Recorded: h.codeVersion,
+			Running:  d.CodeVersion,
+		}
 	}
 
 	co := newCoroutine()

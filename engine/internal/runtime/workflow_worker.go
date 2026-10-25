@@ -23,6 +23,28 @@ import (
 type WorkflowWorker struct {
 	Engine *Engine
 	Shard  core.ShardID
+
+	// Drain, when closed, tells this worker to stop POLLING and return once it
+	// has finished whatever it is doing. It may be nil, which means "never
+	// drain" and is what a test constructing a worker directly wants.
+	//
+	// It is separate from cancelling the context because the two are not the
+	// same instruction: cancelling also cancels the work in flight, which on
+	// the activity path means an external call is abandoned and re-invoked
+	// after the restart. See WorkerPool.StopAllWithin.
+	Drain <-chan struct{}
+}
+
+// draining reports whether a drain signal has been closed. A nil channel is
+// never ready, so a worker with no drain simply never sees one — which is why
+// the zero value of both workers is still correct.
+func draining(drain <-chan struct{}) bool {
+	select {
+	case <-drain:
+		return true
+	default:
+		return false
+	}
 }
 
 // errShardGone is the loop's private signal that this node no longer holds the
@@ -39,6 +61,13 @@ func (w *WorkflowWorker) Run(ctx context.Context) {
 	idle := taskq.IdleMin
 	for {
 		if ctx.Err() != nil {
+			return
+		}
+		// Checked here, immediately before the poll, so a drain stops this
+		// worker taking NEW work without touching anything already running:
+		// whatever the last process() call started has already committed or
+		// released by the time control reaches this line.
+		if draining(w.Drain) {
 			return
 		}
 
@@ -143,12 +172,48 @@ func (w *WorkflowWorker) process(ctx context.Context, task core.Task) error {
 	if errors.As(err, &nd) {
 		// The code and the log tell two different stories about what this run
 		// did, and the engine has no way to know which is true. Guessing could
-		// charge a customer twice or skip a refund, so the run is failed and
-		// the divergence is written down exactly as found. It is never
-		// repaired: an operator redeploying the old code is the fix.
-		log.Error(ctx, "non-determinism during replay",
-			"k", nd.K, "seq", int64(nd.Seq), "recorded", nd.Recorded, "requested", nd.Requested)
-		return w.failTerminally(ctx, task, tok, ex, hist, nd)
+		// charge a customer twice or skip a refund.
+		//
+		// So the run is PARKED, not failed. This used to commit EvWorkflowFailed
+		// and StatusFailed immediately, which was wrong in two ways at once.
+		// First it contradicted the dispatcher's own stated contract — that
+		// returning the divergence "leaves history untouched, which is what
+		// lets an operator deploy the old code back and resume the run" — which
+		// the worker then made false one call later. Second, and worse, a status
+		// set from OUTSIDE the workflow never runs the workflow's error
+		// handling, so no saga compensation ran: forward steps that had already
+		// moved money were abandoned with no refund. A routine rolling
+		// deployment did that to every in-flight run that landed on a new node.
+		//
+		// Parking leaves the decision to a human, which is the only honest
+		// place for it: redeploy the compatible code and the run continues from
+		// the history it still has, or fail it deliberately with the knowledge
+		// of what its compensations owe. The task comes back on its backoff, so
+		// the run is not lost — but nothing clears it automatically either, and
+		// that is what reasonDiverged is for.
+		e.Runtime.countFailure(string(core.TaskWorkflow), reasonDiverged)
+		log.Error(ctx, "PARKED: non-determinism during replay, history left untouched",
+			"k", nd.K, "seq", int64(nd.Seq), "recorded", nd.Recorded, "requested", nd.Requested,
+			"recovery", "redeploy code compatible with this run, or fail it deliberately so its compensations run")
+		w.release(ctx, task, w.Engine.backoff().Jitter(task.Attempt, randFraction()).Milliseconds())
+		return nil
+	}
+	var vi *core.VersionIncompatibleError
+	if errors.As(err, &vi) {
+		// Same treatment, one step earlier: this binary refused to replay the
+		// run at all. Parking is the whole mechanism — another node running
+		// compatible code can take the task, which is exactly what makes a
+		// mixed-version rollout survivable instead of destructive.
+		vi.WorkflowID = task.WorkflowID
+		e.Runtime.countFailure(string(core.TaskWorkflow), reasonVersionRefused)
+		log.Warn(ctx, "PARKED: refusing to replay a run started by an unaccepted code version",
+			"recorded", vi.Recorded, "running", vi.Running)
+		w.release(ctx, task, w.Engine.backoff().Jitter(task.Attempt, randFraction()).Milliseconds())
+		return nil
+	}
+	var notReg *workflow.NotRegisteredError
+	if errors.As(err, &notReg) {
+		return w.handleUnregistered(ctx, task, tok, ex, hist, notReg)
 	}
 	if err != nil {
 		e.Runtime.countFailure(string(core.TaskWorkflow), reasonDispatch)
@@ -262,7 +327,100 @@ func (w *WorkflowWorker) process(ctx context.Context, task core.Task) error {
 	return nil
 }
 
+// maxUnregisteredAttempts bounds how long a task for a workflow type this
+// binary does not know is retried before it is treated as undeliverable.
+//
+// There has to be SOME retrying, because the common cause is deployment skew —
+// a task for a new workflow type reaching a node that has not been upgraded —
+// and in that case another node can serve it and parking is exactly right.
+// There also has to be a bound, because the other cause is a type that no
+// binary will ever register again, and that retried forever: no cap, no dead
+// letter, and a task polled every backoff interval for the life of the
+// cluster. Ten attempts spans the backoff from milliseconds to minutes, which
+// outlasts any rolling deployment while still converging.
+const maxUnregisteredAttempts = 10
+
+// handleUnregistered deals with a workflow type this binary cannot run.
+//
+// The two causes are indistinguishable from in here, so the response is staged:
+// park and retry while a rollout could still explain it, and after the cap stop
+// pretending a retry will help.
+//
+// What it will NOT do is fail a run that has already done something. A status
+// written from out here never runs the workflow's own error handling, so no
+// compensation would run and any completed forward step would be stranded —
+// the same mistake the divergence path used to make. A run with a completed
+// activity in its history therefore keeps parking, loudly and forever, because
+// a human genuinely is the only thing that can resolve it: the code that knows
+// how to undo those steps does not exist in this binary.
+func (w *WorkflowWorker) handleUnregistered(
+	ctx context.Context, task core.Task, tok core.FencingToken,
+	ex core.Execution, hist []core.Event, cause error,
+) error {
+	e := w.Engine
+	log := e.logger().WithShard(w.Shard).WithWorkflow(task.WorkflowID, task.RunID)
+	e.Runtime.countFailure(string(core.TaskWorkflow), reasonUnregistered)
+
+	if task.Attempt < maxUnregisteredAttempts {
+		log.Warn(ctx, "workflow type is not registered in this binary, parking the task",
+			"workflow_type", ex.WorkflowType, "attempt", task.Attempt,
+			"attempts_before_dead_letter", maxUnregisteredAttempts,
+			"likely_cause", "a rolling deployment: another node may have this code")
+		w.releaseAfterFailure(ctx, task)
+		return nil
+	}
+
+	if hasCompletedWork(hist) {
+		// Owed compensations the engine cannot run. Failing the run would
+		// abandon them silently, so it parks instead and says exactly why.
+		log.Error(ctx, "PARKED PERMANENTLY: workflow type is not registered and the run has already completed work",
+			"workflow_type", ex.WorkflowType, "attempt", task.Attempt,
+			"recovery", "deploy a binary that registers this workflow type; failing the run here would skip its compensations")
+		w.releaseAfterFailure(ctx, task)
+		return nil
+	}
+
+	// Nothing has happened in the world, so there is nothing to compensate and
+	// a terminal failure is the honest answer: the run is undeliverable and
+	// somebody should see it as failed rather than as perpetually running.
+	log.Error(ctx, "DEAD LETTER: workflow type is not registered after the retry cap, failing the run",
+		"workflow_type", ex.WorkflowType, "attempts", task.Attempt)
+	return w.failTerminally(ctx, task, tok, ex, hist, cause)
+}
+
+// hasCompletedWork reports whether any activity or compensation in this run has
+// finished. It is the test for "could this run owe a compensation?", and it is
+// deliberately conservative: a scheduled-but-unresolved activity counts, since
+// the effect may well have happened without its result being journaled.
+func hasCompletedWork(hist []core.Event) bool {
+	for i := range hist {
+		switch hist[i].Type {
+		case core.EvActivityScheduled, core.EvActivityCompleted,
+			core.EvCompensationScheduled, core.EvCompensationCompleted:
+			return true
+		}
+	}
+	return false
+}
+
 // failTerminally writes the failure the engine refuses to work around.
+//
+// KNOWN LIMITATION, stated here because it is load-bearing: a status written by
+// this function does NOT run the workflow's compensations. It commits
+// EvWorkflowFailed and StatusFailed directly, whereas a saga rollback only
+// happens when the workflow function itself observes an error and unwinds its
+// own stack. So this path is correct only where there is nothing to compensate.
+//
+// The two remaining callers satisfy that. A history with no usable start event
+// has no recorded activity to undo, and a BuildDecision failure means the
+// decision was never turned into events, so nothing in it ever happened. The
+// case that did NOT satisfy it was replay divergence, which could strand a
+// completed charge with no refund; that now parks instead — see process.
+//
+// Anything added here in future has to answer the same question first: could
+// this run have performed an external effect that someone is owed the reversal
+// of? If yes, this is the wrong function.
+
 func (w *WorkflowWorker) failTerminally(
 	ctx context.Context, task core.Task, tok core.FencingToken,
 	ex core.Execution, hist []core.Event, cause error,

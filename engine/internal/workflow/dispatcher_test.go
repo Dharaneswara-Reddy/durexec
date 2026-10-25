@@ -151,7 +151,9 @@ func TestNonDeterminismDetected(t *testing.T) {
 	if nd.K != 1 {
 		t.Fatalf("K = %d, want 1 — the divergence is at the second blocking call", nd.K)
 	}
-	if nd.Recorded != "activity:Charge" || nd.Requested != "activity:Cancel" {
+	// The signature carries a digest of the input as well as the type, so the
+	// assertion is on the type part; the input part has its own tests.
+	if nd.Recorded != sigActivity("Charge", nil) || nd.Requested != sigActivity("Cancel", nil) {
 		t.Fatalf("recorded=%q requested=%q", nd.Recorded, nd.Requested)
 	}
 	// The scheduling event for k=1 is the third event in the history.
@@ -182,7 +184,7 @@ func TestNonDeterminismAcrossKinds(t *testing.T) {
 	if !errors.As(err, &nd) {
 		t.Fatalf("expected *core.NonDeterminismError, got %v", err)
 	}
-	if nd.K != 0 || nd.Recorded != sigTimer || nd.Requested != "activity:Charge" {
+	if nd.K != 0 || nd.Recorded != sigTimer || nd.Requested != sigActivity("Charge", nil) {
 		t.Fatalf("unexpected divergence: %+v", nd)
 	}
 }
@@ -302,7 +304,10 @@ func TestSideEffectNotReinvokedOnReplay(t *testing.T) {
 	}
 
 	// Second execution against the recorded value: fn must NOT run again.
-	h.sideEffect(0, `"id-from-first-run"`).activityDone(1, "Charge", "null")
+	// The recorded input has to be the one the code actually passes — the side
+	// effect's value — because the replay signature now covers it.
+	h.sideEffect(0, `"id-from-first-run"`).
+		activityDoneWith(1, "Charge", `"id-from-first-run"`, "null")
 	res = run(t, d, h.done())
 	if calls != 1 {
 		t.Fatalf("fn called %d times in total; replay must reuse the recorded value", calls)

@@ -187,10 +187,15 @@ func (c *wfContext) replay(k int, requested string) (Future, bool) {
 
 func (c *wfContext) ExecuteActivity(activityType string, input any) Future {
 	k := c.next()
-	if f, done := c.replay(k, sigActivity(activityType)); done {
-		return f
-	}
 
+	// The input is marshalled BEFORE the replay check, because the replay
+	// signature now includes a digest of it and there is nothing to digest
+	// until it exists. The order matters in one case only: code that passes an
+	// unserialisable value at a k whose result is already recorded now reports
+	// the marshalling error instead of returning the recorded result. That is
+	// the better answer — the code genuinely changed, and the error travels
+	// through the workflow's own error handling rather than being papered over
+	// with a result for a call the new code cannot even express.
 	raw, err := marshalInput(input)
 	if err != nil {
 		// A value the workflow cannot even serialise is a bug in the workflow,
@@ -199,6 +204,10 @@ func (c *wfContext) ExecuteActivity(activityType string, input any) Future {
 		// emit no command. k has still been consumed, so this stays
 		// deterministic on every later replay.
 		return resolvedFuture{err: err}
+	}
+
+	if f, done := c.replay(k, sigActivity(activityType, raw)); done {
+		return f
 	}
 
 	c.commands = append(c.commands, core.Command{
