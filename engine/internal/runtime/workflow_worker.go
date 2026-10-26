@@ -161,6 +161,20 @@ func (w *WorkflowWorker) process(ctx context.Context, task core.Task) error {
 		replayHist = append(replayHist, pre.events...)
 	}
 
+	// A node with no dispatcher cannot run any workflow, which is a wiring
+	// mistake rather than anything this run did. Saying so and releasing the
+	// task is better than dereferencing nil: a panic here takes the whole
+	// process down, and inside a test binary it ends the package mid-run while
+	// the summary still reports zero failures — the green-but-wrong signal this
+	// engine exists to argue against. codeVersion() already guards the same
+	// field; this is the other caller.
+	if e.Dispatcher == nil {
+		e.Runtime.countFailure(string(core.TaskWorkflow), reasonDispatch)
+		log.Error(ctx, "no workflow dispatcher configured on this node")
+		w.releaseAfterFailure(ctx, task)
+		return nil
+	}
+
 	start := time.Now()
 	res, err := e.Dispatcher.Execute(replayHist, ex.WorkflowType, input)
 	replaySeconds := time.Since(start).Seconds()
