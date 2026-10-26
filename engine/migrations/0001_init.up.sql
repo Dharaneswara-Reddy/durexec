@@ -51,7 +51,18 @@ CREATE TABLE IF NOT EXISTS tasks (
     attempt             INT         NOT NULL DEFAULT 0,
     PRIMARY KEY (shard_id, task_id)
 );
-CREATE INDEX IF NOT EXISTS tasks_pollable ON tasks (shard_id, task_type, visible_at, task_id);
+-- The poll index lives in 0002 (tasks_poll_ready), not here.
+--
+-- This file used to create tasks_pollable (shard_id, task_type, visible_at,
+-- task_id) and 0002 drops it. Because there is no schema_migrations table —
+-- every *.up.sql is re-applied on every node boot — that pair made each boot
+-- BUILD a large index on tasks under ACCESS EXCLUSIVE and then drop it again,
+-- blocking every poll for the length of the build. It also deadlocked against
+-- concurrent pollers when a second migrator ran (observed as
+-- "apply 0002_poll_ready_index.up.sql: deadlock detected" with test packages
+-- in parallel). Removing the create makes both files genuine no-ops after the
+-- first pass; 0002's DROP INDEX IF EXISTS still removes the index from any
+-- database that was created before this line was deleted.
 
 CREATE TABLE IF NOT EXISTS timers (
     shard_id    INT         NOT NULL,
