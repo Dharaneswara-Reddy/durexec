@@ -1,0 +1,15 @@
+# terraform.tfstate holds the GENERATED DATABASE AND GRAFANA PASSWORDS in
+# plaintext. It is a secret, not just build output.
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Real variable values, including the operator's own IP address.
+terraform.tfvars
+*.auto.tfvars
+
+# Saved plan files embed every variable value, so they are secrets too.
+*.tfplan
+plan.txt

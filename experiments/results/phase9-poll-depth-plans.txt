@@ -1,0 +1,55 @@
+===== depth=1 claimable=mixed =====
+ Limit  (cost=15.08..15.09 rows=1 width=29) (actual time=0.021..0.022 rows=0 loops=1)
+   Buffers: shared hit=18
+   ->  Sort  (cost=15.08..15.09 rows=1 width=29) (actual time=0.021..0.021 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=18
+         ->  Seq Scan on tasks  (cost=0.00..15.07 rows=1 width=29) (actual time=0.012..0.012 rows=0 loops=1)
+               Filter: ((shard_id = 0) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Rows Removed by Filter: 4
+               Buffers: shared hit=15
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.274 ms
+ Execution Time: 0.046 ms
+===== depth=1001 claimable=0 =====
+ Limit  (cost=0.28..8.30 rows=1 width=29) (actual time=0.011..0.011 rows=0 loops=1)
+   Buffers: shared hit=2
+   ->  Index Scan using tasks_poll_ready on tasks  (cost=0.28..8.30 rows=1 width=29) (actual time=0.011..0.011 rows=0 loops=1)
+         Index Cond: ((shard_id = 0) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+         Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.310 ms
+ Execution Time: 0.036 ms
+===== depth=10000 claimable=0 =====
+ Limit  (cost=0.29..5.19 rows=1 width=29) (actual time=0.012..0.012 rows=0 loops=1)
+   Buffers: shared hit=2
+   ->  Index Scan using tasks_poll_ready on tasks  (cost=0.29..10.09 rows=2 width=29) (actual time=0.011..0.012 rows=0 loops=1)
+         Index Cond: ((shard_id = 0) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+         Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.257 ms
+ Execution Time: 0.036 ms
+===== depth=100001 claimable=0 =====
+ Limit  (cost=0.29..5.20 rows=1 width=29) (actual time=0.013..0.014 rows=0 loops=1)
+   Buffers: shared hit=2
+   ->  Index Scan using tasks_poll_ready on tasks  (cost=0.29..10.10 rows=2 width=29) (actual time=0.012..0.012 rows=0 loops=1)
+         Index Cond: ((shard_id = 0) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+         Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.271 ms
+ Execution Time: 0.040 ms
+===== depth=100001 claimable=1 =====
+ Limit  (cost=0.29..5.20 rows=1 width=29) (actual time=0.011..0.011 rows=0 loops=1)
+   Buffers: shared hit=2
+   ->  Index Scan using tasks_poll_ready on tasks  (cost=0.29..10.10 rows=2 width=29) (actual time=0.010..0.011 rows=0 loops=1)
+         Index Cond: ((shard_id = 0) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+         Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.290 ms
+ Execution Time: 0.033 ms

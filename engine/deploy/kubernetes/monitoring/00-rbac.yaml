@@ -1,0 +1,41 @@
+# Prometheus is the only component in this lab that talks to the Kubernetes
+# API, and it needs exactly two things: to discover the engine pods, and to
+# read the kubelet's cAdvisor endpoint for container CPU and memory. Those are
+# the only verbs granted. The engine's own service account stays at zero
+# permissions with no mounted token (see base/00-namespace-rbac.yaml).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: durexec-lab
+---
+# ClusterRole, not Role, because nodes and nodes/metrics are cluster-scoped
+# resources: a namespaced Role cannot grant them. The read verbs are the
+# narrowest set that service discovery and a cAdvisor scrape actually use.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: durexec-lab-prometheus
+rules:
+  - apiGroups: [""]
+    # nodes/proxy, not just nodes/metrics: the cAdvisor scrape goes through
+    # the API server proxy (/api/v1/nodes/<n>/proxy/metrics/cadvisor), and
+    # that path authorises against the nodes/proxy subresource. Granting
+    # nodes/metrics alone returned 403 Forbidden on every scrape.
+    resources: ["nodes", "nodes/proxy", "nodes/metrics", "services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics", "/metrics/cadvisor"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: durexec-lab-prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: durexec-lab-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: durexec-lab

@@ -240,3 +240,45 @@ embedder-logs:
 ## --wait embedder`) to already be healthy.
 experiment:
 	go run ./cmd/experiment -embedder=http -endpoint=$(EXPERIMENT_ENDPOINT)
+
+# ---- Phase 9: AWS deployment preparation ----------------------------------
+#
+# Every target here is LOCAL AND SAFE. None of them reaches AWS to create a
+# resource, and none costs anything. The billable steps are deliberately NOT
+# make targets: they are scripts that refuse to run without
+# DUREXEC_CONFIRM=i-understand-this-costs-money, so no amount of
+# tab-completing in this Makefile can start an EC2 instance. The authorized
+# sequence is in docs/cloud-deployment/DEPLOYMENT-RUNBOOK.md.
+.PHONY: aws-preflight aws-validate aws-build aws-package aws-plan
+
+## aws-preflight: check this host has the memory and disk for a build
+aws-preflight:
+	./scripts/aws/preflight_local.sh
+
+## aws-validate: fmt and validate the Terraform, and prove that nothing in the
+## cloud compose file would be reachable from outside the instance. Local
+## only; makes no AWS call at all.
+aws-validate:
+	terraform -chdir=deploy/aws/terraform fmt -check -recursive
+	terraform -chdir=deploy/aws/terraform init -backend=false -input=false
+	terraform -chdir=deploy/aws/terraform validate
+	./scripts/aws/assert_no_public_bind.sh
+
+## aws-build: build durexec-engine and durexec-extsimd for linux/amd64.
+## Tags both with the short git SHA plus -dirty when the tree is uncommitted,
+## because Phase 6 found three nodes running three different builds behind one
+## unchanged tag.
+aws-build:
+	./scripts/aws/build_images.sh
+
+## aws-package: save both images into one checksummed archive under
+## .artifacts/. Uploads nothing and needs no registry.
+aws-package:
+	./scripts/aws/package_images.sh
+
+## aws-plan: show the Terraform plan without applying it. This makes
+## READ-ONLY AWS API calls, creates nothing, and needs
+## deploy/aws/terraform/terraform.tfvars to exist.
+aws-plan:
+	terraform -chdir=deploy/aws/terraform init -input=false
+	terraform -chdir=deploy/aws/terraform plan -input=false

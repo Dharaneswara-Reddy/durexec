@@ -1,0 +1,107 @@
+# The scrape configuration for the Kubernetes lab.
+#
+# Four jobs, and each one exists to answer a question the Phase 9 reports could
+# not: engine internals (already instrumented, never scraped in Kubernetes),
+# PostgreSQL resource use (gap L-5), container CPU and memory (gap L-5), and
+# Prometheus's own cost (the monitoring-overhead measurement).
+#
+# scrape_interval is 5 s, matching deploy/prometheus.yml so a figure measured
+# in compose and one measured here are at the same resolution. An experiment
+# that runs for 120 s then has 24 samples per series, which is enough for a
+# rate() over a 30 s window and still cheap on a 2-vCPU node.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: durexec-lab
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 5s
+      evaluation_interval: 5s
+      external_labels:
+        lab: durexec-minikube
+
+    scrape_configs:
+      # ---- the engine itself ------------------------------------------------
+      # Discovered through the headless Service's endpoints rather than listed
+      # statically, because the whole point of a StatefulSet here is stable
+      # identity: the endpoint's target name IS the node id the engine uses in
+      # its hash ring, so `instance` lines up with `owner_node` in SQL without
+      # any translation.
+      #
+      # publishNotReadyAddresses is true on durexec-hl (see base/30-engine.yaml),
+      # so a pod that is up but not yet ready is still scraped. That is wanted:
+      # the interesting metrics during a recovery are the ones from the node
+      # that has not finished recovering.
+      - job_name: durexec-engine
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names: [durexec-lab]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: durexec-hl
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: http
+          # Stable, low-cardinality identity. The pod name is bounded by the
+          # replica count; nothing here is derived from a workflow or run id.
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: node
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: instance
+
+      # ---- PostgreSQL -------------------------------------------------------
+      - job_name: postgres
+        static_configs:
+          - targets: ["postgres-exporter.durexec-lab.svc.cluster.local:9187"]
+
+      # ---- container CPU and memory, from the kubelet's own cAdvisor --------
+      # No DaemonSet and no separate agent: cAdvisor is already inside the
+      # kubelet. On a node with 3.7 GiB allocatable, a container-metrics agent
+      # that costs 100 MiB would be measuring a system it had itself perturbed.
+      #
+      # cAdvisor is extremely verbose, so metric_relabel_configs keeps only the
+      # families actually used and drops the rest at ingestion. Without this the
+      # series count from one node dominates everything else in the TSDB.
+      - job_name: kubelet-cadvisor
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          # The kubelet's serving certificate in minikube is signed for its
+          # internal name only. This is a single-node local lab on a private
+          # network; the alternative is provisioning a kubelet serving CA for
+          # a cluster that is deleted after the experiment.
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            action: keep
+            regex: container_(cpu_usage_seconds_total|memory_working_set_bytes|memory_usage_bytes|fs_reads_bytes_total|fs_writes_bytes_total|network_receive_bytes_total|network_transmit_bytes_total|spec_cpu_quota|spec_memory_limit_bytes)
+          # Keep only this lab's containers. Everything in kube-system is noise
+          # for these questions and is pure cardinality.
+          - source_labels: [namespace]
+            action: keep
+            regex: durexec-lab
+          # cAdvisor emits one series per container AND a rolled-up series with
+          # an empty container name for the whole pod. Both are kept on purpose:
+          # the pod total is what a resource limit applies to.
+
+      # ---- Prometheus's own cost -------------------------------------------
+      # This job is what makes the monitoring-overhead number measurable rather
+      # than asserted: process_resident_memory_bytes and
+      # process_cpu_seconds_total for Prometheus come from here.
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]

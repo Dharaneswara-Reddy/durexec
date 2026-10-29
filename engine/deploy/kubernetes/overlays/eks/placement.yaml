@@ -1,0 +1,23 @@
+# Placement is ENFORCED, not hoped for.
+#
+# requiredDuringScheduling, not preferred: with "preferred" the scheduler may
+# stack every engine pod onto one node when resources are tight, and a
+# three-node result would silently be a one-node result. A pod that cannot be
+# placed must stay Pending so the operator sees it.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: durexec
+  namespace: durexec-lab
+spec:
+  template:
+    spec:
+      nodeSelector:
+        durexec.io/role: engine
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: durexec
+              topologyKey: kubernetes.io/hostname

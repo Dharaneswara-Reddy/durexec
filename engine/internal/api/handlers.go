@@ -132,6 +132,98 @@ type HealthResponse struct {
 
 // ---- workflow lifecycle ---------------------------------------------------
 
+// Start outcomes. The vocabulary is spelled once, here, so that the same
+// event cannot appear under two names and split one time series in two — the
+// same reason internal/runtime names its failure reasons in one const block.
+//
+// Every value is a fixed string. None is derived from a request field or from
+// an error message, because the label values of a counter become series in the
+// time-series database: a label built from err.Error() would mint a new series
+// for every distinct error string, including ones carrying a workflow id, and
+// a metrics endpoint is the last place a per-request identifier should appear.
+const (
+	// OutcomeAccepted is a run this node created and persisted.
+	OutcomeAccepted = "accepted"
+	// OutcomeAlreadyOpen is a duplicate start for a run already open. It is
+	// reported as success to the client, and is counted separately because a
+	// client retrying is a different story from a client starting new work.
+	OutcomeAlreadyOpen = "already_open"
+	// OutcomeInvalid is a request rejected before any routing or storage
+	// decision: the caller's fault, and never the engine's.
+	OutcomeInvalid = "invalid"
+	// OutcomeNotOwned is a request this node did not serve itself because the
+	// shard belongs elsewhere — forwarded to the owner, or refused naming it.
+	OutcomeNotOwned = "not_owned"
+	// OutcomeUnavailable is a node with no starter wired at all.
+	OutcomeUnavailable = "unavailable"
+	// OutcomeRefused is a start the engine attempted and could not commit,
+	// which is the case the PostgreSQL outage tests produced 183 times.
+	OutcomeRefused = "refused"
+)
+
+// observeStart records one start outcome, if a node has an observer wired.
+//
+// The nil check lives here rather than at each call site so that adding an
+// outcome cannot accidentally reintroduce a nil dereference in a test server
+// built without metrics.
+func (s *Server) observeStart(workflowType, outcome string) {
+	if s.deps.StartObserver == nil || outcome == "" {
+		return
+	}
+	// An empty workflow_type would be a label value of "", which is a legal
+	// but confusing series. Name it instead.
+	if workflowType == "" {
+		workflowType = "unspecified"
+	}
+	s.deps.StartObserver.WorkflowStartObserved(workflowType, outcome)
+}
+
+// startOutcome maps the error from a start attempt to one of the bounded
+// outcome labels above.
+//
+// This function is the boundary that keeps unbounded strings out of the label
+// space. Every return is a constant from the block above; nothing is derived
+// from err.Error(). That matters more here than it looks: NotOwnerError
+// formats a shard id and an owner name, and CompensationFailedError and
+// NonDeterminismError format workflow ids, so a label built from an error
+// message would mint a fresh time series per workflow and publish run
+// identifiers on /metrics.
+//
+// A nil error returns "", which observeStart reads as "do not count". The
+// success path is counted by the caller as OutcomeAccepted, and counting it
+// here as well would double every accepted start.
+func startOutcome(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	// Both ownership cases collapse to OutcomeNotOwned, and deliberately so.
+	// What they share is the fact that matters operationally: the engine did
+	// not attempt to persist anything, so the request is not evidence of a
+	// durability problem. Counting a lease that lapsed mid-start as "refused"
+	// would make every failover look like a burst of commit failures, which
+	// is exactly the misreading this metric exists to prevent — during a
+	// takeover these are expected and the client's retry reaches the new
+	// owner.
+	//
+	// errors.As for NotOwnerError because it is a struct pointer carrying the
+	// shard and current owner; errors.Is for ErrLostOwnership because it is a
+	// sentinel. Both unwrap, so a wrapped error is still classified.
+	var notOwner *core.NotOwnerError
+	if errors.As(err, &notOwner) {
+		return OutcomeNotOwned
+	}
+	if errors.Is(err, core.ErrLostOwnership) {
+		return OutcomeNotOwned
+	}
+
+	// Everything else is a start the engine tried to commit and could not:
+	// the database unreachable, a statement timeout, a context deadline. This
+	// is the case the PostgreSQL outage tests produced 183 times, and the one
+	// worth alerting on.
+	return OutcomeRefused
+}
+
 // handleStartWorkflow opens a workflow, or reports the one already open.
 func (s *Server) handleStartWorkflow(w http.ResponseWriter, r *http.Request) {
 	var body StartWorkflowBody
@@ -139,15 +231,18 @@ func (s *Server) handleStartWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.WorkflowID == "" || body.WorkflowType == "" {
+		s.observeStart(body.WorkflowType, OutcomeInvalid)
 		writeBadRequest(w, "workflow_id and workflow_type are required")
 		return
 	}
 
 	rt, ok := s.route(w, r, body.WorkflowID)
 	if !ok {
+		s.observeStart(body.WorkflowType, OutcomeNotOwned)
 		return
 	}
 	if s.deps.Starter == nil {
+		s.observeStart(body.WorkflowType, OutcomeUnavailable)
 		writeNotImplemented(w, "workflow starter")
 		return
 	}
@@ -165,6 +260,7 @@ func (s *Server) handleStartWorkflow(w http.ResponseWriter, r *http.Request) {
 	// gets the same body it would have got had it won the race and needs no
 	// special case of its own.
 	if errors.Is(err, core.ErrWorkflowAlreadyOpen) {
+		s.observeStart(body.WorkflowType, OutcomeAlreadyOpen)
 		if s.deps.Executions != nil {
 			if exec, getErr := s.deps.Executions.Get(r.Context(), rt.ShardID, body.WorkflowID); getErr == nil {
 				resp := executionResponse(exec)
@@ -177,10 +273,24 @@ func (s *Server) handleStartWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		s.observeStart(body.WorkflowType, startOutcome(err))
 		s.logError(r, "start workflow failed", err)
 		writeError(w, err)
 		return
 	}
+	// A duplicate start reaches this point two different ways: as
+	// ErrWorkflowAlreadyOpen, handled above, or as a SUCCESS carrying
+	// res.AlreadyOpen — which is the path the engine actually takes, because
+	// the executions row is opened in the same transaction as the start event
+	// and the loser of that race is told about the winner rather than given
+	// an error. Counting only the error form reported duplicates as
+	// "accepted": a validation run that issued one create and one duplicate
+	// produced accepted=2 and already_open=0.
+	outcome := OutcomeAccepted
+	if res.AlreadyOpen {
+		outcome = OutcomeAlreadyOpen
+	}
+	s.observeStart(body.WorkflowType, outcome)
 
 	status := res.Status
 	if status == "" {

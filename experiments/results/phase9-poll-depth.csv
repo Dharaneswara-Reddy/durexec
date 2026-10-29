@@ -1,0 +1,6 @@
+depth_rows,claimable,scan_type,actual_ms,buffers_hit,buffers_read,rows_out,index_used
+1,mixed,Seq Scan,0.021..0.022,18,0,0,NONE
+1001,0,Index Scan,0.011..0.011,2,0,0,tasks_poll_ready
+10000,0,Index Scan,0.012..0.012,2,0,0,tasks_poll_ready
+100001,0,Index Scan,0.013..0.014,2,0,0,tasks_poll_ready
+100001,1,Index Scan,0.011..0.011,2,0,0,tasks_poll_ready

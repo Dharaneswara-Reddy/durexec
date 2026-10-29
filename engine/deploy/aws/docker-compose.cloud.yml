@@ -1,0 +1,221 @@
+# durexec on one EC2 instance. Self-contained; NOT an overlay on
+# deploy/docker-compose.yml.
+#
+# Why self-contained rather than `-f docker-compose.yml -f overlay.yml`:
+# Compose MERGES sequence fields by appending, so an overlay that tried to
+# narrow `ports: ["3000:3000"]` down to `127.0.0.1:3000:3000` would end up
+# publishing BOTH. The 0.0.0.0 binding would survive, and Grafana and the
+# external-effect simulator would be reachable from the internet by anyone who
+# found the instance. Overriding that correctly needs a `!override` tag on
+# every ports block in the file, and one forgotten tag is a public service. A
+# file that states its own bindings cannot be wrong in that direction, and
+# scripts/aws/assert_no_public_bind.sh proves the property rather than
+# trusting this comment.
+#
+# EVERY published port is bound to 127.0.0.1. Nothing here is reachable from
+# outside the instance. The security group opens port 22 only, and the
+# operator reaches the dashboards through an SSH tunnel
+# (see docs/cloud-deployment/DEPLOYMENT-RUNBOOK.md). That is what makes it
+# impossible for the test-only simulator to become a public service: not a
+# policy, a missing listener.
+
+name: durexec
+
+x-engine-common: &engine-common
+  # Built and loaded by scripts/aws/package_images.sh, never pulled. There is
+  # no registry in this architecture, so a tag that is not present on the
+  # instance fails loudly at `up` instead of silently pulling something else.
+  image: durexec-engine:${DUREXEC_VERSION:?set DUREXEC_VERSION}
+  pull_policy: never
+  environment: &engine-common-env
+    DATABASE_URL: postgres://durexec:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres-leader:5432/durexec?sslmode=disable
+    # Every node gets the same list; the ring is a pure function of it.
+    CLUSTER_NODES: node-a,node-b,node-c
+    SHARD_COUNT: "16"
+    LEASE_TTL: 10s
+    LEASE_RENEW: 3s
+    LISTEN_ADDR: ":8080"
+    # Default OFF, unlike deploy/docker-compose.yml which hard-codes "true"
+    # for the webui's demo controls. config.Validate refuses to honour
+    # FAULT_CRASH_AT unless FAULT_INJECTION was explicitly true in the
+    # environment, so a crash boundary cannot be armed by accident here. The
+    # acceptance suite turns it on for one named scenario and turns it back
+    # off afterwards; see the runbook.
+    FAULT_INJECTION: "${FAULT_INJECTION:-false}"
+    FAULT_CRASH_AT: "${FAULT_CRASH_AT:-}"
+    # Empty unless a scenario needs the simulator. Empty means the
+    # ExternalPayment activity and the probe workflow are not registered at
+    # all, so the engine is bit-identical to a build without them.
+    EXTSIM_URL: "${EXTSIM_URL:-}"
+    GROQ_API_KEY: "${GROQ_API_KEY:-}"
+    GROQ_MODEL: "${GROQ_MODEL:-}"
+  depends_on:
+    postgres-leader:
+      condition: service_healthy
+  mem_limit: 300m
+  # Not unless-stopped. `docker kill node-a` has to simulate a dead node and
+  # STAY dead so shard ownership visibly moves once the lease expires. An
+  # auto-restart policy lets the same node reclaim its own shard and hides the
+  # very transfer the test is looking for.
+  restart: "no"
+
+services:
+  # ---- PostgreSQL: one leader, one streaming-replication follower ----------
+
+  postgres-leader:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: durexec
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: durexec
+      REPL_USER: replicator
+      REPL_PASSWORD: ${REPL_PASSWORD:?set REPL_PASSWORD}
+      REPL_SLOT: standby_slot
+      # The PVC equivalent. initdb refuses a non-empty directory and a fresh
+      # EBS volume always has lost+found, so the cluster goes in a subdirectory.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ../postgres/10-replication.sh:/docker-entrypoint-initdb.d/10-replication.sh:ro
+      # A bind mount onto the SEPARATE EBS data volume, not a Docker named
+      # volume on the root disk. This is the whole reason instance loss is
+      # testable in AWS and was not testable on minikube: the instance can be
+      # terminated and this volume re-attached to its replacement, so "the
+      # machine died, did we lose committed work?" becomes a real experiment
+      # rather than a thought one.
+      - ${DUREXEC_DATA_DIR:?set DUREXEC_DATA_DIR}/pg-leader:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U durexec -d durexec"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    mem_limit: 500m
+    restart: unless-stopped
+
+  postgres-standby:
+    image: pgvector/pgvector:pg16
+    entrypoint: ["/scripts/standby-entrypoint.sh"]
+    environment:
+      PRIMARY_HOST: postgres-leader
+      REPL_USER: replicator
+      REPL_PASSWORD: ${REPL_PASSWORD:?set REPL_PASSWORD}
+      REPL_SLOT: standby_slot
+      POSTGRES_USER: durexec
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: durexec
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ../postgres/standby-entrypoint.sh:/scripts/standby-entrypoint.sh:ro
+      - ${DUREXEC_DATA_DIR:?set DUREXEC_DATA_DIR}/pg-standby:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5434:5432"
+    depends_on:
+      postgres-leader:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U durexec -d durexec"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    mem_limit: 500m
+    restart: unless-stopped
+
+  # ---- the engine ----------------------------------------------------------
+
+  node-a:
+    <<: *engine-common
+    container_name: node-a
+    environment:
+      <<: *engine-common-env
+      NODE_ID: node-a
+    ports:
+      - "127.0.0.1:8081:8080"
+
+  node-b:
+    <<: *engine-common
+    container_name: node-b
+    environment:
+      <<: *engine-common-env
+      NODE_ID: node-b
+    ports:
+      - "127.0.0.1:8082:8080"
+
+  node-c:
+    <<: *engine-common
+    container_name: node-c
+    environment:
+      <<: *engine-common-env
+      NODE_ID: node-c
+    ports:
+      - "127.0.0.1:8083:8080"
+
+  # ---- TEST-ONLY external-effect simulator --------------------------------
+  #
+  # Reachable only from the compose network: there is no `ports:` key at all,
+  # so no port is published even on the loopback interface. The engine calls
+  # it as http://extsim:8090 through Docker's embedded DNS, and the operator
+  # reads its ledger with `docker exec`. Its /arm endpoint can make a payment
+  # processor fail on demand, which is exactly why it gets no listener an
+  # outside caller could ever reach.
+  #
+  # Started only by the profile, so a plain `docker compose up -d` does not
+  # run it. Phase 8 scenario H was corrupted once because an unrelated
+  # workflow reached a globally-armed crash point; keeping the simulator off
+  # unless a scenario asks for it is the same lesson applied to the stack.
+  extsim:
+    profiles: ["extsim"]
+    image: durexec-extsimd:${DUREXEC_VERSION:?set DUREXEC_VERSION}
+    pull_policy: never
+    container_name: extsim
+    command: ["-addr=:8090"]
+    mem_limit: 64m
+    # No restart policy and no healthcheck: the ledger is in memory and IS the
+    # evidence. A restart would silently empty it mid-scenario.
+    restart: "no"
+
+  # ---- observability -------------------------------------------------------
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./prometheus.cloud.yml:/etc/prometheus/prometheus.yml:ro
+      - ${DUREXEC_DATA_DIR:?set DUREXEC_DATA_DIR}/prom:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # Bounded on purpose. The data volume is 20 GB and also holds PGDATA;
+      # an unbounded TSDB on a shared volume is how a monitoring system comes
+      # to fill the disk out from under the database it was watching.
+      - --storage.tsdb.retention.time=48h
+      - --storage.tsdb.retention.size=2GB
+    ports:
+      - "127.0.0.1:9090:9090"
+    # Resolves host.docker.internal to the instance itself so the node job in
+    # prometheus.cloud.yml can scrape node_exporter, which runs on the host
+    # rather than in compose.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 300m
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Reached over an SSH tunnel at localhost:3000, so this is the real
+      # origin from the browser's point of view.
+      GF_SERVER_ROOT_URL: http://localhost:3000
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ${DUREXEC_DATA_DIR:?set DUREXEC_DATA_DIR}/grafana:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    mem_limit: 250m
+    restart: unless-stopped

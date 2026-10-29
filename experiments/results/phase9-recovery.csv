@@ -1,0 +1,17 @@
+# durexec Phase 9 recovery measurements
+# resume: ./experiments/scripts/fault.sh <scenario> <trials>
+# t_* are milliseconds from t_inject, measured on the PostgreSQL clock
+scenario,trial,victim,shards_held,t_expire_ms,t_claim_ms,t_progress_ms,new_owner,token_before,token_after,restarts,verdict
+abrupt,1,durexec-1,9,2091,NA,NA,,2,3,0->0,INVALID_graceful_not_abrupt__kubelet_sent_SIGTERM__and_claim_probe_excluded_victims_stable_identity
+abrupt,1,durexec-1,9,NA,2413,NA,durexec-1.durexec-hl,3,4,0->1,VALID_LEASE_TIMING_ONLY__no_workload__port-forward_died_with_victim_pod__t_progress_unmeasurable
+abrupt,2,durexec-1,9,8080,17885,NA,durexec-1.durexec-hl,4,5,1->2,VALID_LEASE_TIMING_ONLY__no_workload__port-forward_died_with_victim_pod__t_progress_unmeasurable
+abrupt,3,durexec-1,9,10719,25859,175291,durexec-1.durexec-hl,5,6,2->3,CONTAMINATED_k8s_exponential_restart_backoff__same_pod_killed_repeatedly__t_claim_gated_by_container_restart_not_lease_timers
+abrupt,4,durexec-1,9,9415,21453,21453,durexec-1.durexec-hl,6,7,3->0,CONTAMINATED_k8s_exponential_restart_backoff__same_pod_killed_repeatedly__t_claim_gated_by_container_restart_not_lease_timers
+graceful,1,durexec-1,9,754,5135,5135,durexec-1.durexec-hl,6,7,3->0,ok
+graceful,2,durexec-1,9,689,6105,6105,durexec-1.durexec-hl,7,8,0->0,ok
+graceful,3,durexec-1,9,2177,3912,3912,durexec-1.durexec-hl,8,9,0->0,ok
+abrupt,1,durexec-1,9,NA,2954,2954,durexec-1.durexec-hl,9,10,0->1,ok
+abrupt,2,durexec-1,9,8733,19319,19319,durexec-1.durexec-hl,10,11,1->2,CONTAMINATED_k8s_exponential_restart_backoff__same_pod_killed_repeatedly__t_claim_gated_by_container_restart_not_lease_timers
+abrupt,3,durexec-1,9,8776,21869,21869,durexec-1.durexec-hl,11,12,2->3,CONTAMINATED_k8s_exponential_restart_backoff__same_pod_killed_repeatedly__t_claim_gated_by_container_restart_not_lease_timers
+abrupt,4,durexec-1,9,7007,27471,27471,durexec-0.durexec-hl,12,13,3->4,CONTAMINATED_k8s_exponential_restart_backoff__same_pod_killed_repeatedly__t_claim_gated_by_container_restart_not_lease_timers
+abrupt,5,durexec-1,9,8780,30089,30089,durexec-0.durexec-hl,14,15,4->5,CONTAMINATED_k8s_exponential_restart_backoff__same_pod_killed_repeatedly__t_claim_gated_by_container_restart_not_lease_timers

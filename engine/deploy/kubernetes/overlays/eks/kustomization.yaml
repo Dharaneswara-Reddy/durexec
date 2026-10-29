@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: durexec-lab
+
+resources:
+  - ../../base
+  - storageclass.yaml
+
+patches:
+  - path: placement.yaml
+  - path: external-db.yaml
+  # PostgreSQL runs on a dedicated EC2 host for this campaign, so the
+  # in-cluster database must not start. Deleting rather than scaling to zero:
+  # a scaled-down StatefulSet still owns its PVC, and that PVC holds an EBS
+  # volume that bills all campaign while serving nothing.
+  - target: { kind: StatefulSet, name: postgres }
+    patch: |
+      $patch: delete
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata: { name: postgres, namespace: durexec-lab }
+  - target: { kind: Service, name: postgres }
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata: { name: postgres, namespace: durexec-lab }

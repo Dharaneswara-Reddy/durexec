@@ -1,0 +1,6 @@
+# durexec Phase 9: frozen-node failover + stale-owner fencing
+# resume: ./experiments/scripts/stale-owner.sh <trials>
+trial,victim,shards,t_expire_ms,t_takeover_ms,t_progress_ms,taken_by,tok_before,tok_after,frozen_s,post_thaw_writes_by_stale_owner,stale_tok_still_present,orphans,dup_journal,verdict
+1,durexec-1,9,8312,28808,28808,durexec-0.durexec-hl,16,17,29,927,0,0,0,ok
+2,durexec-1,9,8522,29318,29318,durexec-0.durexec-hl,18,19,29,576,0,0,0,ok
+3,durexec-1,9,10187,31463,31463,durexec-0.durexec-hl,20,21,31,557,0,0,0,ok

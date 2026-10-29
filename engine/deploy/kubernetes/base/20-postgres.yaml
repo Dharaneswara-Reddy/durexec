@@ -1,0 +1,119 @@
+# PostgreSQL as a StatefulSet with a real PersistentVolumeClaim. A Deployment
+# with emptyDir would lose the journal on every pod restart, which would make
+# every recovery experiment meaningless: spec section 2.2 forbids an ephemeral
+# database for durability testing.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: durexec-lab
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: durexec-lab
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      serviceAccountName: durexec
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef: { name: postgres-config, key: POSTGRES_DB }
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef: { name: postgres-config, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: durexec-db, key: password }
+            # Postgres refuses to initdb into a non-empty mount point, and a
+            # PVC always has lost+found. A subdirectory avoids that.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          args:
+            - -c
+            - config_file=/etc/postgresql/postgresql.conf
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: conf
+              mountPath: /etc/postgresql
+          # pg_isready proves the server answers, which is not the same as the
+          # engine being healthy. Spec section 2.2: a healthy database does not
+          # imply a healthy engine, so nothing downstream infers that.
+          # timeoutSeconds is stated explicitly, and that is a fix rather than
+          # tidying. Left unset it defaults to ONE SECOND, and `pg_isready` on
+          # a 2-vCPU node whose CPU requests are already 98% subscribed does
+          # not reliably return within a second: the kubelet logged 186
+          # readiness timeouts and then killed this container 25 times on a
+          # LIVENESS timeout, while the server's own log showed checkpoints
+          # completing normally. The database was healthy throughout; the probe
+          # was measuring node contention and reporting it as database death.
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "durexec", "-d", "durexec"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 6
+          # The liveness probe is deliberately far more forgiving than the
+          # readiness probe. Readiness going false is cheap and correct under
+          # load — it just stops new connections. Liveness going false RESTARTS
+          # PostgreSQL, which on this engine means every in-flight transaction
+          # is lost and every lease is left to expire. A restart must therefore
+          # require sustained, unambiguous failure: 10s timeout, 30s period and
+          # 6 failures is three minutes of a genuinely dead server.
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "durexec", "-d", "durexec"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          # Requests trimmed to leave the node schedulable headroom. With
+          # kube-system asking for 750m and the lab's own pods for 820m, the
+          # node sat at 98% of its 2000m and every probe competed with the
+          # workload it was measuring.
+          resources:
+            requests: { cpu: 200m, memory: 512Mi }
+            limits:   { cpu: "2",  memory: 1Gi }
+      volumes:
+        - name: conf
+          configMap:
+            name: postgres-config
+            items:
+              - key: postgresql.conf
+                path: postgresql.conf
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 8Gi

@@ -1,0 +1,46 @@
+# Scrape config for the AWS single-instance deployment.
+#
+# Differs from deploy/prometheus.yml in two ways that matter.
+#
+# 1. scrape_interval is 15s, not 5s. Phase 6 measured monitoring overhead at
+#    0.6% on a 2-vCPU node, but that node was not also running three engine
+#    nodes, two PostgreSQL servers and Grafana on the SAME two vCPUs. Here
+#    Prometheus competes directly with the system it is measuring, and a 5s
+#    interval would put its cost inside the measurement. 15s keeps enough
+#    resolution for the increase() windows the acceptance suite uses; Phase 6
+#    established that a 60s minimum window is required anyway because of
+#    cAdvisor's refresh rate, and 15s samples give four points in that window.
+#
+# 2. node_exporter is scraped for host CPU, memory and DISK. Phase 6 closed
+#    gap L-5 for container metrics via cAdvisor through the kubelet, which does
+#    not exist here. Disk is the one that actually matters on AWS: PGDATA,
+#    Prometheus's TSDB and the collected evidence all share one 20 GB EBS
+#    volume, and a full volume stops the database rather than slowing it.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: durexec-aws
+
+scrape_configs:
+  - job_name: durexec
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - node-a:8080
+          - node-b:8080
+          - node-c:8080
+
+  # Runs on the instance itself (installed by user_data.sh), not in compose,
+  # because it has to see the host's real disk and memory rather than a
+  # container's view of them.
+  #
+  # The address is host.docker.internal, resolved by the
+  # `host.docker.internal:host-gateway` extra_hosts entry on the prometheus
+  # service. Hard-coding 172.17.0.1 would be wrong: that is the gateway of
+  # the DEFAULT bridge, and compose puts these containers on a project
+  # network of its own with a different subnet and a different gateway. The
+  # alias asks Docker for whatever the right address is.
+  - job_name: node
+    static_configs:
+      - targets: ["host.docker.internal:9100"]

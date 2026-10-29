@@ -1,0 +1,2 @@
+url=postgres://durexec:<REDACTED>@10.91.0.7:5432/durexec
+acct <ACCT>

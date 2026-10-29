@@ -1,0 +1,8 @@
+# durexec Phase 9 Test A: PostgreSQL outage and recovery
+# resume: ./experiments/scripts/db-outage.sh <pause|restart> <outage_seconds> [trials]
+# t_* are milliseconds from t_inject, on the HOST clock (the db clock is unavailable mid-outage)
+method,trial,outage_s,t_db_down_ms,t_db_up_ms,t_engine_recovered_ms,t_progress_ms,wf_before,wf_after,completed_after,failed_after,inflight_after,orphans,dup_journal,dup_invoke,stuck_gt_5min,engine_restarts,verdict
+pause,1,30,358,30903,30914,31046,8428,8450,8443,1,5,0,0,0,0,0+5+->0+5+,ok
+pause,2,30,493,31149,31162,31337,8497,8533,8526,1,6,0,0,0,0,0+5+->0+5+,ok
+restart,1,25,213,32920,32932,33070,8821,8919,8906,1,12,0,0,0,0,0+5+->0+5+,ok
+restart,2,25,217,32801,32811,32946,9015,9115,9106,1,12,0,0,0,0,0+5+->0+5+,ok

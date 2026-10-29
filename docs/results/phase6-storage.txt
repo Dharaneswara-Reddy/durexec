@@ -1,0 +1,27 @@
+==== 2026-10-27T12:46:10+05:30  commit=fde6ae0 ====
+-- row counts --
+ executions | events | tasks_pending | events_per_execution 
+------------+--------+---------------+----------------------
+      41734 | 500540 |             0 |                11.99
+(1 row)
+
+-- per-relation size, table vs index --
+     relname      |    heap    | indexes |  total  
+------------------+------------+---------+---------
+ events           | 147 MB     | 53 MB   | 200 MB
+ executions       | 5376 kB    | 3288 kB | 8664 kB
+ tasks            | 24 kB      | 4472 kB | 4496 kB
+ timers           | 24 kB      | 448 kB  | 472 kB
+ shard_leases     | 56 kB      | 16 kB   | 72 kB
+ activity_intents | 8192 bytes | 16 kB   | 24 kB
+(6 rows)
+
+-- cost per unit, measured not estimated --
+ events | executions | event_heap_bytes | event_index_bytes | event_total_bytes | db_bytes_per_workflow | database_size 
+--------+------------+------------------+-------------------+-------------------+-----------------------+---------------
+ 500540 |      41734 |              308 |               110 |               418 |                  5548 | 221 MB
+(1 row)
+
+-- replay cost distribution, from the engine's own histogram --
+   (queried separately via Prometheus; see phase6-sweep.csv replay_* columns)
+

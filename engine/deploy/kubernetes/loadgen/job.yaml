@@ -1,0 +1,40 @@
+# One benchmark point, run as a Job on the HARNESS node.
+#
+# The toleration plus nodeSelector are the whole point: the generator must not
+# share a node with the engine. On the laptop sweep, generator, engine,
+# PostgreSQL and its standby all competed for twelve threads, and at
+# concurrency 512 the result could not be attributed to any of them. Pinning
+# the generator elsewhere is what makes a cloud number interpretable.
+#
+# LOADGEN_ARGS and LOADGEN_IMAGE are substituted by scripts/aws/eks_loadgen.sh.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: LOADGEN_JOB_NAME
+  namespace: durexec-lab
+  labels: { app: durexec-loadgen }
+spec:
+  backoffLimit: 0          # a failed run must not silently repeat and overwrite its own evidence
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels: { app: durexec-loadgen }
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        durexec.io/role: harness
+      tolerations:
+        - key: durexec.io/harness
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      containers:
+        - name: loadgen
+          image: LOADGEN_IMAGE
+          args: LOADGEN_ARGS
+          resources:
+            requests: { cpu: 500m, memory: 128Mi }
+            # No CPU limit. A throttled generator produces a low number that
+            # looks like an engine limit, which is the single easiest way to
+            # publish a wrong capacity figure.
+            limits: { memory: 512Mi }

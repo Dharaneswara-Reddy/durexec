@@ -1,0 +1,32 @@
+# The load generator, as its own image.
+#
+# WHY A SEPARATE IMAGE. ./Dockerfile builds engined and healthcheck only, so
+# there is no loadgen binary anywhere in the cluster. Without this the
+# generator can only run on the operator's laptop through a port-forward,
+# which puts internet round-trip time inside every latency sample and leaves
+# the generator competing with nothing it can be measured against. A cloud
+# capacity number taken that way is not a capacity number.
+#
+# Deliberately NOT a second target inside ./Dockerfile: the engine image must
+# not carry a load generator, and keeping them apart means no stray --target
+# can put one there.
+
+FROM golang:1.25 AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+
+ARG VERSION=dev
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ENV CGO_ENABLED=0
+
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+        -trimpath -ldflags="-s -w -X main.version=${VERSION}" \
+        -o /out/loadgen ./cmd/loadgen
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /out/loadgen /loadgen
+USER nonroot:nonroot
+ENTRYPOINT ["/loadgen"]

@@ -1,0 +1,97 @@
+# TEST-ONLY external-effect simulator (cmd/extsimd).
+#
+# It is a SEPARATE pod, and that is the whole design. The scenarios this phase
+# has to test include "the external effect happened but the process died before
+# journaling the result". If the simulator lived inside the engine, SIGKILLing
+# the engine would destroy the only record of whether the effect occurred — the
+# evidence and the thing under test would share a fate. Out here, the ledger
+# survives every engine kill and can be read afterwards.
+#
+# It has NO authentication and a /arm endpoint that changes its behaviour, so
+# it belongs only in this isolated lab namespace. It is never built into the
+# engine image, nothing in engined imports it, and the engine reaches it only
+# when EXTSIM_URL names it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: extsim
+  namespace: durexec-lab
+spec:
+  selector:
+    app: extsim
+  ports:
+    - name: http
+      port: 8090
+      targetPort: 8090
+---
+# A NodePort too, so the experiment scripts can read the effect ledger from the
+# host without going through a pod that a test might be about to kill.
+apiVersion: v1
+kind: Service
+metadata:
+  name: extsim-np
+  namespace: durexec-lab
+spec:
+  type: NodePort
+  selector:
+    app: extsim
+  ports:
+    - name: http
+      port: 8090
+      targetPort: 8090
+      nodePort: 30091
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: extsim
+  namespace: durexec-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: extsim
+  strategy:
+    # Recreate, never rolling. Two simulators would hold two independent
+    # in-memory ledgers, and a request deduplicated against one would be a
+    # fresh effect to the other — which would look exactly like the duplicate
+    # effect this phase is hunting for. One replica, replaced outright.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: extsim
+    spec:
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+      containers:
+        - name: extsimd
+          image: durexec-extsimd:phase7
+          imagePullPolicy: IfNotPresent
+          args: ["-addr=:8090"]
+          ports:
+            - name: http
+              containerPort: 8090
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+          # No liveness probe on purpose. The ledger is in memory, so a
+          # restart silently empties it; a liveness probe that restarted this
+          # pod mid-scenario would destroy the evidence and leave a test
+          # reporting "0 effects" as though that were a measurement.

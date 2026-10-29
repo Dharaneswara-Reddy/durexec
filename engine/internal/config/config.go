@@ -10,10 +10,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dharaneswar339/durexec/internal/faultinj"
 )
 
 // Environment variable names, listed once so the loader and the documentation
@@ -33,6 +36,8 @@ const (
 	EnvDatabaseURL     = "DATABASE_URL"
 	EnvEmbedderURL     = "EMBEDDER_URL"
 	EnvFaultInjection  = "FAULT_INJECTION"
+	EnvFaultCrashAt    = "FAULT_CRASH_AT"
+	EnvExtsimURL       = "EXTSIM_URL"
 	EnvEscalationBlock = "ESCALATION_BLOCKS"
 	EnvClusterNodes    = "CLUSTER_NODES"
 	EnvSemanticHybrid  = "SEMANTIC_HYBRID"
@@ -120,6 +125,31 @@ type Config struct {
 
 	// FaultInjection arms internal/faultinj. See faultExplicit.
 	FaultInjection bool
+
+	// FaultCrashAt names one crash boundary to arm at start-up, or "" for
+	// none. It is how the crash-boundary scenarios are made testable WITHOUT
+	// adding a network endpoint that can kill or stall a node: arming happens
+	// once, from the process's own configuration, before it serves anything.
+	//
+	// Changing it requires editing the deployment and restarting the pod,
+	// which is already a privileged operation, so it adds no new control
+	// surface at all. An HTTP route would have had to be authenticated, and
+	// this engine has no authentication to build one on.
+	//
+	// It is consumed exactly once per process start: the armed point fires at
+	// the first boundary it reaches and disarms itself, so a node does not sit
+	// in a loop failing at the same place.
+	FaultCrashAt string
+
+	// ExtsimURL points at a TEST-ONLY external-effect simulator (cmd/extsimd).
+	// When it is set, engined registers the ExternalPayment activity and the
+	// ExternalEffectProbe workflow; when it is empty, neither exists and the
+	// engine's behaviour is bit-identical to a build without them.
+	//
+	// It is a URL rather than a boolean on purpose: there is nothing to turn
+	// "on". The feature is the ability to reach a specific simulator, so a
+	// deployment that has not been given one cannot have it.
+	ExtsimURL string
 
 	// faultExplicit records that FAULT_INJECTION was actually present in the
 	// environment and parsed as true. It is unexported so no code path can set
@@ -309,6 +339,14 @@ func LoadFrom(lookup func(string) (string, bool)) (Config, error) {
 		}
 	}
 
+	if v, ok := get(EnvFaultCrashAt); ok {
+		cfg.FaultCrashAt = strings.TrimSpace(v)
+	}
+
+	if v, ok := get(EnvExtsimURL); ok {
+		cfg.ExtsimURL = strings.TrimSpace(v)
+	}
+
 	return cfg, errors.Join(errs...)
 }
 
@@ -382,6 +420,47 @@ func (c Config) Validate() error {
 	// on a laptop and watch a verdict get journaled. Leaving it out is
 	// therefore a choice, and SemanticIsFake reports which choice was made so
 	// startup can say so out loud.
+
+	// A crash boundary may only be armed on a process whose injector is
+	// switched on, and only by a name that some code path actually checks.
+	// Both halves matter. Without the first, FAULT_CRASH_AT alone would be a
+	// second, quieter way to arm a deliberate failure. Without the second, a
+	// typo or a declared-but-unwired seam would produce a run that never
+	// crashed and a report that read as if the boundary had been tested and
+	// survived — the worst possible outcome, and one this project has already
+	// been bitten by.
+	if c.FaultCrashAt != "" {
+		if !c.FaultInjection {
+			errs = append(errs, fmt.Errorf(
+				"%s=%q requires %s=true: a crash boundary may not be armed on a process whose fault injector is off",
+				EnvFaultCrashAt, c.FaultCrashAt, EnvFaultInjection))
+		}
+		if _, ok := faultinj.ParseCrashPoint(c.FaultCrashAt); !ok {
+			errs = append(errs, fmt.Errorf(
+				"%s=%q is not a crash point this build checks; wired points are %s",
+				EnvFaultCrashAt, c.FaultCrashAt, strings.Join(faultinj.WiredCrashPoints(), ", ")))
+		}
+	}
+
+	// The simulator URL is validated rather than trusted. An unparseable or
+	// non-HTTP value would otherwise register an activity that fails at call
+	// time with a transport error, which the retry policy would read as the
+	// AMBIGUOUS case — the one outcome in this engine that must never be
+	// manufactured by a configuration mistake, because "the effect may or may
+	// not have happened" is exactly what it means.
+	if c.ExtsimURL != "" {
+		u, err := url.Parse(c.ExtsimURL)
+		switch {
+		case err != nil:
+			errs = append(errs, fmt.Errorf("%s=%q is not a URL: %w", EnvExtsimURL, c.ExtsimURL, err))
+		case u.Scheme != "http" && u.Scheme != "https":
+			errs = append(errs, fmt.Errorf(
+				"%s=%q must be an http or https URL; the external-effect activity speaks HTTP",
+				EnvExtsimURL, c.ExtsimURL))
+		case u.Host == "":
+			errs = append(errs, fmt.Errorf("%s=%q has no host", EnvExtsimURL, c.ExtsimURL))
+		}
+	}
 
 	if c.FaultInjection && !c.faultExplicit {
 		errs = append(errs, fmt.Errorf(

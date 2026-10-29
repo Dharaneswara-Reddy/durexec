@@ -1,0 +1,24 @@
+# A NodePort for the load generator.
+#
+# Phase 9 finding: kubectl port-forward binds to ONE pod, so killing that pod
+# kills the load path and the workload never starts -- which silently turned a
+# fault experiment into an unloaded lease-timing measurement. A NodePort is
+# served by kube-proxy on the node and load-balances across all ready pods, so
+# killing any single pod leaves the offered load intact. That is a requirement
+# for fault injection, not a convenience.
+apiVersion: v1
+kind: Service
+metadata:
+  name: durexec-np
+  namespace: durexec-lab
+  labels:
+    app: durexec
+spec:
+  type: NodePort
+  selector:
+    app: durexec
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      nodePort: 30080

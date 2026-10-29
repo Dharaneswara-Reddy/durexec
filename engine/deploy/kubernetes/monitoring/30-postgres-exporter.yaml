@@ -1,0 +1,134 @@
+# Custom queries for the two things the exporter does not ship by default and
+# that this project actually needs: WAL generation rate, and an aggregate view
+# of statement cost.
+#
+# Cardinality rule: neither query emits a per-statement or per-query-text label.
+# pg_stat_statements has one row per normalised query, and exporting that as
+# labels would both be unbounded and put SQL fragments into metric labels. The
+# aggregate is summed instead; when a specific statement matters, the
+# experiment scripts query pg_stat_statements directly over psql.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-exporter-queries
+  namespace: durexec-lab
+data:
+  queries.yaml: |
+    pg_stat_wal:
+      query: "SELECT wal_records, wal_fpi, wal_bytes, wal_buffers_full, wal_write, wal_sync FROM pg_stat_wal"
+      master: true
+      metrics:
+        - wal_records:
+            usage: "COUNTER"
+            description: "WAL records generated"
+        - wal_fpi:
+            usage: "COUNTER"
+            description: "WAL full page images generated"
+        - wal_bytes:
+            usage: "COUNTER"
+            description: "Bytes of WAL generated"
+        - wal_buffers_full:
+            usage: "COUNTER"
+            description: "Times WAL buffers filled and had to be written out"
+        - wal_write:
+            usage: "COUNTER"
+            description: "Times WAL buffers were written to disk"
+        - wal_sync:
+            usage: "COUNTER"
+            description: "Times WAL files were synced to disk"
+
+    pg_statements_summary:
+      query: "SELECT sum(calls)::bigint AS calls, sum(total_exec_time) AS total_exec_time_ms, sum(rows)::bigint AS rows, sum(shared_blks_hit)::bigint AS shared_blks_hit, sum(shared_blks_read)::bigint AS shared_blks_read FROM pg_stat_statements"
+      master: true
+      metrics:
+        - calls:
+            usage: "COUNTER"
+            description: "Total statement executions across all normalised statements"
+        - total_exec_time_ms:
+            usage: "COUNTER"
+            description: "Total statement execution time in milliseconds across all normalised statements"
+        - rows:
+            usage: "COUNTER"
+            description: "Total rows returned or affected across all normalised statements"
+        - shared_blks_hit:
+            usage: "COUNTER"
+            description: "Shared buffer hits across all normalised statements"
+        - shared_blks_read:
+            usage: "COUNTER"
+            description: "Shared buffer misses that required a read across all normalised statements"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-exporter
+  namespace: durexec-lab
+spec:
+  selector:
+    app: postgres-exporter
+  ports:
+    - name: http
+      port: 9187
+      targetPort: 9187
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  namespace: durexec-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-exporter
+  template:
+    metadata:
+      labels:
+        app: postgres-exporter
+    spec:
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+      containers:
+        - name: exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --extend.query-path=/etc/pgexporter/queries.yaml
+            # Per-table and per-index statistics are off. They are one series
+            # per relation per database, and nothing in this phase asks a
+            # per-table question — the queue questions are answered by the
+            # engine's own metrics and by EXPLAIN against the real schema.
+            - --no-collector.stat_user_tables
+            - --no-collector.statio_user_tables
+          env:
+            # Reuses the url key of the existing durexec-db secret, which
+            # lab.sh creates at deploy time. No second credential is created,
+            # nothing is added to git, and nothing is baked into an image.
+            - name: DATA_SOURCE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: durexec-db
+                  key: url
+          ports:
+            - name: http
+              containerPort: 9187
+          resources:
+            requests:
+              cpu: 10m
+              memory: 24Mi
+            limits:
+              cpu: 200m
+              memory: 96Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          volumeMounts:
+            - name: queries
+              mountPath: /etc/pgexporter
+      volumes:
+        - name: queries
+          configMap:
+            name: postgres-exporter-queries

@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: durexec-lab
+# The monitoring stack is a SEPARATE kustomization from base/, not a layer on
+# top of it. Applying base/ must stay possible without an observer attached,
+# because "monitoring overhead with collection enabled versus disabled" is one
+# of the measurements this phase has to produce — and that comparison is only
+# honest if the no-monitoring case is a real deployment rather than a scrape
+# config with the targets commented out.
+resources:
+  - 00-rbac.yaml
+  - 10-prometheus-config.yaml
+  - 20-prometheus.yaml
+  - 30-postgres-exporter.yaml

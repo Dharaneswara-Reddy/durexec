@@ -1,0 +1,80 @@
+# Non-secret engine configuration. CLUSTER_NODES is the ring membership and it
+# MUST list exactly the pods the StatefulSet creates: the ring is built from
+# this list on every node, so a name here that no pod answers is a shard no
+# request can reach, and a pod missing from here is a node nothing routes to.
+#
+# This is why replica count is not elastic. Changing it means editing this map
+# AND restarting every pod. See docs/cloud-testing/01-RECON.md, finding R-2.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: durexec-config
+  namespace: durexec-lab
+data:
+  SHARD_COUNT: "16"
+  CLUSTER_NODES: "durexec-0.durexec-hl,durexec-1.durexec-hl"
+  # Finding R-3: the connection budget is computed from NODE_COUNT, NOT from
+  # the length of CLUSTER_NODES. Left unset it defaults to 3, so an 8-replica
+  # run would pass a budget check for 3 nodes and then exhaust the server.
+  # It MUST equal .spec.replicas in 30-engine.yaml.
+  NODE_COUNT: "2"
+  LISTEN_ADDR: ":8080"
+  LEASE_TTL: "10s"
+  LEASE_RENEW: "3s"
+  TASK_LOCK: "30s"
+  WORKFLOW_WORKERS: "4"
+  ACTIVITY_WORKERS: "8"
+  # Semantic idempotency needs the embedder overlay. Off in the base so the
+  # lab runs without it and nothing silently falls back to a stub.
+  SEMANTIC_HYBRID: "false"
+  SYNC_COMMIT: "on"
+  FAULT_INJECTION: "off"
+  # Declared explicitly, and empty, so that `kubectl apply` always resets it.
+  # Omitting the key does NOT clear it: apply performs a three-way merge, so a
+  # value patched in by an experiment survives an apply that does not mention
+  # it. That combination — FAULT_CRASH_AT set, FAULT_INJECTION reset to off —
+  # is refused by config.Validate, and a node that had it crash-looped on
+  # start-up. Declaring the key here makes an apply return the cluster to a
+  # known state.
+  FAULT_CRASH_AT: ""
+  # TEST-ONLY. Naming a simulator is what registers the ExternalPayment
+  # activity and the ExternalEffectProbe workflow; leaving it empty means
+  # neither exists and the engine behaves bit-identically to a build without
+  # them. Declared explicitly for the same reason as FAULT_CRASH_AT above:
+  # `kubectl apply` performs a three-way merge and would otherwise leave a
+  # value an experiment had patched in.
+  # Empty by default: the external-effect probe is OPT-IN, so a plain
+  # `kubectl apply -k base` leaves neither the ExternalPayment activity nor
+  # the ExternalEffectProbe workflow registered. experiments/scripts/
+  # extsim-matrix.sh patches this on for its own run and the value it uses is
+  # http://extsim.durexec-lab.svc.cluster.local:8090.
+  EXTSIM_URL: ""
+---
+# PostgreSQL tuning kept separate from the engine's config so a database
+# change does not roll the engine pods.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: durexec-lab
+data:
+  POSTGRES_DB: durexec
+  POSTGRES_USER: durexec
+  # max_connections must cover NODE_COUNT x (20 pool + 4 renewal) + 26 overhead
+  # (cmd/engined/main.go:558). 8 replicas need 218, so 250 covers the largest
+  # planned overlay. The engine refuses to boot if the budget does not fit.
+  postgresql.conf: |
+    listen_addresses = '*'
+    max_connections = 250
+    shared_buffers = 256MB
+    synchronous_commit = on
+    wal_level = replica
+    # Transaction-duration visibility, required by spec section 2.2. Anything
+    # slower than 200ms is logged with its statement.
+    log_min_duration_statement = 200
+    log_lock_waits = on
+    log_checkpoints = on
+    track_io_timing = on
+    # pg_stat_statements gives per-query latency without a sidecar.
+    shared_preload_libraries = 'pg_stat_statements'
+    pg_stat_statements.track = all

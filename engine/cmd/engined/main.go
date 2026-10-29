@@ -40,6 +40,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/dharaneswar339/durexec/app/agent"
 	"github.com/dharaneswar339/durexec/app/agent/llm"
@@ -49,6 +50,7 @@ import (
 	"github.com/dharaneswar339/durexec/internal/config"
 	"github.com/dharaneswar339/durexec/internal/core"
 	"github.com/dharaneswar339/durexec/internal/eventlog"
+	"github.com/dharaneswar339/durexec/internal/extsim"
 	"github.com/dharaneswar339/durexec/internal/faultinj"
 	"github.com/dharaneswar339/durexec/internal/idem/semantic"
 	"github.com/dharaneswar339/durexec/internal/lease"
@@ -155,6 +157,38 @@ func run() error {
 
 	activities := activity.NewRegistry()
 	faults := faultinj.New(cfg.FaultInjection)
+
+	// Arm one crash boundary from configuration, if asked. config.Validate has
+	// already refused this unless FAULT_INJECTION is explicitly true and the
+	// point is one this build actually checks, so reaching here means both.
+	//
+	// The log line is the evidence that the boundary was reached: the seam
+	// abandons a transaction rather than killing the process, so there is no
+	// core dump to point at, and a metric incremented on a path that then
+	// fails is easy to mistake for a real error. An explicit warning at arm
+	// time plus the existing CrashInjectedError at fire time is what a report
+	// cites.
+	// Attach the injector to the event log. WITHOUT THIS LINE the commit-path
+	// crash seams are dead code in the deployed binary: Store.faults stays
+	// nil, ShouldCrash handles a nil receiver by returning false, and
+	// BeforeDecisionCommit therefore never fires however it is armed. It
+	// failed silently and no unit test could catch it, because the tests in
+	// internal/runtime call UseFaultInjector themselves and so exercise a
+	// wiring that cmd/engined did not have. This was the real cause of the
+	// open item recorded as F9-2.
+	//
+	// It is safe unconditionally: faults is inert unless FAULT_INJECTION was
+	// explicitly set to true, so on a normal deployment this attaches an
+	// injector that ignores every arming call.
+	events.UseFaultInjector(faults)
+
+	if cfg.FaultCrashAt != "" {
+		if point, ok := faultinj.ParseCrashPoint(cfg.FaultCrashAt); ok {
+			faults.CrashAt(point)
+			log.Warn(ctx, "ARMED a deliberate crash boundary from configuration; this node will abandon the first transaction that reaches it",
+				"crash_point", string(point), "env", config.EnvFaultCrashAt)
+		}
+	}
 	renderers, err := registerActivities(activities, faults)
 	if err != nil {
 		return fmt.Errorf("register activities: %w", err)
@@ -165,6 +199,29 @@ func run() error {
 		return fmt.Errorf("register workflows: %w", err)
 	}
 
+	// The test-only external-effect path. Registered last and only when a
+	// simulator URL was configured, so that on every other deployment neither
+	// name exists in either registry.
+	//
+	// This is the narrowest wiring that puts a REAL external effect on the
+	// engine's own activity path. Until it existed, ExternalPayment was an
+	// activity nothing could schedule: the engine registers activities, but
+	// only a workflow can schedule one, and no shipped workflow named it. The
+	// existing tests drive it by building a decision by hand, which exercises
+	// the activity but not the engine's claim, retry, journal and recovery
+	// path — so the dedup-key mechanism the project's central claim rests on
+	// had never run inside engined.
+	if cfg.ExtsimURL != "" {
+		if err := extsim.RegisterProbe(activities, workflows, cfg.ExtsimURL); err != nil {
+			return fmt.Errorf("register external-effect probe: %w", err)
+		}
+		log.Warn(ctx, "TEST-ONLY external-effect simulator wired in: the ExternalPayment activity and the ExternalEffectProbe workflow are registered on this node and will make real HTTP calls to the configured URL. No shipped workflow references either name.",
+			"extsim_url", cfg.ExtsimURL,
+			"activity", extsim.PayActivityName,
+			"workflow", extsim.ProbeWorkflowType,
+			"env", config.EnvExtsimURL)
+	}
+
 	dispatcher := workflow.NewDispatcher(workflows)
 	// The dispatcher stamps every scheduled activity with its declared
 	// idempotency mode, and it does so on the REPLAY path, so this lookup must
@@ -173,8 +230,39 @@ func run() error {
 	dispatcher.ModeFor = activities.Mode
 
 	registry := prometheus.NewRegistry()
+	// A private registry, not the default one, so that a test can build a
+	// fresh registry and assert on exact counter values. The cost of that
+	// choice is that the Go runtime and process collectors — which come for
+	// free with the default registry — have to be registered by hand. They
+	// were not, so until this phase the engine reported no CPU time, no
+	// resident memory, no goroutine count and no open file descriptors at
+	// all: on a /metrics page with 10 families, every single one described
+	// the engine's own logic and none described the process running it.
+	registry.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
 	metrics := obs.New(registry)
 	runtimeMetrics := runtime.NewMetrics(registry)
+
+	// Connection-pool occupancy and pressure, sampled at scrape time. The
+	// pool is the engine's only route to its only infrastructure dependency,
+	// so saturating it is the most likely way for offered load to stop
+	// turning into completed work, and EmptyAcquireCount is the signal that
+	// says so before throughput visibly bends.
+	obs.RegisterPoolStats(registry, func() obs.PoolStats {
+		st := pool.Stat()
+		return obs.PoolStats{
+			AcquiredConns:        st.AcquiredConns(),
+			IdleConns:            st.IdleConns(),
+			TotalConns:           st.TotalConns(),
+			MaxConns:             st.MaxConns(),
+			AcquireCount:         st.AcquireCount(),
+			EmptyAcquireCount:    st.EmptyAcquireCount(),
+			CanceledAcquireCount: st.CanceledAcquireCount(),
+			TotalAcquireWait:     st.AcquireDuration(),
+		}
+	})
 
 	checker := &semantic.Checker{
 		Embedder:   newEmbedder(cfg, log, ctx),
@@ -220,19 +308,29 @@ func run() error {
 		// is counted. The wrapper returns the error untouched — the fenced-out
 		// worker stops exactly as it did before — and counts only a genuine token
 		// mismatch, not the other ways a commit can report lost ownership.
-		Committer:        eventlog.NewFencingCounter(events, metrics),
-		Tasks:            queue,
-		Leases:           leases,
-		Dispatcher:       dispatcher,
-		Activities:       activities,
-		Executor:         activity.NewExecutor(activities),
-		Checker:          checker,
-		ShardCount:       int32(cfg.ShardCount),
-		NodeID:           cfg.NodeID,
-		Clock:            core.SystemClock{},
-		Metrics:          metrics,
-		Log:              log,
-		Runtime:          runtimeMetrics,
+		Committer:  eventlog.NewFencingCounter(events, metrics),
+		Tasks:      queue,
+		Leases:     leases,
+		Dispatcher: dispatcher,
+		Activities: activities,
+		Executor:   activity.NewExecutor(activities),
+		Checker:    checker,
+		ShardCount: int32(cfg.ShardCount),
+		NodeID:     cfg.NodeID,
+		Clock:      core.SystemClock{},
+		Metrics:    metrics,
+		Log:        log,
+		Runtime:    runtimeMetrics,
+		// The second half of the F9-2 fix. Engine.Faults was never assigned,
+		// so the AfterActivityJournaled seam in the activity worker was dead
+		// in the deployed binary for the same reason the commit-path seams
+		// were: a nil injector answers every ShouldCrash with false, and does
+		// so silently. Two independent wiring omissions, both invisible
+		// because the nil handling that makes an unset injector SAFE also
+		// makes an unset injector QUIET.
+		//
+		// Inert unless FAULT_INJECTION was explicitly set to true.
+		Faults:           faults,
 		EscalationBlocks: cfg.EscalationBlocks,
 		Backoff:          queue.Config().Backoff,
 		// Taken from the queue rather than from cfg so the engine and the queue
@@ -343,15 +441,16 @@ func run() error {
 	// ---- 5. the HTTP front door -------------------------------------------
 
 	server := api.New(api.Deps{
-		Executions: events,
-		Events:     events,
-		Leases:     leases,
-		Starter:    engine,
-		Signaller:  engine,
-		Canceller:  engine,
-		Faults:     &runtime.Faults{Injector: faults},
-		NodeID:     cfg.NodeID,
-		Shards:     engine,
+		Executions:    events,
+		Events:        events,
+		Leases:        leases,
+		StartObserver: metrics,
+		Starter:       engine,
+		Signaller:     engine,
+		Canceller:     engine,
+		Faults:        &runtime.Faults{Injector: faults},
+		NodeID:        cfg.NodeID,
+		Shards:        engine,
 		// PeerAddr is what turns a rejection into a redirect. Without it a node
 		// that does not own a shard answers 409 and the caller has to implement
 		// cluster routing itself; with it the node forwards and the caller

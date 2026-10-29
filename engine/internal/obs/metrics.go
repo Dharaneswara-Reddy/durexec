@@ -26,6 +26,7 @@ import (
 // counter values. Package-level collectors would leak state between tests and
 // make "did this increment?" unanswerable.
 type Metrics struct {
+	WorkflowStarts    *prometheus.CounterVec
 	WorkflowCompleted *prometheus.CounterVec
 	ReplayDuration    prometheus.Histogram
 	ShardRecovery     prometheus.Histogram
@@ -52,6 +53,19 @@ const (
 // fresh prometheus.NewRegistry() is what tests do.
 func New(reg prometheus.Registerer) *Metrics {
 	m := &Metrics{
+		// The counterpart to WorkflowCompleted, and the metric whose absence
+		// made a real measurement unreadable. During the PostgreSQL outage
+		// tests the engine refused 183 start requests it could not persist —
+		// correct behaviour, and invisible here: completions were simply
+		// lower than offered load, with nothing to say whether the engine had
+		// rejected the work or never been asked. Counting starts by outcome
+		// separates "refused" from "never arrived", which is the difference
+		// between a durability failure and a client timeout.
+		WorkflowStarts: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "workflow_starts_total",
+			Help: "Workflow start requests handled by this node, by type and outcome.",
+		}, []string{"workflow_type", "outcome"}),
+
 		WorkflowCompleted: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "workflow_completed_total",
 			Help: "Workflow executions that reached a terminal state, by type and final status.",
@@ -123,6 +137,7 @@ func New(reg prometheus.Registerer) *Metrics {
 	}
 
 	reg.MustRegister(
+		m.WorkflowStarts,
 		m.WorkflowCompleted,
 		m.ReplayDuration,
 		m.ShardRecovery,
@@ -138,6 +153,15 @@ func New(reg prometheus.Registerer) *Metrics {
 // The helpers below exist so that callers never spell a label value by hand.
 // Every label here is a core type, and converting it in one place is what
 // keeps "COMPLETED" from appearing alongside "Completed" in the same series.
+
+// WorkflowStartObserved records one start request and how it ended.
+//
+// outcome must come from a bounded vocabulary chosen by the caller; this
+// method does not validate it, because the only caller that can name an
+// outcome correctly is the one that produced it. See api.startOutcome.
+func (m *Metrics) WorkflowStartObserved(workflowType, outcome string) {
+	m.WorkflowStarts.WithLabelValues(workflowType, outcome).Inc()
+}
 
 // WorkflowFinished records a workflow reaching a terminal state.
 func (m *Metrics) WorkflowFinished(workflowType string, status core.ExecutionStatus) {

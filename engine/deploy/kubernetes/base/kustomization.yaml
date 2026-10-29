@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: durexec-lab
+resources:
+  - 00-namespace-rbac.yaml
+  - 10-config.yaml
+  - 20-postgres.yaml
+  - 30-engine.yaml
+  - 31-engine-nodeport.yaml
+  - 32-engine-per-pod-nodeport.yaml
+  - 40-extsim.yaml
+# No secret is committed. It is created at deploy time from the environment by
+# experiments/scripts/lab.sh, so no credential ever reaches git or an image
+# layer (spec section 14).

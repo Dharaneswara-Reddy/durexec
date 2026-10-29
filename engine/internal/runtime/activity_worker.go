@@ -196,6 +196,31 @@ func (w *ActivityWorker) process(ctx context.Context, task core.Task) error {
 		}
 	}
 
+	// BeforeResultJournal. The narrow window, and the only one that needs a
+	// real process death to test.
+	//
+	// At this instant the activity has returned, so any external effect it
+	// performed HAS HAPPENED and the recipient has confirmed it. Nothing
+	// durable records that: the result lives only in `d`, in this process's
+	// memory. A machine that stops here loses the knowledge that the call
+	// succeeded while the effect itself survives, outside, unrecorded.
+	//
+	// Recovery must therefore redeliver the task and invoke the activity
+	// again — there is no alternative, because nothing in the database says
+	// it already ran. The journaled dedup key is the only thing that stops
+	// that second invocation becoming a second effect, which is exactly the
+	// claim this seam exists to put under test.
+	//
+	// Inert unless explicitly armed; see internal/faultinj. Unlike every
+	// other seam here, arming this one KILLS the process.
+	if w.Engine.Faults.KillProcessIfArmed(faultinj.BeforeResultJournal, func() {
+		log.Warn(ctx, "injected process kill after the external effect completed and BEFORE its result was journaled; the effect exists and nothing durable records it",
+			"activity", sched.ActivityType, "workflow_id", task.WorkflowID,
+			"dedup_key", sched.DedupKey, "seq", int64(seq), "task_id", task.TaskID)
+	}) {
+		return errCrashInjected
+	}
+
 	if err := e.Committer.CommitDecision(ctx, d); err != nil {
 		// The activity worker had the same defect as the workflow worker: both
 		// causes of lost ownership ended the worker for good, and only one of

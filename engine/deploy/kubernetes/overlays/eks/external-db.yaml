@@ -1,0 +1,112 @@
+# Corrections the in-cluster base cannot supply once PostgreSQL moves to a
+# dedicated EC2 host.
+#
+# 1. The base init gate hardcodes the in-cluster Service
+#    (base/30-engine.yaml:109), which this overlay deletes, and loops
+#    `until pg_isready; do sleep 2; done` with no bound. Against a wrong host
+#    that hangs FOR EVER in Init:0/1 -- a stall that reads as a slow rollout
+#    rather than a misconfiguration.
+# 2. pg_isready proves only that a server answered the port. It does NOT
+#    authenticate, so a wrong password still passes the gate and the engine
+#    then fails later, making a credential fault look like a network fault.
+# 3. The base image tag is a LOCAL tag that EKS cannot pull.
+#
+# DB_HOST_PLACEHOLDER and IMAGE_PLACEHOLDER are substituted by
+# scripts/aws/eks_deploy.sh, which refuses to apply if either survives.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: durexec
+  namespace: durexec-lab
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          env:
+            # Password via environment, NEVER argv: everything on a command
+            # line is visible in `kubectl describe pod` and in the node's
+            # process table. psql reads PGPASSWORD without it appearing there.
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: durexec-db, key: password }
+            - name: PGCONNECT_TIMEOUT
+              value: "5"
+            - name: DB_HOST
+              value: "DB_HOST_PLACEHOLDER"
+            - name: READY_DEADLINE_SECONDS
+              value: "180"
+            - name: MAX_AUTH_FAILURES
+              value: "3"
+          command:
+            - sh
+            - -c
+            - |
+              # No `set -x`: tracing would echo PGPASSWORD into the pod log.
+              set -eu
+              host="$DB_HOST"; port=5432; user=durexec; db=durexec
+              deadline=$(( $(date +%s) + READY_DEADLINE_SECONDS ))
+              authfail=0
+
+              echo "gate: waiting for postgres at ${host}:${port} (deadline ${READY_DEADLINE_SECONDS}s)"
+
+              while :; do
+                now=$(date +%s)
+                if [ "$now" -ge "$deadline" ]; then
+                  echo "GATE FAILED [TIMEOUT]: ${host}:${port} not usable within ${READY_DEADLINE_SECONDS}s" >&2
+                  exit 1
+                fi
+
+                # Stage 1 -- is anything listening and accepting?
+                # Two traps here, both found by testing rather than reading.
+                # `$?` after `if ! cmd` is the status of the NEGATION, always
+                # 0, so the diagnostic category becomes a lie. And a BARE
+                # failing command under `set -e` kills the script before the
+                # retry loop can classify anything. `|| rc=$?` avoids both.
+                rc=0
+                pg_isready -h "$host" -p "$port" -U "$user" -d "$db" -t 5 >/dev/null 2>&1 || rc=$?
+                if [ "$rc" -ne 0 ]; then
+                  case "$rc" in
+                    2) echo "gate: no response from ${host}:${port} (DNS, routing or security group); retrying" ;;
+                    1) echo "gate: ${host}:${port} reachable but rejecting connections (starting up); retrying" ;;
+                    *) echo "gate: pg_isready rc=${rc} against ${host}:${port}; retrying" ;;
+                  esac
+                  sleep 3
+                  continue
+                fi
+
+                # Stage 2 -- can we actually authenticate and run a query?
+                # This is what pg_isready cannot tell us. Output is discarded
+                # so a verbose server notice cannot carry anything sensitive
+                # into the log; only our own classification is printed.
+                if err=$(psql -h "$host" -p "$port" -U "$user" -d "$db" \
+                           -v ON_ERROR_STOP=1 -tAc 'select 1' 2>&1 >/dev/null); then
+                  echo "gate: OK -- ${host}:${port} accepted an authenticated query"
+                  exit 0
+                fi
+
+                case "$err" in
+                  *"authentication failed"*|*"password"*|*"role \""*"does not exist"*)
+                    authfail=$(( authfail + 1 ))
+                    echo "GATE [AUTH] failure ${authfail}/${MAX_AUTH_FAILURES} for user '${user}' at ${host}" >&2
+                    if [ "$authfail" -ge "$MAX_AUTH_FAILURES" ]; then
+                      # Bad credentials never fix themselves. Retrying to the
+                      # deadline would waste three minutes of a paid cluster
+                      # and bury the real cause.
+                      echo "GATE FAILED [AUTH]: credentials rejected ${authfail} times; check the durexec-db secret" >&2
+                      exit 1
+                    fi
+                    ;;
+                  *"does not exist"*)
+                    echo "GATE FAILED [NO_DATABASE]: database '${db}' absent on ${host}" >&2
+                    exit 1
+                    ;;
+                  *)
+                    echo "gate: server up but query failed (category UNKNOWN); retrying" >&2
+                    ;;
+                esac
+                sleep 3
+              done
+      containers:
+        - name: engined
+          image: IMAGE_PLACEHOLDER

@@ -1,0 +1,185 @@
+# The headless Service is what makes NODE_ID resolvable. A StatefulSet pod
+# durexec-0 gets DNS durexec-0.durexec-hl, and the engine builds peer URLs as
+# http://<NODE_ID>:8080 (cmd/engined/main.go:365). So NODE_ID must BE that DNS
+# name, which is why it is composed from the pod name below rather than set to
+# a bare ordinal.
+apiVersion: v1
+kind: Service
+metadata:
+  name: durexec-hl
+  namespace: durexec-lab
+  labels:
+    app: durexec
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true   # peers must be resolvable while still starting
+  selector:
+    app: durexec
+  ports:
+    - name: http
+      port: 8080
+---
+# A normal Service for the load generator and for Prometheus to reach any node.
+# Requests landing on a node that does not own the shard are forwarded by the
+# engine itself, so load balancing across all pods is correct here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: durexec
+  namespace: durexec-lab
+  labels:
+    app: durexec
+spec:
+  selector:
+    app: durexec
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: durexec
+  namespace: durexec-lab
+spec:
+  # Shard ownership moves only when a lease expires (LEASE_TTL 10s). Allowing
+  # one pod down at a time bounds how much of the ring is unowned during a
+  # voluntary disruption such as a node drain.
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: durexec
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: durexec
+  namespace: durexec-lab
+spec:
+  serviceName: durexec-hl
+  replicas: 2
+  # Parallel, not OrderedReady: these nodes are peers, not a primary chain.
+  # OrderedReady would serialise startup and make a rolling update take
+  # replicas x (lease TTL) with shards unowned the whole time.
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: durexec
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: durexec
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: durexec
+      automountServiceAccountToken: false
+      # Must exceed the time the engine needs to release its leases and drain
+      # in-flight workflow tasks, or SIGKILL turns a graceful shutdown into a
+      # crash and every rolling update becomes a failover experiment.
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      # Finding R-5: with podManagementPolicy Parallel the engine pods start
+      # before the postgres Service has DNS, the engine correctly exits 1 on an
+      # unresolvable host, and Kubernetes reports CrashLoopBackOff. It recovers
+      # by itself, but a restart caused by startup ordering would be
+      # misattributed to an injected fault during a fault experiment.
+      #
+      # The gate is here rather than in the engine: the engine's fail-fast on an
+      # unreachable database is correct behaviour and must not be softened into
+      # a retry loop that masks a genuinely misconfigured database.
+      initContainers:
+        - name: wait-for-postgres
+          image: pgvector/pgvector:pg16
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres.durexec-lab.svc.cluster.local -p 5432 -U durexec -d durexec; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits:   { cpu: 200m, memory: 64Mi }
+      containers:
+        - name: engined
+          # A distinct tag per build, never a floating one. An earlier defect
+          # in this project had three nodes running three different builds
+          # while every health check passed, so the tag is part of the
+          # provenance of every measurement: `kubectl get pod -o
+          # jsonpath=...image` must name the build the report claims.
+          image: durexec-engine:phase8
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef: { fieldPath: metadata.name }
+            # The whole reason a StatefulSet is required. $(POD_NAME) is
+            # durexec-0, and durexec-0.durexec-hl is what peers can resolve.
+            - name: NODE_ID
+              value: "$(POD_NAME).durexec-hl"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: durexec-db, key: url }
+          envFrom:
+            - configMapRef:
+                name: durexec-config
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # THREE DISTINCT CONCERNS, deliberately not collapsed (spec section 4).
+          #
+          # startup: migrations run at boot and every migration re-runs on
+          # every boot (there is no schema_migrations table), so first start
+          # against an empty database is the slowest. Generous threshold here
+          # keeps that from being mistaken for a crash loop.
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 2
+            failureThreshold: 45
+          # readiness: can this process serve HTTP. /healthz returns 200
+          # whenever the server is up, INCLUDING when it owns zero shards
+          # (internal/api/handlers.go:550). That is correct: a node owning
+          # nothing still accepts requests and forwards them to the owner.
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+            failureThreshold: 3
+          # liveness: restart only a wedged process. Slower and more forgiving
+          # than readiness so a lease handover never restarts a healthy pod.
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          #
+          # SHARD OWNERSHIP IS NOT A PROBE. It is the "shards" field in the
+          # /healthz body and is observed via metrics and the dashboard. A
+          # ready pod does not imply an owning pod, and conflating them would
+          # hide exactly the failure the fault experiments look for.
+          resources:
+            requests: { cpu: 150m, memory: 128Mi }
+            limits:   { cpu: "2",  memory: 512Mi }

@@ -1,0 +1,18 @@
+# Everything for one experiment lives in one namespace, so cleanup is a single
+# namespace delete and cannot touch anything else on the cluster.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: durexec-lab
+  labels:
+    experiment: durexec-lab
+---
+# The engine talks to PostgreSQL and to its peers. It never calls the
+# Kubernetes API, so it gets a service account with no permissions at all
+# and no mounted token.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: durexec
+  namespace: durexec-lab
+automountServiceAccountToken: false

@@ -1,0 +1,311 @@
+==============================================================
+EXPLAIN (ANALYZE, BUFFERS) of the real poll selection -- BEFORE (healthy)
+queue shape: total=16 claimable=12 backing_off=3
+2026-10-27T01:04:25+05:30
+--- shard 0, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=28.34..28.35 rows=1 width=29) (actual time=0.034..0.034 rows=1 loops=1)
+   Buffers: shared hit=6
+   ->  Sort  (cost=28.34..28.35 rows=1 width=29) (actual time=0.034..0.034 rows=1 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=6
+         ->  Index Scan using tasks_pkey on tasks  (cost=0.26..28.33 rows=1 width=29) (actual time=0.016..0.017 rows=2 loops=1)
+               Index Cond: (shard_id = 0)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.292 ms
+ Execution Time: 0.055 ms
+(14 rows)
+
+--- shard 13, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=28.34..28.35 rows=1 width=29) (actual time=0.023..0.023 rows=1 loops=1)
+   Buffers: shared hit=6
+   ->  Sort  (cost=28.34..28.35 rows=1 width=29) (actual time=0.022..0.023 rows=1 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=6
+         ->  Index Scan using tasks_pkey on tasks  (cost=0.26..28.33 rows=1 width=29) (actual time=0.012..0.012 rows=1 loops=1)
+               Index Cond: (shard_id = 13)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.274 ms
+ Execution Time: 0.046 ms
+(14 rows)
+
+==============================================================
+EXPLAIN (ANALYZE, BUFFERS) of the real poll selection -- BEFORE (storm)
+queue shape: total=16 claimable=8 backing_off=4
+2026-10-27T01:04:27+05:30
+--- shard 0, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=28.34..28.35 rows=1 width=29) (actual time=0.034..0.035 rows=1 loops=1)
+   Buffers: shared hit=6
+   ->  Sort  (cost=28.34..28.35 rows=1 width=29) (actual time=0.034..0.034 rows=1 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=6
+         ->  Index Scan using tasks_pkey on tasks  (cost=0.26..28.33 rows=1 width=29) (actual time=0.015..0.015 rows=1 loops=1)
+               Index Cond: (shard_id = 0)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.345 ms
+ Execution Time: 0.062 ms
+(14 rows)
+
+--- shard 13, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=28.34..28.35 rows=1 width=29) (actual time=0.021..0.021 rows=0 loops=1)
+   Buffers: shared hit=5
+   ->  Sort  (cost=28.34..28.35 rows=1 width=29) (actual time=0.020..0.020 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=5
+         ->  Index Scan using tasks_pkey on tasks  (cost=0.26..28.33 rows=1 width=29) (actual time=0.010..0.010 rows=0 loops=1)
+               Index Cond: (shard_id = 13)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.271 ms
+ Execution Time: 0.045 ms
+(14 rows)
+
+==============================================================
+EXPLAIN (ANALYZE, BUFFERS) of the real poll selection -- BEFORE (probe)
+queue shape: total=20 claimable=15 backing_off=6
+2026-10-27T01:12:05+05:30
+--- shard 0, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=20.31..20.32 rows=1 width=29) (actual time=0.025..0.025 rows=0 loops=1)
+   Buffers: shared hit=5
+   ->  Sort  (cost=20.31..20.32 rows=1 width=29) (actual time=0.024..0.025 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=5
+         ->  Index Scan using tasks_pkey on tasks  (cost=0.26..20.30 rows=1 width=29) (actual time=0.009..0.009 rows=0 loops=1)
+               Index Cond: (shard_id = 0)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.274 ms
+ Execution Time: 0.046 ms
+(14 rows)
+
+--- shard 13, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=20.31..20.32 rows=1 width=29) (actual time=0.018..0.018 rows=0 loops=1)
+   Buffers: shared hit=5
+   ->  Sort  (cost=20.31..20.32 rows=1 width=29) (actual time=0.018..0.018 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=5
+         ->  Index Scan using tasks_pkey on tasks  (cost=0.26..20.30 rows=1 width=29) (actual time=0.009..0.009 rows=0 loops=1)
+               Index Cond: (shard_id = 13)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.363 ms
+ Execution Time: 0.041 ms
+(14 rows)
+
+==============================================================
+EXPLAIN (ANALYZE, BUFFERS) of the real poll selection -- BEFORE (healthy)
+queue shape: total=15 claimable=9 backing_off=4
+2026-10-27T01:14:48+05:30
+--- shard 0, ACTIVITY ---
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=27.10..27.11 rows=1 width=29) (actual time=0.045..0.046 rows=0 loops=1)
+   Buffers: shared hit=30
+   ->  Sort  (cost=27.10..27.11 rows=1 width=29) (actual time=0.045..0.045 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=30
+         ->  Seq Scan on tasks  (cost=0.00..27.09 rows=1 width=29) (actual time=0.036..0.036 rows=0 loops=1)
+               Filter: ((shard_id = 0) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Rows Removed by Filter: 10
+               Buffers: shared hit=27
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.286 ms
+ Execution Time: 0.066 ms
+(14 rows)
+
+--- shard 13, ACTIVITY ---
+                                                                                  QUERY PLAN                                                                                   
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=27.10..27.11 rows=1 width=29) (actual time=0.043..0.043 rows=0 loops=1)
+   Buffers: shared hit=30
+   ->  Sort  (cost=27.10..27.11 rows=1 width=29) (actual time=0.042..0.043 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=30
+         ->  Seq Scan on tasks  (cost=0.00..27.09 rows=1 width=29) (actual time=0.034..0.034 rows=0 loops=1)
+               Filter: ((shard_id = 13) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Rows Removed by Filter: 10
+               Buffers: shared hit=27
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.244 ms
+ Execution Time: 0.065 ms
+(14 rows)
+
+==============================================================
+EXPLAIN (ANALYZE, BUFFERS) of the real poll selection -- AFTER (healthy)
+queue shape: total=17 claimable=11 backing_off=6
+2026-10-27T01:16:22+05:30
+--- shard 0, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=28.30..28.31 rows=1 width=29) (actual time=0.043..0.044 rows=0 loops=1)
+   Buffers: shared hit=14
+   ->  Sort  (cost=28.30..28.31 rows=1 width=29) (actual time=0.043..0.043 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=14
+         ->  Bitmap Heap Scan on tasks  (cost=24.27..28.29 rows=1 width=29) (actual time=0.032..0.033 rows=0 loops=1)
+               Recheck Cond: (shard_id = 0)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Rows Removed by Filter: 1
+               Heap Blocks: exact=9
+               Buffers: shared hit=11
+               ->  Bitmap Index Scan on tasks_pkey  (cost=0.00..24.27 rows=1 width=0) (actual time=0.013..0.013 rows=25 loops=1)
+                     Index Cond: (shard_id = 0)
+                     Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.292 ms
+ Execution Time: 0.072 ms
+(19 rows)
+
+--- shard 13, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=28.30..28.31 rows=1 width=29) (actual time=0.049..0.049 rows=0 loops=1)
+   Buffers: shared hit=13
+   ->  Sort  (cost=28.30..28.31 rows=1 width=29) (actual time=0.048..0.048 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=13
+         ->  Bitmap Heap Scan on tasks  (cost=24.27..28.29 rows=1 width=29) (actual time=0.038..0.039 rows=0 loops=1)
+               Recheck Cond: (shard_id = 13)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Heap Blocks: exact=7
+               Buffers: shared hit=10
+               ->  Bitmap Index Scan on tasks_pkey  (cost=0.00..24.27 rows=1 width=0) (actual time=0.022..0.022 rows=21 loops=1)
+                     Index Cond: (shard_id = 13)
+                     Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.274 ms
+ Execution Time: 0.077 ms
+(18 rows)
+
+==============================================================
+EXPLAIN (ANALYZE, BUFFERS) of the real poll selection -- BEFORE (storm)
+queue shape: total=9 claimable=8 backing_off=5
+2026-10-27T01:16:23+05:30
+--- shard 0, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=28.30..28.31 rows=1 width=29) (actual time=0.051..0.052 rows=1 loops=1)
+   Buffers: shared hit=15
+   ->  Sort  (cost=28.30..28.31 rows=1 width=29) (actual time=0.051..0.051 rows=1 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=15
+         ->  Bitmap Heap Scan on tasks  (cost=24.27..28.29 rows=1 width=29) (actual time=0.022..0.039 rows=1 loops=1)
+               Recheck Cond: (shard_id = 0)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Heap Blocks: exact=10
+               Buffers: shared hit=12
+               ->  Bitmap Index Scan on tasks_pkey  (cost=0.00..24.27 rows=1 width=0) (actual time=0.012..0.012 rows=29 loops=1)
+                     Index Cond: (shard_id = 0)
+                     Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.376 ms
+ Execution Time: 0.079 ms
+(18 rows)
+
+--- shard 13, ACTIVITY ---
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=28.30..28.31 rows=1 width=29) (actual time=0.062..0.062 rows=0 loops=1)
+   Buffers: shared hit=14
+   ->  Sort  (cost=28.30..28.31 rows=1 width=29) (actual time=0.061..0.061 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=14
+         ->  Bitmap Heap Scan on tasks  (cost=24.27..28.29 rows=1 width=29) (actual time=0.050..0.050 rows=0 loops=1)
+               Recheck Cond: (shard_id = 13)
+               Filter: ((task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Heap Blocks: exact=8
+               Buffers: shared hit=11
+               ->  Bitmap Index Scan on tasks_pkey  (cost=0.00..24.27 rows=1 width=0) (actual time=0.018..0.018 rows=28 loops=1)
+                     Index Cond: (shard_id = 13)
+                     Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.306 ms
+ Execution Time: 0.092 ms
+(18 rows)
+
+==============================================================
+EXPLAIN (ANALYZE, BUFFERS) of the real poll selection -- AFTER (storm)
+queue shape: total=20 claimable=0 backing_off=20
+2026-10-27T01:17:57+05:30
+--- shard 0, ACTIVITY ---
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=22.46..22.47 rows=1 width=29) (actual time=0.051..0.051 rows=0 loops=1)
+   Buffers: shared hit=25
+   ->  Sort  (cost=22.46..22.47 rows=2 width=29) (actual time=0.050..0.050 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=25
+         ->  Seq Scan on tasks  (cost=0.00..22.45 rows=2 width=29) (actual time=0.035..0.035 rows=0 loops=1)
+               Filter: ((shard_id = 0) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Rows Removed by Filter: 20
+               Buffers: shared hit=22
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.630 ms
+ Execution Time: 0.077 ms
+(14 rows)
+
+--- shard 13, ACTIVITY ---
+                                                                                  QUERY PLAN                                                                                   
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=22.46..22.47 rows=1 width=29) (actual time=0.048..0.048 rows=0 loops=1)
+   Buffers: shared hit=25
+   ->  Sort  (cost=22.46..22.47 rows=2 width=29) (actual time=0.047..0.047 rows=0 loops=1)
+         Sort Key: (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)))
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=25
+         ->  Seq Scan on tasks  (cost=0.00..22.45 rows=2 width=29) (actual time=0.037..0.037 rows=0 loops=1)
+               Filter: ((shard_id = 13) AND (task_type = 'ACTIVITY'::text) AND (GREATEST(visible_at, COALESCE(locked_until, '-infinity'::timestamp with time zone)) <= now()))
+               Rows Removed by Filter: 20
+               Buffers: shared hit=22
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.797 ms
+ Execution Time: 0.077 ms
+(14 rows)
+

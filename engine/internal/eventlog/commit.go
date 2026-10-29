@@ -325,6 +325,14 @@ func (s *Store) CommitDecision(ctx context.Context, d core.Decision) error {
 	// database exactly as it was before Begin, which is precisely the state a
 	// process that died at this instant would leave behind. Inert unless a fault
 	// was explicitly armed — see the contract on Store.Faults.
+	// The creation case is checked first and separately. A decision that
+	// CREATES a workflow stages an execution row, a WorkflowStarted event and
+	// the run's first task; abandoning it must leave none of the three, which
+	// is a stronger assertion than the one a later decision needs. Keeping the
+	// two points distinct is what lets a test say which boundary it reached.
+	if d.CreateExecution != nil && s.faults.ShouldCrash(faultinj.BeforeStartCommit) {
+		return &CrashInjectedError{Point: string(faultinj.BeforeStartCommit)}
+	}
 	if s.faults.ShouldCrash(faultinj.BeforeDecisionCommit) {
 		return &CrashInjectedError{Point: string(faultinj.BeforeDecisionCommit)}
 	}

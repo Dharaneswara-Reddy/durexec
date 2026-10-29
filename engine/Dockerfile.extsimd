@@ -1,0 +1,54 @@
+# TEST-ONLY external-effect simulator (cmd/extsimd).
+#
+# This file exists to close a reproducibility gap. Phase 7 and Phase 8 both
+# ran against an image called durexec-extsimd:phase7 that was built by hand
+# from the command line and never committed, so the image that produced the
+# external-effect evidence could not be rebuilt from the repository. Anyone
+# re-running those scenarios got whatever happened to be in their local
+# daemon's cache, or nothing at all.
+#
+# It is deliberately a SEPARATE file from ./Dockerfile rather than a second
+# target inside it. The engine image must not contain this binary: an image
+# that can impersonate a payment processor has no business being deployable as
+# the engine, and keeping them apart means no build argument, typo or stray
+# --target can put it there.
+
+FROM golang:1.25 AS builder
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ARG VERSION=dev
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ENV CGO_ENABLED=0
+
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+        -trimpath \
+        -ldflags="-s -w -X main.version=${VERSION}" \
+        -o /out/extsimd ./cmd/extsimd
+
+# ---------------------------------------------------------------------------
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+WORKDIR /
+
+COPY --from=builder /out/extsimd /extsimd
+
+USER 65532:65532
+
+EXPOSE 8090
+
+# No HEALTHCHECK. The simulator's ledger lives in memory and exists to prove
+# how many times an effect really happened; a restart empties it and destroys
+# the evidence the scenario was collecting. A failing health check is exactly
+# the thing that would trigger such a restart, so this image declares none and
+# the compose file sets no restart policy. The same reasoning is written out
+# in deploy/kubernetes/base/40-extsim.yaml, which omits its liveness probe for
+# this reason.
+ENTRYPOINT ["/extsimd"]

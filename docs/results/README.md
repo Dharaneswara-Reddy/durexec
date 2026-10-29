@@ -1,5 +1,17 @@
 # Measured results
 
+**The cloud campaign that would fill the NOT RUN rows below is designed in
+[`../cloud-deployment/CLOUD-TEST-CAMPAIGN.md`](../cloud-deployment/CLOUD-TEST-CAMPAIGN.md).**
+
+**Local exploratory shard/concurrency sweep (2026-10-29), NOT study results:**
+[`local-shard-sweep/FINDINGS.md`](local-shard-sweep/FINDINGS.md) — refutes this
+plan's own shard-scaling prediction and shows the fixed-concurrency sweep was
+offered-load-limited by 2.74x.
+
+**For a one-page roll-up of the best valid run of every metric, read
+[`../RESULTS_SUMMARY.md`](../RESULTS_SUMMARY.md).** This file remains the
+per-run index, including the runs that are invalid and why they are kept.
+
 Every file here is output from a run against the live three-node cluster or the
 real `all-MiniLM-L6-v2` encoder. Nothing is estimated.
 
@@ -12,6 +24,16 @@ real `all-MiniLM-L6-v2` encoder. Nothing is estimated.
 | `duplicates-undisturbed.txt` | NFR-3 on a cluster nobody disturbed | **Weak evidence** — see below |
 | `acceptance-matrix.txt` / `.csv` | Every FR and NFR checked against the live cluster by `cmd/acceptance -inject` | 0 FAIL. MANUAL rows are ones the tool cannot verify from outside — see the other files for those |
 | `semantic-experiment-minilm.html` | Precision–recall of semantic idempotency, real encoder | Labels generated, not hand-assigned |
+| `phase6-sweep.csv` | **Phase 6.** Open-loop offered-load sweep on the 2-vCPU Kubernetes lab: generator view (offered, completed/s, p50/p95/p99, lag, in-flight slope, saturation verdict) joined to the infrastructure view for the same window (PostgreSQL txn/WAL/buffers/connections, container CPU and memory, engine pool pressure). 32 rows, 6 tags | **Valid, but NOT a capacity estimate.** 1 node = 12.98 wf/s, 2 nodes = 25.78 wf/s (1.99×). Rows tagged `baseline` at rates ≥16 are **GENERATOR_BOUND and invalid as engine evidence** — kept deliberately; superseded by tag `aw600` |
+| `phase6-storage.txt` | **Phase 6.** Heap vs index size per relation, and cost per event and per workflow, read from `pg_total_relation_size` on the live database | **Valid.** 11.99 events/workflow, 418 B/event, 5,548 B/workflow. Also records `tasks` index bloat: 4,472 kB of indexes over 24 kB of heap |
+| `phase6-crash-boundaries.txt` | **Phase 6 (F9-2).** Durable state after each armed crash boundary: workflow creation, decision commit (mid-run), and after-activity-journaled | **Valid for the blocks headed "RE-RUN AFTER THE F9-2 WIRING FIX".** The three blocks ABOVE that heading are **invalid** — they ran against a binary whose crash seams were dead, and are kept to document the defect |
+| `phase7-extsim-matrix.txt` | **Phase 7.** External-effect failure matrix: seven scenarios (ambiguous response, transient pre-effect failure, journaled-then-crash, crash-before-invocation, saga-after-effect, claim expiry mid-flight, node-level SIGKILL mid-flight). Each reads PostgreSQL and, independently, an effect ledger held in a separate pod that survives the engine being killed | **Valid.** Every scenario: invocations ≥ effects, exactly one effect per dedup key, 0 duplicate `(run_id,seq)`, 0 pending tasks. Proves at-least-once invocation with **effectively-once effect, conditional on the recipient honouring the idempotency key** — NOT exactly-once. Scenario E records a real gap: a failed saga leaves the external effect standing with 0 compensations. The `(ledger unreadable)` lines are a harness defect in the per-key reader, preserved; the `counters` line carries the decisive numbers |
+| `phase8-boundaries.txt` | **Phase 8.** The two boundaries Phase 7 left open: (H) external effect confirmed then a REAL self-`SIGKILL` before the result journal, via the new `BeforeResultJournal` seam; (I) shard ownership moved by pausing the owner while the effect was in flight, then thawing the stale worker | **Valid for the LAST H block only** — the first three are preserved failures: one armed the killing seam while an unrelated workflow was on a timer (both nodes died, start got HTTP 000), one used a broken quiescence query that matched every row, one read the seam log after the disarm had replaced the pod. H: `Requests=2 Performed=1 Replayed=1 Injected=0`, one journal completion. I: fencing token 63→64 mid-flight, one effect — but the stale worker was stopped by the **task-claim check, not fencing** |
+| `phase8-restore-drill.txt` | **Phase 8.** Backup usability drill: `pg_dump -Fc`, `pg_restore -l` integrity listing, restore into a fresh database, then row-count and invariant verification | **Valid as a dump-usability result only.** 247 MB → 24.6 MB in 2.0 s; restore 4.3 s; all counts match; 0 duplicate journal records. It restored into a second database in the **same instance**, so recovery from losing the instance, volume or node is **NOT TESTED**. `archive_mode=off`, so there is no PITR at all |
+| `cloud-tier1.csv` | **Phase 9.** Tier 1 cloud acceptance results, one row per case, appended and flushed as each finishes. Written by `engine/scripts/aws/acceptance_tier1.sh`; resumable, with the resume command in the file's own header | **Does not exist yet — NOT RUN.** Phase 9 was preparation only: no AWS resource was created, so there is no cloud result to report. The file appears on the first authorized deployment. Treating an absent file as a pass would be exactly the fabrication this project forbids |
+| `cloud/<timestamp>-<label>/` | **Phase 9.** Evidence bundles from `collect_evidence.sh`: container logs, compose state, `docker stats`, host memory and disk, the four journal invariants, all nine PostgreSQL durability settings, the external-effect ledger when the simulator is running, and raw `/metrics` from each node | **Empty — NOT RUN.** Collected *before* any disarm or restart, because Phase 7 and Phase 8 each destroyed their own evidence by doing it the other way round |
+
+
 | `semantic-experiment-minilm.csv` | Per-arm numbers behind the report | As above |
 | `semantic-experiment-minilm.txt` | Full terminal output of that run | As above |
 | `LIVENESS_FIX_BEFORE_AFTER.md` | The one-page before/after for the two liveness fixes — read this first, the four files below are its evidence | **Published figures still stand.** Safety unchanged, throughput unchanged |
@@ -189,3 +211,43 @@ permanently; and `/healthz` answered `owned_shards=16` on all three nodes
 throughout, because it was reporting the cluster's shard count under the name
 of the owned set. Both are fixed and written up in
 `green-but-wrong-findings.txt`.
+
+## Phase 9 — AWS deployment preparation (no cloud results)
+
+`docs/cloud-testing/10-PHASE9-AWS-PREP.md` is the report. It has **no measured
+cloud numbers, deliberately**: nothing was deployed, so every Tier 1 and Tier 2
+row in `docs/cloud-deployment/ACCEPTANCE-MATRIX.md` reads NOT RUN rather than
+PASS.
+
+What it does contain that is real and measured locally: `terraform validate`
+Success and a `plan` audited to **18 resources with exactly one ingress rule**
+(tcp/22 from one `/32`, no `0.0.0.0/0`); both container images built for
+`linux/amd64`; the external-effect simulator re-verified honouring an
+idempotency key in a local container; `gofmt` and `go vet` clean; and
+`make test-integration` at **1220 passed, 0 failed, 0 skipped, 2 blocked**.
+
+Three findings in it are worth reading even if the deployment never happens.
+
+**The external-effect simulator had no Dockerfile.** `durexec-extsimd:phase7`,
+the image behind every Phase 7 and Phase 8 external-effect result, was built by
+hand and never committed. The committed `Dockerfile.extsimd` now produces
+**8.05 MB** from the same source where that image was 27.8 MB. Behaviour should
+be identical, and the local re-verification is consistent with that, but the
+exact artifact those phases ran is gone. The evidence stands; its
+reproducibility did not, and now does.
+
+**One of the two BLOCKED tests is no longer blocked by missing plumbing.**
+`TestAcceptNoDuplicateExternalEffectBlocked` waits on "the external-effect
+simulator ... and a crash between the effect and its journal write". Phase 7
+built the first and Phase 8's `BeforeResultJournal` is the second. The suite
+still reports a limitation the engine no longer has. It was **not** implemented
+in Phase 9, because adding capability to turn an acceptance matrix green is the
+opposite of measuring one.
+
+**Two of my own checks were wrong in ways that would have looked like cloud
+failures.** The smoke script queried `tasks.completed_at`, which does not exist
+— a finished task is deleted, so any remaining row is work owed — and it
+treated `/healthz`'s `owned_shards` as a list when it is an integer count.
+Both were caught by reading the engine's code rather than trusting the shape I
+expected, and both are the same class of defect as the five "green but wrong"
+findings already recorded above.

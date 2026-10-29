@@ -35,9 +35,20 @@ deploy/data/
 
 # Binaries produced by `go build ./cmd/<name>` run from this directory. Every
 # command directory is listed so a stray build can never be committed.
+/acceptance
 /engined
 /experiment
-/loadgen
-/acceptance
+/extsimd
+/fieldeval
 /healthcheck
+/loadgen
+/rephrase
+/testinventory
 tail
+
+# ---- Phase 9: AWS deployment preparation ---------------------------------
+# Build artifacts for the cloud deployment. The image archive is ~11 MB of
+# binary and is rebuildable from any commit, so it has no business in git.
+.artifacts/
+# The tag that build_images.sh last produced, read by package_images.sh.
+.durexec-version

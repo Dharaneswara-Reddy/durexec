@@ -129,6 +129,13 @@ type Deps struct {
 	Events     core.EventStore
 	Leases     core.LeaseStore
 
+	// StartObserver counts start requests by outcome. It is a one-method
+	// interface rather than a *obs.Metrics so that this package never imports
+	// Prometheus and its tests need no registry — the same arrangement that
+	// keeps internal/idem/semantic free of a metrics dependency. Nil disables
+	// the counting and changes nothing else.
+	StartObserver StartObserver
+
 	// Engine behaviour.
 	Starter   Starter
 	Signaller Signaller
@@ -227,6 +234,11 @@ func New(d Deps) *Server {
 	}
 	s.routes()
 	return s
+}
+
+// StartObserver records the outcome of one workflow start request.
+type StartObserver interface {
+	WorkflowStartObserved(workflowType, outcome string)
 }
 
 // Gateway exposes the routing gateway, for a caller that wants to make the

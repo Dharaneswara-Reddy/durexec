@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# PostgreSQL host bootstrap for the durexec EKS pilot.
+# Terraform renders $${VAR} as a literal shell variable; $${} escapes it.
+set -euo pipefail
+exec > >(tee /var/log/durexec-db-bootstrap.log) 2>&1
+
+dnf install -y docker
+systemctl enable --now docker
+
+# --- data volume -----------------------------------------------------------
+# Nitro presents EBS as NVMe, so /dev/sdf is only a symlink and may be absent.
+# Find the one non-root disk instead of trusting the requested name.
+ROOT_DISK="$(lsblk -no PKNAME "$(findmnt -no SOURCE /)" 2>/dev/null || true)"
+DEVICE=""
+for d in /dev/nvme*n1 /dev/xvd*; do
+  [ -b "$d" ] || continue
+  [ "$(basename "$d")" = "$${ROOT_DISK}" ] && continue
+  lsblk -no MOUNTPOINT "$d" | grep -q . && continue
+  DEVICE="$d"; break
+done
+if [ -z "$${DEVICE}" ]; then echo "FATAL: no data volume found"; exit 1; fi
+
+# NEVER reformat a disk that already holds a filesystem. This is what lets the
+# volume outlive the instance and still carry its journal.
+if blkid "$${DEVICE}" >/dev/null 2>&1; then
+  echo "EXISTING filesystem on $${DEVICE}; preserving it"
+else
+  echo "no filesystem on $${DEVICE}; creating ext4"
+  mkfs -t ext4 -L durexec-pgdata "$${DEVICE}"
+fi
+
+mkdir -p /var/lib/durexec-pgdata
+grep -q durexec-pgdata /etc/fstab || \
+  echo 'LABEL=durexec-pgdata /var/lib/durexec-pgdata ext4 defaults,nofail 0 2' >> /etc/fstab
+mount -a
+# Postgres refuses to initdb into a non-empty directory and ext4 always has
+# lost+found, so PGDATA is a subdirectory.
+mkdir -p /var/lib/durexec-pgdata/pgdata
+chown -R 999:999 /var/lib/durexec-pgdata
+
+# --- credentials -----------------------------------------------------------
+install -d -m 0700 /opt/durexec
+cat > /opt/durexec/.env <<ENVEOF
+POSTGRES_PASSWORD=${postgres_password}
+REPL_PASSWORD=${replication_password}
+ENVEOF
+chmod 0600 /opt/durexec/.env
+
+# --- PostgreSQL ------------------------------------------------------------
+# max_connections must cover every engine pod's pool plus renewal pools plus
+# headroom. The Compose default of 100 caps the cluster at three nodes; the
+# pilot needs room for more pods than that.
+docker run -d --name durexec-postgres --restart unless-stopped \
+  -p 5432:5432 \
+  -e POSTGRES_DB=durexec \
+  -e POSTGRES_USER=durexec \
+  -e POSTGRES_PASSWORD="${postgres_password}" \
+  -e PGDATA=/var/lib/postgresql/data/pgdata \
+  -v /var/lib/durexec-pgdata:/var/lib/postgresql/data \
+  pgvector/pgvector:pg16 \
+  -c max_connections=${max_connections} \
+  -c shared_buffers=1GB \
+  -c synchronous_commit=on \
+  -c wal_level=replica \
+  -c max_wal_senders=4 \
+  -c max_replication_slots=4
+
+# A marker the deploy script waits on. Written last, so its presence means
+# every step above succeeded.
+for i in $(seq 1 60); do
+  if docker exec durexec-postgres pg_isready -U durexec -d durexec >/dev/null 2>&1; then
+    touch /opt/durexec/.db-ready
+    echo "postgres ready after $${i}s"
+    exit 0
+  fi
+  sleep 1
+done
+echo "FATAL: postgres did not become ready"
+exit 1

@@ -1,0 +1,12 @@
+# durexec LOCAL EXPLORATORY shard sweep -- NOT cloud results, NOT for the study's performance tables.
+# resume: SWEEP=1,2,4,8,16 CONCURRENCY=128 DURATION=25s ./experiments/scripts/shard_sweep.sh
+# engine SHARD_COUNT is fixed at 16; the shards column is how many of those 16 were driven.
+# host: Linux 6.17.5-200.fc42.x86_64 x86_64; cpu: 13th Gen Intel(R) Core(TM) i5-1335U
+run_id,config_id,ts_start,ts_end,git_sha,tree,shards,concurrency,duration,completed,wf_per_s,p50_ms,p95_ms,p99_ms,errors,owner_nodes,gen_cpu_pct,pg_conns,verdict,raw_file
+20261029T054823Z,shards1-c128-d25s,2026-10-29T05:48:23Z,2026-10-29T05:48:53Z,fde6ae0,dirty,1,128,25s,105,5.25,1,1,1,0,,50,67,RECORDED,20261029T054823Z-shards1-c128-d25s.txt
+20261029T054823Z,shards2-c128-d25s,2026-10-29T05:48:54Z,2026-10-29T05:49:24Z,fde6ae0,dirty,2,128,25s,97,4.85,2,2,2,0,,49,67,RECORDED,20261029T054823Z-shards2-c128-d25s.txt
+20261029T054823Z,shards4-c128-d25s,2026-10-29T05:49:24Z,2026-10-29T05:49:54Z,fde6ae0,dirty,4,128,25s,294,14.70,4,4,4,0,,52,66,RECORDED,20261029T054823Z-shards4-c128-d25s.txt
+20261029T054823Z,shards8-c128-d25s,2026-10-29T05:49:54Z,2026-10-29T05:50:25Z,fde6ae0,dirty,8,128,25s,577,28.85,8,8,8,0,,57,66,RECORDED,20261029T054823Z-shards8-c128-d25s.txt
+20261029T054823Z,shards16-c128-d25s,2026-10-29T05:50:25Z,2026-10-29T05:50:55Z,fde6ae0,dirty,16,128,25s,943,47.15,16,16,16,0,,57,67,RECORDED,20261029T054823Z-shards16-c128-d25s.txt
+20261029T055158Z,shards16-c256-d25s,2026-10-29T05:51:58Z,2026-10-29T05:52:29Z,fde6ae0,dirty,16,256,25s,2586,129.30,16,16,16,0,,63,63,RECORDED,20261029T055158Z-shards16-c256-d25s.txt
+20261029T055248Z,shards16-c512-d25s,2026-10-29T05:52:48Z,2026-10-29T05:53:19Z,fde6ae0,dirty,16,512,25s,890,44.50,16,16,16,0,,101,64,RECORDED,20261029T055248Z-shards16-c512-d25s.txt

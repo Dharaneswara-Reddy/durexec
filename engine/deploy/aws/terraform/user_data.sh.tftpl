@@ -1,0 +1,182 @@
+#!/bin/bash
+# Instance bootstrap for the durexec validation cluster.
+#
+# What this does NOT do: start the engine. There is no container registry in
+# this architecture, so the images arrive later by `docker save` over scp (see
+# scripts/aws/package_images.sh). Trying to `compose up` here would fail on a
+# missing image and leave a confusing boot log. This script prepares the
+# machine and stops; the runbook brings the stack up explicitly.
+#
+# Rendered by Terraform's templatefile(). A doubled dollar sign escapes the
+# interpolation, so $${NAME} reaches the instance as a shell variable, while a
+# single one is substituted by Terraform before the file is ever uploaded.
+# (This comment is itself written with the escape, because terraform validate
+# correctly rejected the unescaped version -- it tried to substitute a
+# variable called VAR that does not exist.)
+set -euo pipefail
+
+exec > >(tee -a /var/log/durexec-bootstrap.log) 2>&1
+echo "=== durexec bootstrap starting $(date -Is) ==="
+
+DATA_DIR="${data_dir}"
+
+# ---------------------------------------------------------------------------
+# 1. Packages
+# ---------------------------------------------------------------------------
+dnf -y update --security || echo "WARN: security update failed, continuing"
+dnf -y install docker git jq postgresql16
+
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+# The compose plugin is not in the AL2023 repositories, so it is fetched to
+# the Docker CLI plugin path. Pinned to an exact version: an unpinned
+# "latest" download means two deployments a month apart run different compose
+# versions, and compose has changed list-merging behaviour between minors --
+# which is exactly the behaviour deploy/aws/docker-compose.cloud.yml depends
+# on not changing.
+COMPOSE_VERSION=v2.29.7
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL \
+  "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+docker compose version
+
+# ---------------------------------------------------------------------------
+# 2. The data volume
+# ---------------------------------------------------------------------------
+#
+# This is the most dangerous block in the file, because getting it wrong
+# destroys the thing the instance-loss test exists to measure. The volume may
+# ALREADY hold a PostgreSQL cluster: the whole point of keeping it separate is
+# that it can be detached from a dead instance and attached to this one. So
+# the filesystem is created only when there is provably no filesystem there,
+# and never because the mount happened to fail.
+
+# t3 is a Nitro instance type, so EBS volumes appear as NVMe devices and the
+# /dev/sdf name requested in the attachment is only a symlink that may not
+# exist. Resolve the real device by looking for a disk that is not the root
+# disk, rather than guessing a name.
+ROOT_DISK=$(lsblk -no PKNAME "$(findmnt -no SOURCE /)" 2>/dev/null | head -1 || true)
+if [ -z "$${ROOT_DISK}" ]; then
+  ROOT_DISK=$(lsblk -dno NAME,TYPE | awk '$2=="disk"{print $1; exit}')
+fi
+echo "root disk: $${ROOT_DISK}"
+
+DEVICE=""
+for _ in $(seq 1 30); do
+  for cand in $(lsblk -dno NAME,TYPE | awk '$2=="disk"{print $1}'); do
+    [ "$${cand}" = "$${ROOT_DISK}" ] && continue
+    DEVICE="/dev/$${cand}"
+    break
+  done
+  [ -n "$${DEVICE}" ] && break
+  echo "waiting for the data volume to appear..."
+  sleep 2
+done
+
+if [ -z "$${DEVICE}" ]; then
+  echo "FATAL: no data volume found. Not falling back to the root disk."
+  exit 1
+fi
+echo "data device: $${DEVICE}"
+
+# blkid exits non-zero when there is no filesystem, which is the signal to
+# create one. Any other content -- including a filesystem this script does not
+# recognise -- is left strictly alone.
+if blkid "$${DEVICE}" >/dev/null 2>&1; then
+  echo "EXISTING filesystem on $${DEVICE}; NOT formatting. Preserving its contents."
+else
+  echo "no filesystem on $${DEVICE}; creating ext4"
+  mkfs -t ext4 -L durexec-data "$${DEVICE}"
+fi
+
+mkdir -p "$${DATA_DIR}"
+
+# Mounted by LABEL, not by device name. NVMe enumeration order is not
+# guaranteed across reboots, so an fstab entry naming /dev/nvme1n1 can mount
+# the wrong disk after a restart. A label follows the volume.
+if ! grep -q 'LABEL=durexec-data' /etc/fstab; then
+  # nofail matters: without it, a boot where the volume has not attached yet
+  # drops the instance into emergency mode with no SSH, and the only way back
+  # is the serial console.
+  echo "LABEL=durexec-data $${DATA_DIR} ext4 defaults,nofail 0 2" >> /etc/fstab
+fi
+mount -a
+findmnt "$${DATA_DIR}" || { echo "FATAL: $${DATA_DIR} did not mount"; exit 1; }
+
+# PostgreSQL in the pgvector image runs as uid 999; Grafana as 472;
+# Prometheus as 65534. Each gets its own directory with its own owner, rather
+# than one world-writable tree.
+mkdir -p "$${DATA_DIR}"/pg-leader "$${DATA_DIR}"/pg-standby "$${DATA_DIR}"/prom "$${DATA_DIR}"/grafana "$${DATA_DIR}"/evidence
+chown -R 999:999     "$${DATA_DIR}/pg-leader" "$${DATA_DIR}/pg-standby"
+chown -R 65534:65534 "$${DATA_DIR}/prom"
+chown -R 472:472     "$${DATA_DIR}/grafana"
+chown -R ec2-user:ec2-user "$${DATA_DIR}/evidence"
+
+# ---------------------------------------------------------------------------
+# 3. node_exporter
+# ---------------------------------------------------------------------------
+#
+# On the host, not in compose, because the number that matters is free space
+# on the shared data volume and a container sees its own filesystem view. The
+# database, the Prometheus TSDB and the collected evidence all live on the
+# same volume, and a full volume stops PostgreSQL rather than slowing it --
+# that is a failure mode worth being able to see coming.
+NE_VERSION=1.8.2
+curl -fsSL "https://github.com/prometheus/node_exporter/releases/download/v$${NE_VERSION}/node_exporter-$${NE_VERSION}.linux-amd64.tar.gz" \
+  -o /tmp/ne.tar.gz
+tar -xzf /tmp/ne.tar.gz -C /tmp
+install -m 0755 "/tmp/node_exporter-$${NE_VERSION}.linux-amd64/node_exporter" /usr/local/bin/node_exporter
+
+useradd -rs /sbin/nologin node_exporter 2>/dev/null || true
+cat > /etc/systemd/system/node_exporter.service <<'UNIT'
+[Unit]
+Description=Prometheus node exporter
+After=network-online.target
+
+[Service]
+User=node_exporter
+# Binds to all interfaces, which is safe here only because the security group
+# opens no inbound port but 22. Prometheus reaches it from inside a container
+# via the host-gateway address, so a 127.0.0.1 bind would NOT work.
+ExecStart=/usr/local/bin/node_exporter --web.listen-address=:9100
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now node_exporter
+
+# ---------------------------------------------------------------------------
+# 4. Environment file
+# ---------------------------------------------------------------------------
+#
+# Mode 0600 and owned by ec2-user. These are the generated passwords; they are
+# never committed, and they are not passed on a command line where they would
+# show up in `ps` for every process on the box.
+install -d -o ec2-user -g ec2-user /opt/durexec
+cat > /opt/durexec/.env <<ENVEOF
+# Generated by Terraform at instance launch. Do not commit.
+POSTGRES_PASSWORD=${postgres_password}
+REPL_PASSWORD=${repl_password}
+GRAFANA_PASSWORD=${grafana_password}
+DUREXEC_DATA_DIR=${data_dir}
+# Set by scripts/aws/deploy_stack.sh to the tag that was actually loaded.
+DUREXEC_VERSION=
+# Fault injection is OFF. The acceptance suite turns it on for one named
+# scenario and turns it back off afterwards.
+FAULT_INJECTION=false
+FAULT_CRASH_AT=
+# Empty means the ExternalPayment activity and the probe workflow are not
+# registered at all.
+EXTSIM_URL=
+ENVEOF
+chown ec2-user:ec2-user /opt/durexec/.env
+chmod 600 /opt/durexec/.env
+
+echo "=== durexec bootstrap complete $(date -Is) ==="
+# A marker the deploy script waits on, so it never races the bootstrap.
+touch /opt/durexec/.bootstrap-complete
