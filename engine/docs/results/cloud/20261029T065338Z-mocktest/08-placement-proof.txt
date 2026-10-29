@@ -1,2 +1,0 @@
-POD                          NODE                     ROLE
-durexec-0                    ip-10-91-0-5             engine

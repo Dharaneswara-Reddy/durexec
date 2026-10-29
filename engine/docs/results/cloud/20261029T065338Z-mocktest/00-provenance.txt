@@ -1,7 +1,0 @@
-campaign    : mocktest
-collected_at: 20261029T065338Z
-context     : arn:aws:eks:us-east-1:<ACCT>:cluster/durexec-bench
-namespace   : durexec-lab
-git_sha     : fde6ae0
-git_tree    : dirty
-aws_identity: 

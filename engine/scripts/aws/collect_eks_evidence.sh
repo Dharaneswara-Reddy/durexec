@@ -10,7 +10,11 @@
 # runs BEFORE any teardown and treats a missing artefact as a failure rather
 # than as silence.
 set -uo pipefail
-cd "$(dirname "$0")/../.."
+# Two levels up from engine/scripts/aws is engine/, not the repository root,
+# so a relative docs/ path lands in engine/docs/. Resolve the repo root
+# explicitly; an evidence bundle written to the wrong tree is worse than one
+# not written at all, because it looks collected.
+cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || echo "$(dirname "$0")/../..")"
 
 CAMPAIGN="${1:-}"
 [ -n "$CAMPAIGN" ] || { echo "usage: $0 <campaign-name>" >&2; exit 2; }

@@ -1,7 +1,0 @@
-campaign    : degraded
-collected_at: 20261029T065343Z
-context     : ctx
-namespace   : durexec-lab
-git_sha     : fde6ae0
-git_tree    : dirty
-aws_identity: 
