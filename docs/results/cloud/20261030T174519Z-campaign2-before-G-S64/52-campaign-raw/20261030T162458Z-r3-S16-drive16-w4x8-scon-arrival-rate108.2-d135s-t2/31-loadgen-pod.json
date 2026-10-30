@@ -1,0 +1,284 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-10-30T16:25:03Z",
+                "generateName": "loadgen-20261030t162458z-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec-loadgen",
+                    "batch.kubernetes.io/controller-uid": "5eaa1ae7-b07e-4a42-bc8a-10fa124e7197",
+                    "batch.kubernetes.io/job-name": "loadgen-20261030t162458z",
+                    "controller-uid": "5eaa1ae7-b07e-4a42-bc8a-10fa124e7197",
+                    "job-name": "loadgen-20261030t162458z",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "loadgen-20261030t162458z-dnrzh",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "batch/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Job",
+                        "name": "loadgen-20261030t162458z",
+                        "uid": "5eaa1ae7-b07e-4a42-bc8a-10fa124e7197"
+                    }
+                ],
+                "resourceVersion": "16502",
+                "uid": "98aad839-d921-4d71-87db-0afcf06b9618"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "-mode",
+                            "arrival",
+                            "-rates",
+                            "108.2",
+                            "-service-floor",
+                            "2.2086s",
+                            "-shards",
+                            "16",
+                            "-duration",
+                            "135s",
+                            "-warmup",
+                            "15s",
+                            "-id-prefix",
+                            "lg-20261030t162458z",
+                            "-base",
+                            "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080"
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "loadgen",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-9nv88",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "ip-10-91-0-252.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "harness"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoSchedule",
+                        "key": "durexec.io/harness",
+                        "operator": "Equal",
+                        "value": "true"
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-9nv88",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "500m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-10-30T16:27:41Z",
+                        "message": "pod sandbox is not ready",
+                        "observedGeneration": 1,
+                        "reason": "PodSandboxNotReady",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-10-30T16:25:03Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-10-30T16:27:40Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-10-30T16:27:40Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-10-30T16:25:03Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "500m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://09ebbcf70eaf539b834b35d0864ebf37d94429c2e2f9ff902cd5d74a63e99210",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:8b0b831783873c833071b13b810431624e32dbfea5de2bac84718e6a7469ad75",
+                        "lastState": {},
+                        "name": "loadgen",
+                        "ready": false,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://09ebbcf70eaf539b834b35d0864ebf37d94429c2e2f9ff902cd5d74a63e99210",
+                                "exitCode": 0,
+                                "finishedAt": "2026-10-30T16:27:39Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-10-30T16:25:04Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-9nv88",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.91.0.252",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.252"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Succeeded",
+                "podIP": "10.91.0.151",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.151"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "489m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-10-30T16:25:03Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

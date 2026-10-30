@@ -1,0 +1,2 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T174600Z-eks_loadgen.sh-172184.log
+r3-S64-drive64-w1x2-scon-scaling-c32-d135s-t1 -> ? wf/s lg=- p99=s gen=?c eng=?c node_max=?% db_cpu=2.022% sat=[] missing=[gen_cpu+eng_total+node_max] verdict=INVALID_generator_exit_1

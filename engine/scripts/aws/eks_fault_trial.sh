@@ -91,8 +91,8 @@ ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 IMAGE="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/durexec/loadgen:${TAG}"
 DEPLOYED_SHARDS=$(kubectl -n "$NS" get configmap durexec-config -o jsonpath='{.data.SHARD_COUNT}')
 BASES=""; for p in $PODS; do BASES="${BASES},http://${p}.durexec-hl.${NS}.svc.cluster.local:8080"; done
-ARGS=$(printf '["-mode","arrival","-rates","%s","-service-floor","%s","-shards","%s","-duration","%s","-warmup","5s","-grace","120s","-id-prefix","%s","-base","%s"]' \
-        "$LOAD_RATE" "$FLOOR" "$DEPLOYED_SHARDS" "$LOAD_DUR" "$IDP" "${BASES#,}")
+ARGS=$(printf '["-mode","arrival","-rates","%s","-service-floor","%s","-shard-count","%s","-shards","%s","-duration","%s","-warmup","5s","-grace","120s","-id-prefix","%s","-base","%s"]' \
+        "$LOAD_RATE" "$FLOOR" "$DEPLOYED_SHARDS" "$DEPLOYED_SHARDS" "$LOAD_DUR" "$IDP" "${BASES#,}")
 sed -e "s|LOADGEN_JOB_NAME|$JOB|" -e "s|LOADGEN_IMAGE|$IMAGE|" -e "s|LOADGEN_ARGS|$ARGS|" \
     deploy/kubernetes/loadgen/job.yaml | kubectl apply -f - >/dev/null
 log "load: $LOAD_RATE wf/s for $LOAD_DUR (job $JOB)"

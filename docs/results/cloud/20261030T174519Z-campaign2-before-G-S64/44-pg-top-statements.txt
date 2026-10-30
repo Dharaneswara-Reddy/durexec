@@ -1,0 +1,25 @@
+5309624|13460950.8ms|2.535ms|SELECT fencing_token FROM shard_leases WHERE shard_id = $1 FOR UPDATE
+10487165|1518616.1ms|0.145ms|WITH pick AS ( SELECT shard_id, task_id FROM tasks WHERE shard_id=$1 AND task_type=$2 AND GREATEST(visible_at, COALESCE(locked_until, $4::timestam
+21712477|681127.4ms|0.031ms|SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at FROM executions WHERE shard_id = $1 AND workflow_id = $2
+29267533|375826.0ms|0.013ms|SELECT shard_id, COALESCE(owner_node, $2), fencing_token, expires_at FROM shard_leases WHERE shard_id = $1
+4827132|365498.0ms|0.076ms|SELECT shard_id, workflow_id, run_id::text, seq, event_type, payload, created_at FROM events WHERE shard_id = $1 AND workflow_id = $2 AND run_id = $3 ORDER 
+5792311|286988.8ms|0.050ms|INSERT INTO events (shard_id, workflow_id, run_id, seq, event_type, payload, created_at) VALUES ($1, $2, $3::uuid, $4, $5, $6::jsonb, COALESCE($7, now()))
+5309610|271698.5ms|0.051ms|UPDATE executions SET status = COALESCE(NULLIF($3, $5), status), last_seq = GREATEST(executions.last_seq, $4), updated_at = now() WHERE shard_
+4826924|233743.5ms|0.048ms|INSERT INTO tasks (shard_id, task_type, workflow_id, run_id, scheduled_event_seq, visible_at) VALUES ($1, $2, $3, $4::uuid, $5, COALESCE($6, now()))
+4826913|161399.0ms|0.033ms|DELETE FROM tasks WHERE shard_id = $1 AND task_id = $2
+29621|50460.1ms|1.704ms|UPDATE shard_leases SET expires_at = now() + $4::interval WHERE shard_id = $1 AND owner_node = $2 AND fencing_token = $3
+482692|33559.3ms|0.070ms|INSERT INTO timers (shard_id, workflow_id, run_id, timer_seq, fire_at) VALUES ($1, $2, $3::uuid, $4, $5) ON CONFLICT (shard_id, workflow_id, run_id, timer_seq) 
+482701|30496.6ms|0.063ms|INSERT INTO executions (shard_id, workflow_id, run_id, workflow_type, status, last_seq) VALUES ($1, $2, $3::uuid, $4, $5, $6)
+482691|17660.6ms|0.037ms|DELETE FROM timers WHERE shard_id = $1 AND workflow_id = $2 AND run_id = $3::uuid AND timer_seq = $4
+40|16786.8ms|419.670ms|create temp table r as select e.shard_id, e.workflow_id, e.run_id, e.seq, e.event_type, e.payload, e.created_at from events e where e.workflow_id like $1 || 
+1|8436.5ms|8436.484ms|select $1 || (select count(*) from (select run_id, seq from events group by run_id, seq having count(*) > $2) d)
+95295|4290.9ms|0.045ms|SELECT shard_id, workflow_id, run_id::text, timer_seq, fire_at FROM timers WHERE shard_id = $1 AND fire_at <= now() ORDER BY fire_at LIMIT $2
+5309601|3585.8ms|0.001ms|commit
+1124|3282.2ms|2.920ms|select $1 || coalesce(sum(calls), $2) || $3 || $4 || round(coalesce(sum(total_exec_time), $5)::numeric, $6) from pg_stat_statements
+5309668|3156.2ms|0.001ms|begin
+1|2897.7ms|2897.657ms|select $1 || (select count(*) from (select run_id from events group by run_id having max(seq) <> count(*)) d)
+1|2748.1ms|2748.078ms|select $1 || (select count(*) from (select run_id, payload->>$2 from events where event_type = $3 group by 1, 2 having count(
+40|1718.8ms|42.971ms|select $1 || coalesce(string_agg(status || $2 || n, $3 order by status), $4) from ( select status, count(*) n from executions where workflow_id like $5 || $6 
+1290|1710.0ms|1.326ms|select $1 || pg_database_size(current_database())
+181506|1610.4ms|0.009ms|WITH pick AS ( SELECT shard_id, task_id FROM tasks WHERE shard_id=$1 AND task_type=$2 AND GREATEST(visible_at, COALESCE(locked_until, $4::timestam
+1290|1364.4ms|1.058ms|select $1 || count(*) from pg_stat_activity where datname = current_database()

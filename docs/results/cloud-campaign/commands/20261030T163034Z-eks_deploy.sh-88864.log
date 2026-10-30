@@ -1,0 +1,32 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T163034Z-eks_deploy.sh-88864.log
+experiment        : replicas=3 shards=16 workers=2x4 sync_commit=on
+database endpoint : 10.91.0.102 (private)
+engine image      : 183192605828...ecr.../durexec/engine:cf986fb
+secret durexec-db : created (value never printed)
+verified          : init gate, image tag and postgres removal all correct
+verified          : replicas=3 = NODE_COUNT = ring length; shards=16
+stopping engines  : scaling to 0 before reconfiguration
+namespace/durexec-lab configured
+storageclass.storage.k8s.io/durexec-gp3 unchanged
+serviceaccount/durexec unchanged
+configmap/durexec-config configured
+configmap/postgres-config unchanged
+service/durexec unchanged
+service/durexec-0-np unchanged
+service/durexec-1-np unchanged
+service/durexec-hl unchanged
+service/durexec-np unchanged
+statefulset.apps/durexec configured
+poddisruptionbudget.policy/durexec configured
+Waiting for 3 pods to be ready...
+Waiting for 2 pods to be ready...
+Waiting for 1 pods to be ready...
+statefulset rolling update complete 3 pods at revision durexec-59b95cb587...
+NOTICE:  extension "pg_stat_statements" already exists, skipping
+pg_stat_statements: enabled
+
+NAME            READY   STATUS    RESTARTS   AGE   IP           NODE                          NOMINATED NODE   READINESS GATES
+durexec-0       1/1     Running   0          4s    10.91.0.90   ip-10-91-0-67.ec2.internal    <none>           <none>
+durexec-1       1/1     Running   0          4s    10.91.0.47   ip-10-91-0-39.ec2.internal    <none>           <none>
+durexec-2       1/1     Running   0          4s    10.91.0.81   ip-10-91-0-43.ec2.internal    <none>           <none>
+durexec-probe   1/1     Running   0          53m   10.91.0.41   ip-10-91-0-252.ec2.internal   <none>           <none>

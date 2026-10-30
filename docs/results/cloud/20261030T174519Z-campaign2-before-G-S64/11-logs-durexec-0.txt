@@ -1,0 +1,20 @@
+gate: waiting for postgres at 10.91.0.102:5432 (deadline 180s)
+gate: OK -- 10.91.0.102:5432 accepted an authenticated query
+{"time":"2026-10-30T17:29:56.477389023Z","level":"INFO","msg":"starting engine node","config":"node=durexec-0.durexec-hl listen=:8080 shards=32 lease_ttl=10s lease_renew=3s task_lock=30s workers=2/4 sync_commit=true tau=0.85/0.90 db=postgres://durexec:<REDACTED>@10.91.0.102:5432/durexec?sslmode=disable embedder=(built-in fake) dedup=semantic (similarity over the whole intent) escalation_blocks=false fault_injection=false"}
+{"time":"2026-10-30T17:29:56.477461605Z","level":"WARN","msg":"no EMBEDDER_URL configured: using the built-in deterministic stand-in encoder. It matches identical intent text exactly and cannot recognise a reworded repeat, so verdicts from this node exercise the plumbing, not the contribution"}
+{"time":"2026-10-30T17:29:56.483720687Z","level":"INFO","msg":"connection budget fits","nodes":3,"per_node_pool":20,"per_node_renewal":4,"cluster_total":98,"server_max_connections":400}
+{"time":"2026-10-30T17:29:56.574745595Z","level":"INFO","msg":"schema applied","dir":"/migrations"}
+{"time":"2026-10-30T17:29:56.577808163Z","level":"INFO","msg":"hash ring built","nodes":["durexec-0.durexec-hl","durexec-1.durexec-hl","durexec-2.durexec-hl"],"vnodes":150}
+{"time":"2026-10-30T17:29:56.577954583Z","level":"INFO","msg":"engine node ready","shards":32,"workflows":["DeliveryOrder","TravelAgent"],"activities":11,"escalation_blocks":false}
+{"time":"2026-10-30T17:29:56.577956921Z","level":"INFO","msg":"http listening","addr":":8080"}
+{"time":"2026-10-30T17:29:57.578733806Z","level":"INFO","msg":"starting shard workers","shard":0,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578772949Z","level":"INFO","msg":"starting shard workers","shard":29,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578780706Z","level":"INFO","msg":"starting shard workers","shard":1,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578815103Z","level":"INFO","msg":"starting shard workers","shard":19,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578823734Z","level":"INFO","msg":"starting shard workers","shard":28,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578828051Z","level":"INFO","msg":"starting shard workers","shard":15,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578844506Z","level":"INFO","msg":"starting shard workers","shard":8,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578866067Z","level":"INFO","msg":"starting shard workers","shard":23,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.57890646Z","level":"INFO","msg":"starting shard workers","shard":21,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578912137Z","level":"INFO","msg":"starting shard workers","shard":4,"workflow_workers":2,"activity_workers":4}
+{"time":"2026-10-30T17:29:57.578925921Z","level":"INFO","msg":"starting shard workers","shard":31,"workflow_workers":2,"activity_workers":4}

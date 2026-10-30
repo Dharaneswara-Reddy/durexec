@@ -1,0 +1,37 @@
+cluster: durexec-0.durexec-hl=http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-1.durexec-hl=http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-2.durexec-hl=http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080
+
+--- arrival: 108.20 wf/s offered to 16 shard(s) [0,2,3,1,4,5,6,7,8,9,10,11,12,13,14,15] owned by [durexec-0.durexec-hl durexec-2.durexec-hl durexec-1.durexec-hl] ---
+    window 2m0s (after 15s warm-up), grace 30s, service floor 2.2086s
+    scheduled 12984, issued 10477, dropped 2507, accepted 12097, completed 10474, rejected 3, timed out 0, errored 3
+    completed 76.28 wf/s (offered 87.31), p50 4.677s, in-flight p50 1178 max 1389 slope +9.24/s, lag p99 1.2ms
+    VERDICT GENERATOR_BOUND: the generator dropped 19.3% of its scheduled arrivals (2507 of 12984), above the 1% limit: it could not offer the rate it was asked for
+    first error: after 6 routing attempts: POST /v1/workflows: 409 NotOwner, shard currently unowned
+
+NFR    METRIC                                VALUE                                                                                        TARGET                                VERDICT      KIND
+---    ------                                -----                                                                                        ------                                -------      ----
+NFR-5  saturation_verdict @16shard@108.2rps  GENERATOR_BOUND                                                                              -                                     NO EVIDENCE  derived
+NFR-5  completed_per_sec @16shard@108.2rps   76.275 wf/s                                                                                  no absolute target; NFR-5 is a ratio  NO EVIDENCE  measured
+-      offered_per_sec @16shard@108.2rps     87.308 wf/s                                                                                  -                                     -            measured
+-      accounting @16shard@108.2rps          12984/10477/12097/10474/3/0/3 scheduled/issued/accepted/completed/rejected/timedout/errored  -                                     -            measured
+-      generator_lag_p99 @16shard@108.2rps   0.0012 s                                                                                     -                                     -            measured
+-      in_flight_slope @16shard@108.2rps     +9.239 wf/s                                                                                  -                                     -            measured
+NFR-5  latency_p50 @16shard@108.2rps         4.6767 s                                                                                     -                                     -            measured
+NFR-5  latency_p95 @16shard@108.2rps         37.5779 s                                                                                    -                                     -            measured
+NFR-5  latency_p99 @16shard@108.2rps         45.1922 s                                                                                    -                                     -            measured
+
+notes
+  saturation_verdict @16shard@108.2rps the generator dropped 19.3% of its scheduled arrivals (2507 of 12984), above the 1% limit: it could not offer the rate it was asked for
+  completed_per_sec @16shard@108.2rps shards 0,2,3,1,4,5,6,7,8,9,10,11,12,13,14,15 owned by 3 node(s): [durexec-0.durexec-hl durexec-2.durexec-hl durexec-1.durexec-hl]; verdict GENERATOR_BOUND — the generator dropped 19.3% of its scheduled arrivals (2507 of 12984), above the 1% limit: it could not offer the rate it was asked for
+  offered_per_sec @16shard@108.2rps  asked for 108.200/s; 12984 scheduled, 10477 issued, 2507 dropped (an arrival with no free generator worker is dropped, never queued)
+  accounting @16shard@108.2rps       0 reached a terminal status other than COMPLETED; 9153 of the 10474 completions finished inside the window and only those count as throughput, the rest drained during the 30.000s grace period
+  generator_lag_p99 @16shard@108.2rps p50 145us, max 33.5ms; the gap between an arrival's due time and its actual start. A generator that cannot keep its schedule is measuring itself
+  in_flight_slope @16shard@108.2rps  in-flight p50 1178, max 1389, sampled every 100ms. A positive slope means the queue was still growing when the window closed
+  latency_p50 @16shard@108.2rps      10474 samples; declared service floor 2.209s; a p50 on the floor means the engine was idling, not saturated
+  latency_p99 @16shard@108.2rps      10474 samples
+
+how to read the 'kind' column
+  measured      an observation taken from the running cluster in this run
+  derived       arithmetic over this run's measurements (a ratio, a percentile)
+  assumed       a value this tool was told, not something it checked
+  not-measured  this run produced no evidence; the target column still shows
+                what the design document asks for, and the value column is empty

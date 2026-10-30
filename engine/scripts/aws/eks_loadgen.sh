@@ -96,6 +96,10 @@ grep -q ",${CFG},${KIND},${MODE}," "$CSV" && { echo "$CFG ($KIND) already record
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 IMAGE="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/durexec/loadgen:${TAG}"
 
+# loadgen hashes workflow ids onto -shard-count shards; it defaults to 16, so
+# every non-16 deployment either failed ("-shards 32 exceeds -shard-count 16",
+# campaign 2 Stage G) or, below 16, would silently aim at shards that do not
+# exist. It is always the DEPLOYED count, read from the cluster.
 # Per-pod headless DNS: loadgen follows 409 NotOwner redirects to the named
 # owner, and a round-robin Service would send the retry to an arbitrary pod.
 BASES=""; for p in $PODS; do BASES="${BASES},http://${p}.durexec-hl.${NS}.svc.cluster.local:8080"; done
@@ -104,11 +108,11 @@ BASES="${BASES#,}"
 # latency decomposition and the invariants (sql/run_latency_and_invariants.sql).
 IDP="lg-${RUN_ID,,}"
 if [ "$MODE" = arrival ]; then
-  ARGS=$(printf '["-mode","arrival","-rates","%s","-service-floor","%s","-shards","%s","-duration","%s","-warmup","%s","-id-prefix","%s","-base","%s"]' \
-          "$RATE" "$FLOOR" "$SHARDS" "$DUR" "$WARMUP" "$IDP" "$BASES")
+  ARGS=$(printf '["-mode","arrival","-rates","%s","-service-floor","%s","-shard-count","%s","-shards","%s","-duration","%s","-warmup","%s","-id-prefix","%s","-base","%s"]' \
+          "$RATE" "$FLOOR" "$DEPLOYED_SHARDS" "$SHARDS" "$DUR" "$WARMUP" "$IDP" "$BASES")
 else
-  ARGS=$(printf '["-mode","scaling","-sweep","%s","-concurrency","%s","-duration","%s","-warmup","%s","-id-prefix","%s","-base","%s"]' \
-          "$SHARDS" "$CONC" "$DUR" "$WARMUP" "$IDP" "$BASES")
+  ARGS=$(printf '["-mode","scaling","-shard-count","%s","-sweep","%s","-concurrency","%s","-duration","%s","-warmup","%s","-id-prefix","%s","-base","%s"]' \
+          "$DEPLOYED_SHARDS" "$SHARDS" "$CONC" "$DUR" "$WARMUP" "$IDP" "$BASES")
 fi
 
 # --- provenance --------------------------------------------------------------

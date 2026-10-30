@@ -1,0 +1,8 @@
+inv|runs=0
+inv|dup_run_seq=0
+inv|dup_activity_completion=0
+inv|orphan_completion=0
+inv|seq_gaps=0
+inv|multi_terminal=0
+inv|executions_by_status=none
+inv|pending_tasks=0
