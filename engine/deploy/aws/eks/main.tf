@@ -198,6 +198,14 @@ resource "aws_eks_cluster" "main" {
     public_access_cidrs = [var.operator_cidr]
   }
 
+  # Access entries (API) alongside aws-auth. The creator keeps admin; the
+  # optional in-VPC operator (operator.tf) gets its own scoped entry, which a
+  # CONFIG_MAP-only cluster could not express.
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   # Control-plane logs cost CloudWatch storage. Off by default; enable only
   # while diagnosing a control-plane problem.
   enabled_cluster_log_types = var.enable_control_plane_logs ? ["api", "audit"] : []

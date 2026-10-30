@@ -5,3 +5,5 @@ crash.log
 terraform.tfvars
 *.auto.tfvars
 *.tfplan
+# Remote-state settings are per operator and never committed.
+backend_override.tf

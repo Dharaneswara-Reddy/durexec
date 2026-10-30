@@ -97,3 +97,22 @@ variable "enable_db_ssh" {
   type    = bool
   default = false
 }
+
+# --- optional in-VPC operator ------------------------------------------------
+
+variable "enable_operator" {
+  type        = bool
+  default     = false
+  description = "Create an in-VPC operator instance reached through SSM, for running the harness when the operator's own machine cannot reach the Kubernetes API. Off for laptop runs."
+}
+
+variable "operator_instance_type" {
+  type    = string
+  default = "c7i-flex.large"
+}
+
+variable "campaign_bucket" {
+  type        = string
+  default     = ""
+  description = "S3 bucket holding remote state and evidence. The operator may read the state object and read/write the evidence prefix only."
+}

@@ -13,8 +13,11 @@ set -euo pipefail
 # environment. Forcing a profile that does not exist on this machine makes
 # every aws call fail with "profile not found" even though valid environment
 # credentials are present -- the case on a cloud runner with injected secrets.
-if [ -z "${AWS_ACCESS_KEY_ID:-}" ]; then
-  : "${AWS_PROFILE:=aiops-deploy}"
+# Likewise on an EC2 instance whose credentials come from its instance role:
+# the profile is defaulted only if it actually exists in the local config.
+if [ -z "${AWS_ACCESS_KEY_ID:-}" ] && [ -z "${AWS_PROFILE:-}" ] \
+   && aws configure list-profiles 2>/dev/null | grep -qx aiops-deploy; then
+  AWS_PROFILE=aiops-deploy
   export AWS_PROFILE
 fi
 : "${AWS_REGION:=us-east-1}"

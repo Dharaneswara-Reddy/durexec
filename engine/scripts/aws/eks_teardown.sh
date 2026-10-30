@@ -40,6 +40,13 @@ else
   done
 fi
 
+# TEARDOWN_K8S_ONLY=1 stops here: used on the in-VPC operator, which can reach
+# the API but must not destroy the stack it is running in. The destroy is then
+# run from the machine holding Terraform access.
+if [ "${TEARDOWN_K8S_ONLY:-}" = 1 ]; then
+  echo "in-cluster cleanup done; TEARDOWN_K8S_ONLY=1, so no terraform destroy here"
+  exit 0
+fi
 terraform -chdir=deploy/aws/eks destroy -auto-approve
 TF_RC=$?
 
