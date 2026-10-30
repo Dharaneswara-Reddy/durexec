@@ -39,6 +39,3 @@ engine/fieldeval
 
 Report_Template_AIDS_LaTeX
 
-# Documentation and collected evidence stay local to this machine.
-docs/
-engine/docs/
