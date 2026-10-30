@@ -25,6 +25,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . scripts/aws/_common.sh
+enable_evidence_tee
 require_confirmation "inject a fault into the EKS pilot"
 NS="${NS:-durexec-lab}"
 . scripts/aws/_k8s.sh

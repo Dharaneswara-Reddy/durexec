@@ -1,3 +1,94 @@
+# Cloud experimental matrix — revised after the first AWS pilot
+
+> **Revision note (2026-10-30):** This execution matrix supersedes the
+> unexecuted proposal retained at the end of this file. It incorporates the
+> real pilot evidence: r3/S16/w4x8 completed 232 workflows in a 140 s window
+> (1.66/s; p50/p95/p99 2.306/3.503/4.505 s), while the earlier 72-completion
+> point was under-sampled. The pilot's 477.4 PostgreSQL commits/s is not an
+> idle baseline. Source inspection finds 16 × (4 workflow + 8 activity)
+> pollers, with idle poll delay backing off from 10 ms to 1 s; queue polls
+> issue database queries and found work resets the delay. This makes polling a
+> credible transaction source, but the mixed pilot also includes workflow
+> writes, lease renewals and probes, so the fraction attributable to idle
+> polling is **unknown** until Stage B.
+
+## Current campaign protocol
+
+Common fixed setup: three engine nodes (`m7i-flex.large`), one load-generator
+node (`c7i-flex.large`), one PostgreSQL `m7i-flex.large`, one AZ, gp3, and
+`synchronous_commit=on` unless a separately approved experiment changes it.
+Record actual instance type and AZ for each node at every point. Keep flex
+types fixed throughout a campaign; host scheduling variance remains a caveat.
+Each trial gets a unique evidence directory. No point is averaged in if the
+generator saturates, it is under-sampled, or any correctness invariant fails.
+
+For load trials, default warm-up is 15 s and measured duration is specified
+below. Capture accepted/completed workflows, offered/completed throughput,
+p50/p95/p99, errors, transport failures, engine and generator CPU/memory,
+node placement/restarts, PostgreSQL commits/transactions/connections/locks/
+CPU/I/O/pool waits, shard ownership and skew, event-log invariants, and raw
+logs/metrics/CSV. Per-point PASS requires complete evidence, >=1,000 completions
+where required, no missing/duplicate/invalid event history, and load-generator
+headroom (<85% of one core, <85% memory). FAIL is an invariant violation or
+deployment/security check failure. INCONCLUSIVE is under-sampled, missing
+metrics, or generator-saturated; reject it from comparisons. Stop the stage on
+any invariant/security failure, sustained generator saturation, unexpected
+resource change, or projected session cost reaching the approved cap.
+
+| Stage | Exact configuration and method | Repeats / validity | Estimate |
+|---|---|---|---:|
+| A Bring-up | Pilot settings r3/S16/w4x8, sync on; publish, apply, deploy, smoke and `verify-policy`; record image digests and node types | One; all smoke/security checks pass | 0.8 h / $0.52 |
+| B Idle baseline | For each later configuration, no load for 120 s after 15 s settling; sample every 3 s. Require no active jobs and unchanged execution count. Measure PG commits/s, DB CPU, engine CPU, DB connections/locks/I/O | 3 runs/config: r3 S16 w2x4,w4x8,w8x16; r3 S32 w2x4; r3 S64 w1x2; r1/r2 variants of selected Stage G config. Keep every raw sample | 2.2 h / $1.43 |
+| C Calibration | r3/S16/w4x8; closed-loop c=1, then open-loop at 0.25× its measured completed rate; each 300 s measured after 15 s warm-up | 3 each. Floor = median c1 p50; low-rate p50 must be within 10%; generator headroom as common rule | 0.8 h / $0.52 |
+| D Closed-loop ladder | r3/S16/w4x8; c=4,16,32,64,128,256,512; 120 s measured after 15 s warm-up. Stop ladder when completed throughput falls, p99 >10× C floor, or generator saturates | 3 valid trials total at the knee and each adjacent step, each with >=1,000 completions. A screen counts only if it reaches that sample minimum and passes all validity gates; otherwise repeat | 2.5 h / $1.63 |
+| E Open-loop arrival | r3/S16/w4x8; rates 0.5,0.75,0.9,1.0,1.1 × D closed-loop knee throughput; keep offered rate independent of completions | 3 per rate, >=1,000 completions per point; max 1,800 s then INCONCLUSIVE | 4.0 h / $2.60 |
+| F Worker sensitivity | At selected knee, r3/S16; change only workers: w2x4, w4x8, w8x16 | Stage B idle baseline each; bracket each knee then 3 trials at it, >=1,000 completions | 2.0 h / $1.30 |
+| G Shard sensitivity | r3, total configured workers held at 192: S16/w4x8, S32/w2x4, S64/w1x2. Record measured ownership and `shard_skew`; ring expectations 1.69/1.31/1.22 respectively | Fresh initialized DB when shard count changes; bracket each knee then 3 knee trials, >=1,000 completions | 2.0 h / $1.30 |
+| H Replica sensitivity | Same three engine nodes; `ENGINE_REPLICAS=1,2,3`; choose S/workers from G and hold them fixed within each replica comparison | 3 trials at each configuration's knee, >=1,000 completions; Stage B idle values available | 3.0 h / $1.95 |
+
+Stage durations include warm-up, scale/deploy transitions, evidence capture and
+review. The point durations above are measurement windows, not guarantees of
+the stage estimate. At the knee, extend trial duration to
+`ceil(1000 / expected_completed_wf_per_s)` seconds plus 15 s warm-up; do not
+shorten to fit a time estimate. If this pushes projected spend toward the cap,
+stop and seek approval for a smaller campaign. PASS supports only observed
+behavior at the sampled configuration and duration; these stages do not prove
+scaling beyond tested points, multi-AZ/database HA, arbitrary exactly-once
+external effects, or production readiness.
+
+### Separate fault campaign (not included in A–H)
+
+Use the selected E knee configuration and steady open-loop load at 50% of
+that knee. For graceful pod deletion, pod SIGKILL, engine node drain, DB
+connection sever, and one DB host reboot: 30 s warm-up, 300 s load window,
+3–5 trials per fault (start at 3; extend to 5 if recovery-time CV >10%).
+Record injected/observed timestamps, recovery time, offered/completed rate,
+full metrics and the complete event-log invariant suite after every trial.
+PASS requires all invariants and eventual recovery; any invariant violation is
+FAIL; missing recovery or samples is INCONCLUSIVE. Estimate 3.5 h / $2.28.
+This is single-instance recovery evidence only; it cannot establish DB HA or
+exactly-once arbitrary external effects.
+
+### Estimated time and cost
+
+| Work | Hours | Cost at $0.65/h |
+|---|---:|---:|
+| A–H | 17.3 | $11.25 |
+| Teardown / final verification | 0.5 | $0.33 |
+| A–H plus teardown | 17.8 | $11.57 |
+| Optional separate fault campaign | 3.5 | $2.28 |
+
+These are planning estimates, not billing caps. The previous $10 authorization
+was for the completed first session and does not authorize this campaign.
+
+---
+
+## Previous matrix proposal (retained for history; superseded above)
+
+The material below is the original pre-pilot proposal. Its status, estimates,
+duration assumptions and stage ordering are historical and must not be used
+as the current execution protocol.
+
 # Cloud experimental matrix — derived from the evidence
 
 Status: **designed, NOT RUN.** No AWS resource has been created. This matrix

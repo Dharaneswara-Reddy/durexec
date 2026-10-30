@@ -43,6 +43,8 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_caller_identity" "current" {}
+
 # ---------------------------------------------------------------------------
 # Networking
 #
@@ -125,6 +127,36 @@ data "aws_iam_policy_document" "node_assume" {
   }
 }
 
+data "aws_iam_policy_document" "ebs_csi_pod_identity_assume" {
+  statement {
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_eks_cluster.main.arn]
+    }
+  }
+}
+
+resource "aws_iam_role" "ebs_csi" {
+  name               = "durexec-${var.environment}-ebs-csi"
+  assume_role_policy = data.aws_iam_policy_document.ebs_csi_pod_identity_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi" {
+  role       = aws_iam_role.ebs_csi.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
 resource "aws_iam_role" "node" {
   name               = "durexec-${var.environment}-eks-node"
   assume_role_policy = data.aws_iam_policy_document.node_assume.json
@@ -137,7 +169,6 @@ resource "aws_iam_role_policy_attachment" "node" {
     "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
     "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-    "arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicy",
   ])
   role       = aws_iam_role.node.name
   policy_arn = each.value
@@ -250,6 +281,19 @@ resource "aws_eks_node_group" "harness" {
 resource "aws_eks_addon" "ebs_csi" {
   cluster_name = aws_eks_cluster.main.name
   addon_name   = "aws-ebs-csi-driver"
+
+  pod_identity_association {
+    service_account = "ebs-csi-controller-sa"
+    role_arn        = aws_iam_role.ebs_csi.arn
+  }
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  depends_on                  = [aws_eks_addon.pod_identity_agent, aws_iam_role_policy_attachment.ebs_csi]
+}
+
+resource "aws_eks_addon" "pod_identity_agent" {
+  cluster_name = aws_eks_cluster.main.name
+  addon_name   = "eks-pod-identity-agent"
 
   resolve_conflicts_on_create = "OVERWRITE"
   depends_on                  = [aws_eks_node_group.engine]

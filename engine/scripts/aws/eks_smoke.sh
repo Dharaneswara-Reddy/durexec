@@ -9,6 +9,7 @@ set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
 NS="${NS:-durexec-lab}"
 . scripts/aws/_k8s.sh
+enable_evidence_tee
 pass=0; fail=0
 ck() { if [ "$2" = 0 ]; then echo "  PASS  $1"; pass=$((pass+1)); else echo "  FAIL  $1 -- $3"; fail=$((fail+1)); fi; }
 cfg() { kubectl -n "$NS" get configmap durexec-config -o jsonpath="{.data.$1}"; }

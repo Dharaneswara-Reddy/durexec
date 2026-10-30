@@ -8,6 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . scripts/aws/_common.sh
+enable_evidence_tee
 require_confirmation "create an ECR repository and push images"
 
 REGION="${AWS_REGION:-us-east-1}"

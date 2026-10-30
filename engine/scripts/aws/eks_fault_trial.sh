@@ -23,6 +23,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . scripts/aws/_common.sh
+enable_evidence_tee
 require_confirmation "run a fault trial against the EKS pilot"
 NS="${NS:-durexec-lab}"
 . scripts/aws/_k8s.sh

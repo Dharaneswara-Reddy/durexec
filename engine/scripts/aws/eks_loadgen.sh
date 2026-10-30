@@ -23,6 +23,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . scripts/aws/_common.sh
+enable_evidence_tee
 require_confirmation "run a load point against the EKS cluster"
 NS="${NS:-durexec-lab}"
 . scripts/aws/_k8s.sh
@@ -117,6 +118,8 @@ fi
   echo "image_tag=$TAG"; echo "loadgen_args=$ARGS"; echo "ring=$RING"
   kubectl -n "$NS" get pods -o wide 2>&1
   kubectl get nodes -L durexec.io/role,node.kubernetes.io/instance-type,topology.kubernetes.io/zone 2>&1
+  echo "node_inventory: name role EC2_instance_type availability_zone"
+  kubectl get nodes -o json | python3 scripts/aws/node_inventory.py
 } > "$RAW/00-provenance.txt"
 kubectl -n "$NS" get configmap durexec-config -o yaml > "$RAW/01-configmap.yaml" 2>&1 || true
 engine_get "${PODS%% *}" /v1/shards > "$RAW/02-shards-before.json" 2>&1 || true

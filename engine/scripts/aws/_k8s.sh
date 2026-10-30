@@ -25,6 +25,10 @@
 #
 # Sourced, not executed. Expects NS to be set.
 
+if ! declare -F enable_evidence_tee >/dev/null; then
+  . scripts/aws/_evidence.sh
+fi
+
 PROBE_POD="${PROBE_POD:-durexec-probe}"
 
 # engine_get <pod> <path>  -> response body on stdout
@@ -55,6 +59,11 @@ metadata:
   labels: { app: durexec-probe }
 spec:
   nodeSelector: { durexec.io/role: harness }
+  tolerations:
+    - key: durexec.io/harness
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
   restartPolicy: Always
   terminationGracePeriodSeconds: 1
   containers:

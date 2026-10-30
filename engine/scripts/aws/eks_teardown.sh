@@ -7,6 +7,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
 . scripts/aws/_common.sh
+enable_evidence_tee
 require_confirmation "destroy the EKS pilot"
 
 REGION="${AWS_REGION:-us-east-1}"

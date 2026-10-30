@@ -8,6 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . scripts/aws/_common.sh
+enable_evidence_tee
 require_confirmation "deploy workloads onto the running EKS cluster"
 
 NS="${NS:-durexec-lab}"

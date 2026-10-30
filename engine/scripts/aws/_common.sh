@@ -20,6 +20,8 @@ fi
 : "${AWS_REGION:=us-east-1}"
 export AWS_REGION
 
+. scripts/aws/_evidence.sh
+
 TF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../deploy/aws/terraform" && pwd)"
 ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 

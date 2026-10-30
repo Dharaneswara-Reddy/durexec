@@ -38,7 +38,7 @@ variable "kubernetes_version" {
 
 variable "engine_instance_type" {
   type    = string
-  default = "m7i.large"
+  default = "m7i-flex.large"
 }
 
 # The node-scaling experimental variable. Changed between runs.
@@ -53,7 +53,7 @@ variable "engine_node_count" {
 
 variable "harness_instance_type" {
   type        = string
-  default     = "c7i.large"
+  default     = "c7i-flex.large"
   description = "Load generator plus Prometheus. Never shares a node with the engine."
 }
 
@@ -72,7 +72,7 @@ variable "extra_tags" {
 
 variable "db_instance_type" {
   type        = string
-  default     = "m7i.large"
+  default     = "m7i-flex.large"
   description = "PostgreSQL host. Dedicated so its fsync latency is measurable."
 }
 
@@ -95,5 +95,5 @@ variable "db_key_name" {
 
 variable "enable_db_ssh" {
   type    = bool
-  default = true
+  default = false
 }
