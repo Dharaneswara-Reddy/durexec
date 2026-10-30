@@ -1,0 +1,22 @@
+command transcript: /home/user/durexec/docs/results/cloud-campaign/commands/20261030T150741Z-eks_teardown.sh-5784.log
+WARNING: Kubernetes API unreachable; skipping in-cluster cleanup as explicitly requested
+
+=== READ-ONLY sweep: anything still billing? ===
+-- EKS clusters --
+-- EC2 tagged durexec --
+-- EC2 launched by EKS for the pilot cluster (no Project tag) --
+-- EBS volumes tagged durexec (bill even when detached) --
+-- volumes with NO durexec tag, created by the CSI driver --
+-- snapshots (survive destroy, bill for ever) --
+-- load balancers (an orphaned ELB is ~$16/month) --
+-- ECR repos (durexec only; others belong to other projects) --
+-- Elastic IPs (bill when unattached) --
+-- network interfaces left in the pilot VPC (block VPC deletion) --
+-- pilot VPC still present --
+
+-- Secrets Manager secrets of the pilot (recovery window 0, so none should remain) --
+-- CloudWatch log groups for the pilot cluster (bill for storage) --
+
+Empty output on every line above except ECR means nothing is billing.
+ECR images persist deliberately so a re-run need not rebuild; delete by hand to stop that charge.
+TERRAFORM DESTROY FAILED (exit 1). Resources may still be billing; read the sweep above and re-run.

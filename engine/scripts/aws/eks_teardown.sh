@@ -47,8 +47,12 @@ if [ "${TEARDOWN_K8S_ONLY:-}" = 1 ]; then
   echo "in-cluster cleanup done; TEARDOWN_K8S_ONLY=1, so no terraform destroy here"
   exit 0
 fi
-terraform -chdir=deploy/aws/eks destroy -auto-approve
-TF_RC=$?
+# _common.sh turns on `set -e`, which used to end the script right here on a
+# failed destroy, so the sweep below never ran and the failure message never
+# printed (campaign 1: a leaked VPC-CNI ENI blocked the subnet). Capture the
+# exit code instead; the sweep must run precisely when the destroy failed.
+TF_RC=0
+terraform -chdir=deploy/aws/eks destroy -auto-approve || TF_RC=$?
 
 echo
 echo "=== READ-ONLY sweep: anything still billing? ==="

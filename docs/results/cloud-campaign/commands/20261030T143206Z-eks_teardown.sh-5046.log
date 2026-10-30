@@ -1,0 +1,1857 @@
+command transcript: /home/user/durexec/docs/results/cloud-campaign/commands/20261030T143206Z-eks_teardown.sh-5046.log
+WARNING: Kubernetes API unreachable; skipping in-cluster cleanup as explicitly requested
+[0m[1mrandom_password.replication: Refreshing state... [id=none][0m
+[0m[1mrandom_password.postgres: Refreshing state... [id=none][0m
+[0m[1mdata.aws_availability_zones.available: Reading...[0m[0m
+[0m[1maws_secretsmanager_secret.db: Refreshing state... [id=arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG][0m
+[0m[1mdata.aws_iam_policy_document.operator_assume: Reading...[0m[0m
+[0m[1mdata.aws_caller_identity.current: Reading...[0m[0m
+[0m[1mdata.aws_ssm_parameter.al2023: Reading...[0m[0m
+[0m[1mdata.aws_iam_policy_document.db_assume: Reading...[0m[0m
+[0m[1mdata.aws_iam_policy_document.cluster_assume: Reading...[0m[0m
+[0m[1mdata.aws_iam_policy_document.node_assume: Reading...[0m[0m
+[0m[1maws_vpc.main: Refreshing state... [id=vpc-092e3eea33b730d5d][0m
+[0m[1mdata.aws_iam_policy_document.operator_assume: Read complete after 0s [id=2851119427][0m
+[0m[1mdata.aws_iam_policy_document.node_assume: Read complete after 0s [id=2851119427][0m
+[0m[1mdata.aws_iam_policy_document.cluster_assume: Read complete after 0s [id=3552664922][0m
+[0m[1maws_iam_role.operator[0]: Refreshing state... [id=durexec-bench-operator][0m
+[0m[1mdata.aws_iam_policy_document.db_assume: Read complete after 0s [id=2851119427][0m
+[0m[1maws_iam_role.cluster: Refreshing state... [id=durexec-bench-eks-cluster][0m
+[0m[1maws_iam_role.node: Refreshing state... [id=durexec-bench-eks-node][0m
+[0m[1maws_iam_role.db: Refreshing state... [id=durexec-bench-db-host][0m
+[0m[1mdata.aws_caller_identity.current: Read complete after 0s [id=183192605828][0m
+[0m[1mdata.aws_ssm_parameter.al2023: Read complete after 0s [id=/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64][0m
+[0m[1mdata.aws_availability_zones.available: Read complete after 0s [id=us-east-1][0m
+[0m[1mdata.aws_iam_policy_document.db_read_secret: Reading...[0m[0m
+[0m[1maws_secretsmanager_secret_version.db: Refreshing state... [id=arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG|terraform-20261030121713004600000003][0m
+[0m[1mdata.aws_iam_policy_document.db_read_secret: Read complete after 0s [id=1484012858][0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"]: Refreshing state... [id=durexec-bench-eks-node-20261030121713344400000007][0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"]: Refreshing state... [id=durexec-bench-eks-node-20261030121713215500000004][0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"]: Refreshing state... [id=durexec-bench-eks-node-20261030121713357500000008][0m
+[0m[1maws_iam_role_policy_attachment.cluster: Refreshing state... [id=durexec-bench-eks-cluster-20261030121713292500000006][0m
+[0m[1maws_iam_role_policy.db_read_secret: Refreshing state... [id=durexec-bench-db-host:read-db-secret][0m
+[0m[1maws_iam_instance_profile.db: Refreshing state... [id=durexec-bench-db-host][0m
+[0m[1maws_iam_role_policy_attachment.operator_ssm[0]: Refreshing state... [id=durexec-bench-operator-20261030121713237200000005][0m
+[0m[1maws_iam_instance_profile.operator[0]: Refreshing state... [id=durexec-bench-operator][0m
+[0m[1maws_internet_gateway.main: Refreshing state... [id=igw-03918e349302abbab][0m
+[0m[1maws_subnet.public[1]: Refreshing state... [id=subnet-05ec4c5105f09df68][0m
+[0m[1maws_security_group.database: Refreshing state... [id=sg-08eda0cf82c5b95e8][0m
+[0m[1maws_security_group.operator[0]: Refreshing state... [id=sg-08d404e7f6175f039][0m
+[0m[1maws_subnet.public[0]: Refreshing state... [id=subnet-0937b901a3a669655][0m
+[0m[1maws_route_table.public: Refreshing state... [id=rtb-0a53fae3210fc08c9][0m
+[0m[1maws_ebs_volume.pgdata: Refreshing state... [id=vol-00ea9c1a9ec41fa11][0m
+[0m[1maws_eks_cluster.main: Refreshing state... [id=durexec-bench][0m
+[0m[1maws_route_table_association.public[1]: Refreshing state... [id=rtbassoc-013fe2aaa0a8acddb][0m
+[0m[1maws_route_table_association.public[0]: Refreshing state... [id=rtbassoc-092f1d85bf8ea1d30][0m
+[0m[1maws_vpc_security_group_egress_rule.db_all: Refreshing state... [id=sgr-052dd86d69e097baa][0m
+[0m[1maws_vpc_security_group_egress_rule.operator_all[0]: Refreshing state... [id=sgr-0aa9f19baa2d03c64][0m
+[0m[1maws_instance.operator[0]: Refreshing state... [id=i-0c5a7516d5d77b6e3][0m
+[0m[1maws_instance.database: Refreshing state... [id=i-05868ce4035cf1b0b][0m
+[0m[1maws_eks_node_group.harness: Refreshing state... [id=durexec-bench:harness][0m
+[0m[1maws_eks_node_group.engine: Refreshing state... [id=durexec-bench:engine][0m
+[0m[1mdata.aws_iam_policy_document.ebs_csi_pod_identity_assume: Reading...[0m[0m
+[0m[1maws_vpc_security_group_ingress_rule.cluster_api_from_operator[0]: Refreshing state... [id=sgr-0746497df6f5918a3][0m
+[0m[1maws_vpc_security_group_ingress_rule.db_from_nodes: Refreshing state... [id=sgr-0c3ff6b55a40d8f01][0m
+[0m[1mdata.aws_iam_policy_document.operator: Reading...[0m[0m
+[0m[1maws_eks_access_entry.operator[0]: Refreshing state... [id=durexec-bench:arn:aws:iam::183192605828:role/durexec-bench-operator][0m
+[0m[1mdata.aws_iam_policy_document.ebs_csi_pod_identity_assume: Read complete after 0s [id=393873152][0m
+[0m[1mdata.aws_iam_policy_document.operator: Read complete after 0s [id=2507238621][0m
+[0m[1maws_iam_role.ebs_csi: Refreshing state... [id=durexec-bench-ebs-csi][0m
+[0m[1maws_iam_role_policy.operator[0]: Refreshing state... [id=durexec-bench-operator:durexec-operator][0m
+[0m[1maws_eks_addon.vpc_cni: Refreshing state... [id=durexec-bench:vpc-cni][0m
+[0m[1maws_eks_addon.pod_identity_agent: Refreshing state... [id=durexec-bench:eks-pod-identity-agent][0m
+[0m[1maws_iam_role_policy_attachment.ebs_csi: Refreshing state... [id=durexec-bench-ebs-csi-2026103012272434430000000f][0m
+[0m[1maws_eks_access_policy_association.operator[0]: Refreshing state... [id=durexec-bench#arn:aws:iam::183192605828:role/durexec-bench-operator#arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy][0m
+[0m[1maws_eks_addon.ebs_csi: Refreshing state... [id=durexec-bench:aws-ebs-csi-driver][0m
+[0m[1maws_volume_attachment.pgdata: Refreshing state... [id=vai-3931952371][0m
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  [31m-[0m destroy[0m
+
+Terraform will perform the following actions:
+
+[1m  # aws_ebs_volume.pgdata[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_ebs_volume" "pgdata" {
+      [31m-[0m[0m arn                  = "arn:aws:ec2:us-east-1:183192605828:volume/vol-00ea9c1a9ec41fa11" [90m-> null[0m[0m
+      [31m-[0m[0m availability_zone    = "us-east-1a" [90m-> null[0m[0m
+      [31m-[0m[0m create_time          = "2026-10-30T12:17:36Z" [90m-> null[0m[0m
+      [31m-[0m[0m encrypted            = true [90m-> null[0m[0m
+      [31m-[0m[0m final_snapshot       = false [90m-> null[0m[0m
+      [31m-[0m[0m id                   = "vol-00ea9c1a9ec41fa11" [90m-> null[0m[0m
+      [31m-[0m[0m iops                 = 3000 [90m-> null[0m[0m
+      [31m-[0m[0m kms_key_id           = "arn:aws:kms:us-east-1:183192605828:key/a138e9e8-d51e-4cab-9206-fcc69275856d" [90m-> null[0m[0m
+      [31m-[0m[0m multi_attach_enabled = false [90m-> null[0m[0m
+      [31m-[0m[0m size                 = 30 [90m-> null[0m[0m
+      [31m-[0m[0m tags                 = {
+          [31m-[0m[0m "Name" = "durexec-bench-pgdata"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all             = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-pgdata"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m throughput           = 125 [90m-> null[0m[0m
+      [31m-[0m[0m type                 = "gp3" [90m-> null[0m[0m
+        [90m# (2 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_eks_access_entry.operator[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_eks_access_entry" "operator" {
+      [31m-[0m[0m access_entry_arn  = "arn:aws:eks:us-east-1:183192605828:access-entry/durexec-bench/role/183192605828/durexec-bench-operator/82d0c663-b934-2136-b112-753531e4219f" [90m-> null[0m[0m
+      [31m-[0m[0m cluster_name      = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m created_at        = "2026-10-30T12:27:23Z" [90m-> null[0m[0m
+      [31m-[0m[0m id                = "durexec-bench:arn:aws:iam::183192605828:role/durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m kubernetes_groups = [] [90m-> null[0m[0m
+      [31m-[0m[0m modified_at       = "2026-10-30T12:27:23Z" [90m-> null[0m[0m
+      [31m-[0m[0m principal_arn     = "arn:aws:iam::183192605828:role/durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m tags              = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all          = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m type              = "STANDARD" [90m-> null[0m[0m
+      [31m-[0m[0m user_name         = "arn:aws:sts::183192605828:assumed-role/durexec-bench-operator/{{SessionName}}" [90m-> null[0m[0m
+    }
+
+[1m  # aws_eks_access_policy_association.operator[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_eks_access_policy_association" "operator" {
+      [31m-[0m[0m associated_at = "2026-10-30 12:27:24.424 +0000 UTC" [90m-> null[0m[0m
+      [31m-[0m[0m cluster_name  = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m id            = "durexec-bench#arn:aws:iam::183192605828:role/durexec-bench-operator#arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy" [90m-> null[0m[0m
+      [31m-[0m[0m modified_at   = "2026-10-30 12:27:24.424 +0000 UTC" [90m-> null[0m[0m
+      [31m-[0m[0m policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy" [90m-> null[0m[0m
+      [31m-[0m[0m principal_arn = "arn:aws:iam::183192605828:role/durexec-bench-operator" [90m-> null[0m[0m
+
+      [31m-[0m[0m access_scope {
+          [31m-[0m[0m namespaces = [] [90m-> null[0m[0m
+          [31m-[0m[0m type       = "cluster" [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_eks_addon.ebs_csi[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_eks_addon" "ebs_csi" {
+      [31m-[0m[0m addon_name                  = "aws-ebs-csi-driver" [90m-> null[0m[0m
+      [31m-[0m[0m addon_version               = "v1.67.2-eksbuild.1" [90m-> null[0m[0m
+      [31m-[0m[0m arn                         = "arn:aws:eks:us-east-1:183192605828:addon/durexec-bench/aws-ebs-csi-driver/b0d0c664-cf0e-9a27-0b3a-d440284dbb41" [90m-> null[0m[0m
+      [31m-[0m[0m cluster_name                = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m created_at                  = "2026-10-30T12:29:47Z" [90m-> null[0m[0m
+      [31m-[0m[0m id                          = "durexec-bench:aws-ebs-csi-driver" [90m-> null[0m[0m
+      [31m-[0m[0m modified_at                 = "2026-10-30T12:30:14Z" [90m-> null[0m[0m
+      [31m-[0m[0m resolve_conflicts_on_create = "OVERWRITE" [90m-> null[0m[0m
+      [31m-[0m[0m tags                        = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                    = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+        [90m# (2 unchanged attributes hidden)[0m[0m
+
+      [31m-[0m[0m pod_identity_association {
+          [31m-[0m[0m role_arn        = "arn:aws:iam::183192605828:role/durexec-bench-ebs-csi" [90m-> null[0m[0m
+          [31m-[0m[0m service_account = "ebs-csi-controller-sa" [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_eks_addon.pod_identity_agent[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_eks_addon" "pod_identity_agent" {
+      [31m-[0m[0m addon_name                  = "eks-pod-identity-agent" [90m-> null[0m[0m
+      [31m-[0m[0m addon_version               = "v1.4.1-eksbuild.3" [90m-> null[0m[0m
+      [31m-[0m[0m arn                         = "arn:aws:eks:us-east-1:183192605828:addon/durexec-bench/eks-pod-identity-agent/4ed0c664-8a5e-11ec-5d6b-b5e7c97c1f85" [90m-> null[0m[0m
+      [31m-[0m[0m cluster_name                = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m created_at                  = "2026-10-30T12:29:10Z" [90m-> null[0m[0m
+      [31m-[0m[0m id                          = "durexec-bench:eks-pod-identity-agent" [90m-> null[0m[0m
+      [31m-[0m[0m modified_at                 = "2026-10-30T12:29:36Z" [90m-> null[0m[0m
+      [31m-[0m[0m resolve_conflicts_on_create = "OVERWRITE" [90m-> null[0m[0m
+      [31m-[0m[0m tags                        = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                    = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+        [90m# (2 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_eks_addon.vpc_cni[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_eks_addon" "vpc_cni" {
+      [31m-[0m[0m addon_name                  = "vpc-cni" [90m-> null[0m[0m
+      [31m-[0m[0m addon_version               = "v1.22.4-eksbuild.10" [90m-> null[0m[0m
+      [31m-[0m[0m arn                         = "arn:aws:eks:us-east-1:183192605828:addon/durexec-bench/vpc-cni/5cd0c664-8a5d-78fa-be34-5173eb906380" [90m-> null[0m[0m
+      [31m-[0m[0m cluster_name                = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m configuration_values        = jsonencode(
+            {
+              [31m-[0m[0m enableNetworkPolicy = "true"
+            }
+        ) [90m-> null[0m[0m
+      [31m-[0m[0m created_at                  = "2026-10-30T12:29:10Z" [90m-> null[0m[0m
+      [31m-[0m[0m id                          = "durexec-bench:vpc-cni" [90m-> null[0m[0m
+      [31m-[0m[0m modified_at                 = "2026-10-30T12:30:17Z" [90m-> null[0m[0m
+      [31m-[0m[0m resolve_conflicts_on_create = "OVERWRITE" [90m-> null[0m[0m
+      [31m-[0m[0m tags                        = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                    = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_eks_cluster.main[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_eks_cluster" "main" {
+      [31m-[0m[0m arn                           = "arn:aws:eks:us-east-1:183192605828:cluster/durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m bootstrap_self_managed_addons = true [90m-> null[0m[0m
+      [31m-[0m[0m certificate_authority         = [
+          [31m-[0m[0m {
+              [31m-[0m[0m data = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURNVENDQWhtZ0F3SUJBZ0lRVXNZVEdJWEgrOUxtbHVtUDRSb3UzVEFOQmdrcWhraUc5dzBCQVFzRkFEQW4KTVJBd0RnWURWUVFLRXdkQlYxTWdSVXRUTVJNd0VRWURWUVFERXdwcmRXSmxjbTVsZEdWek1CNFhEVEkyTVRBegpNREV5TVRjME1sb1hEVE14TVRBeU9URXlNVGMwTWxvd0p6RVFNQTRHQTFVRUNoTUhRVmRUSUVWTFV6RVRNQkVHCkExVUVBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUIKQUx1TnhmcWRXNUt4NEhRMkdrdk00eGVNSnVoSy94ckpXaWFuSkhCMVo2Ym4vMEZZKzJqdUFqTGxuOERkZzgydQp3cG4vMmVONVdWVlNqTGliWGxER3Brc1dEM3NRZnJPR0pwdXlCMGYzckFyY2RQUXhXdFUwcktMTExPR2hYVGtwCll5MkI3UHBJa1ZLREQyai9pRVBXbDRFZU04Q1NDeFNBUGNGS05TdkliVHB5RVpFdjFKa2VEaGNsOEdZRW9MOUwKcjhzTFI3TnBXQm1taUozSnFnbFYxREduaHUvTzNMV2cwY0xkeHFJTWd2MXphYk1JZ1lmWEc0bGVDbFJvM3JHNQo0TVF4VXdUaHdFOHpycE9OWkp2NUlOd281Q0JFWFh6ajhibG1lakJLczVIWmIra1JubEVJNFpRcXZyQlhCdHVTCllwaHdPZXh3YXBUNU95RGxjU2doY1FrQ0F3RUFBYU5aTUZjd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWQKRXdFQi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZKLyt4aFFzT2loWXJLTDFDUWhHTEl6NVpzTG9NQlVHQTFVZApFUVFPTUF5Q0NtdDFZbVZ5Ym1WMFpYTXdEUVlKS29aSWh2Y05BUUVMQlFBRGdnRUJBQzQ2WXBYVDdZUTAwdWIvCmo0aHllQXhENUkrVkdIZkpoMFlscWtBODFTbktFSURoMUJxY0k4R3FVblRKK09aSUdkMnRJSmxLZHRZYzFCUjEKQkREREMxbnByZ3N2aTk4OXpuWXhESS9OKzhKbmhRdjMrWExXNlRSbkVqQ0sya1VWSHM2dGg5UXRDaGp0RTRCZQp6bTBvZXpFM3RHTTlPTWVwaGJBL3NRVGNTQ1BVVTRmdk5sZW14MVJtNGVKUGJQNDlSSmZYWnFjdjl2K2g4bjhzCnRCQlFjbW01bURSOXVGL0tUdkRvYVdQZmR2VWV4NTNORGYrbC9Da2s2Q3FEbnltZk5BMzFZbzRFSTRJclpRWUoKdmpQUGc3a2tFb2RvRHdEc1JYb2xQL2JPTkJFREwyWnJzNHRpZVNaZDJXNDRKeHhqT1VFTDRuSkxwM1hEWnBnWApiZ3lpOGp3PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m created_at                    = "2026-10-30T12:17:39Z" [90m-> null[0m[0m
+      [31m-[0m[0m enabled_cluster_log_types     = [] [90m-> null[0m[0m
+      [31m-[0m[0m endpoint                      = "https://AAAD676DAC708B6663173FA14CAD92FA.gr7.us-east-1.eks.amazonaws.com" [90m-> null[0m[0m
+      [31m-[0m[0m id                            = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m identity                      = [
+          [31m-[0m[0m {
+              [31m-[0m[0m oidc = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m issuer = "https://oidc.eks.us-east-1.amazonaws.com/id/AAAD676DAC708B6663173FA14CAD92FA"
+                    },
+                ]
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m name                          = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m platform_version              = "eks.7" [90m-> null[0m[0m
+      [31m-[0m[0m role_arn                      = "arn:aws:iam::183192605828:role/durexec-bench-eks-cluster" [90m-> null[0m[0m
+      [31m-[0m[0m status                        = "ACTIVE" [90m-> null[0m[0m
+      [31m-[0m[0m tags                          = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                      = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m version                       = "1.37" [90m-> null[0m[0m
+
+      [31m-[0m[0m access_config {
+          [31m-[0m[0m authentication_mode                         = "API_AND_CONFIG_MAP" [90m-> null[0m[0m
+          [31m-[0m[0m bootstrap_cluster_creator_admin_permissions = true [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m kubernetes_network_config {
+          [31m-[0m[0m ip_family         = "ipv4" [90m-> null[0m[0m
+          [31m-[0m[0m service_ipv4_cidr = "172.20.0.0/16" [90m-> null[0m[0m
+            [90m# (1 unchanged attribute hidden)[0m[0m
+
+          [31m-[0m[0m elastic_load_balancing {
+              [31m-[0m[0m enabled = false [90m-> null[0m[0m
+            }
+        }
+
+      [31m-[0m[0m upgrade_policy {
+          [31m-[0m[0m support_type = "EXTENDED" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m vpc_config {
+          [31m-[0m[0m cluster_security_group_id = "sg-08992c7bdfac3ed14" [90m-> null[0m[0m
+          [31m-[0m[0m endpoint_private_access   = true [90m-> null[0m[0m
+          [31m-[0m[0m endpoint_public_access    = true [90m-> null[0m[0m
+          [31m-[0m[0m public_access_cidrs       = [
+              [31m-[0m[0m "157.50.241.83/32",
+            ] [90m-> null[0m[0m
+          [31m-[0m[0m security_group_ids        = [] [90m-> null[0m[0m
+          [31m-[0m[0m subnet_ids                = [
+              [31m-[0m[0m "subnet-05ec4c5105f09df68",
+              [31m-[0m[0m "subnet-0937b901a3a669655",
+            ] [90m-> null[0m[0m
+          [31m-[0m[0m vpc_id                    = "vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_eks_node_group.engine[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_eks_node_group" "engine" {
+      [31m-[0m[0m ami_type               = "AL2023_x86_64_STANDARD" [90m-> null[0m[0m
+      [31m-[0m[0m arn                    = "arn:aws:eks:us-east-1:183192605828:nodegroup/durexec-bench/engine/ded0c663-b936-b6e1-eda9-92dec175f7cc" [90m-> null[0m[0m
+      [31m-[0m[0m capacity_type          = "ON_DEMAND" [90m-> null[0m[0m
+      [31m-[0m[0m cluster_name           = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m disk_size              = 20 [90m-> null[0m[0m
+      [31m-[0m[0m id                     = "durexec-bench:engine" [90m-> null[0m[0m
+      [31m-[0m[0m instance_types         = [
+          [31m-[0m[0m "m7i-flex.large",
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m labels                 = {
+          [31m-[0m[0m "durexec.io/role" = "engine"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m node_group_name        = "engine" [90m-> null[0m[0m
+      [31m-[0m[0m node_role_arn          = "arn:aws:iam::183192605828:role/durexec-bench-eks-node" [90m-> null[0m[0m
+      [31m-[0m[0m release_version        = "1.37.1-20261026" [90m-> null[0m[0m
+      [31m-[0m[0m resources              = [
+          [31m-[0m[0m {
+              [31m-[0m[0m autoscaling_groups              = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m name = "eks-engine-ded0c663-b936-b6e1-eda9-92dec175f7cc"
+                    },
+                ]
+                [90m# (1 unchanged attribute hidden)[0m[0m
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m status                 = "ACTIVE" [90m-> null[0m[0m
+      [31m-[0m[0m subnet_ids             = [
+          [31m-[0m[0m "subnet-0937b901a3a669655",
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m tags                   = {
+          [31m-[0m[0m "Name" = "durexec-bench-engine"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all               = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-engine"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m version                = "1.37" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+
+      [31m-[0m[0m scaling_config {
+          [31m-[0m[0m desired_size = 3 [90m-> null[0m[0m
+          [31m-[0m[0m max_size     = 6 [90m-> null[0m[0m
+          [31m-[0m[0m min_size     = 1 [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m update_config {
+          [31m-[0m[0m max_unavailable            = 1 [90m-> null[0m[0m
+          [31m-[0m[0m max_unavailable_percentage = 0 [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_eks_node_group.harness[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_eks_node_group" "harness" {
+      [31m-[0m[0m ami_type               = "AL2023_x86_64_STANDARD" [90m-> null[0m[0m
+      [31m-[0m[0m arn                    = "arn:aws:eks:us-east-1:183192605828:nodegroup/durexec-bench/harness/7cd0c663-b941-428d-9151-edbbeebce12c" [90m-> null[0m[0m
+      [31m-[0m[0m capacity_type          = "ON_DEMAND" [90m-> null[0m[0m
+      [31m-[0m[0m cluster_name           = "durexec-bench" [90m-> null[0m[0m
+      [31m-[0m[0m disk_size              = 20 [90m-> null[0m[0m
+      [31m-[0m[0m id                     = "durexec-bench:harness" [90m-> null[0m[0m
+      [31m-[0m[0m instance_types         = [
+          [31m-[0m[0m "c7i-flex.large",
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m labels                 = {
+          [31m-[0m[0m "durexec.io/role" = "harness"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m node_group_name        = "harness" [90m-> null[0m[0m
+      [31m-[0m[0m node_role_arn          = "arn:aws:iam::183192605828:role/durexec-bench-eks-node" [90m-> null[0m[0m
+      [31m-[0m[0m release_version        = "1.37.1-20261026" [90m-> null[0m[0m
+      [31m-[0m[0m resources              = [
+          [31m-[0m[0m {
+              [31m-[0m[0m autoscaling_groups              = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m name = "eks-harness-7cd0c663-b941-428d-9151-edbbeebce12c"
+                    },
+                ]
+                [90m# (1 unchanged attribute hidden)[0m[0m
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m status                 = "ACTIVE" [90m-> null[0m[0m
+      [31m-[0m[0m subnet_ids             = [
+          [31m-[0m[0m "subnet-0937b901a3a669655",
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m tags                   = {
+          [31m-[0m[0m "Name" = "durexec-bench-harness"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all               = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-harness"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m version                = "1.37" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+
+      [31m-[0m[0m scaling_config {
+          [31m-[0m[0m desired_size = 1 [90m-> null[0m[0m
+          [31m-[0m[0m max_size     = 1 [90m-> null[0m[0m
+          [31m-[0m[0m min_size     = 1 [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m taint {
+          [31m-[0m[0m effect = "NO_SCHEDULE" [90m-> null[0m[0m
+          [31m-[0m[0m key    = "durexec.io/harness" [90m-> null[0m[0m
+          [31m-[0m[0m value  = "true" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m update_config {
+          [31m-[0m[0m max_unavailable            = 1 [90m-> null[0m[0m
+          [31m-[0m[0m max_unavailable_percentage = 0 [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_iam_instance_profile.db[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_instance_profile" "db" {
+      [31m-[0m[0m arn         = "arn:aws:iam::183192605828:instance-profile/durexec-bench-db-host" [90m-> null[0m[0m
+      [31m-[0m[0m create_date = "2026-10-30T12:17:13Z" [90m-> null[0m[0m
+      [31m-[0m[0m id          = "durexec-bench-db-host" [90m-> null[0m[0m
+      [31m-[0m[0m name        = "durexec-bench-db-host" [90m-> null[0m[0m
+      [31m-[0m[0m path        = "/" [90m-> null[0m[0m
+      [31m-[0m[0m role        = "durexec-bench-db-host" [90m-> null[0m[0m
+      [31m-[0m[0m tags        = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all    = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m unique_id   = "AIPASVJZBKSCD53J6YEL7" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_iam_instance_profile.operator[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_instance_profile" "operator" {
+      [31m-[0m[0m arn         = "arn:aws:iam::183192605828:instance-profile/durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m create_date = "2026-10-30T12:17:13Z" [90m-> null[0m[0m
+      [31m-[0m[0m id          = "durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m name        = "durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m path        = "/" [90m-> null[0m[0m
+      [31m-[0m[0m role        = "durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m tags        = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all    = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m unique_id   = "AIPASVJZBKSCA3QCMOPFX" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_iam_role.cluster[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role" "cluster" {
+      [31m-[0m[0m arn                   = "arn:aws:iam::183192605828:role/durexec-bench-eks-cluster" [90m-> null[0m[0m
+      [31m-[0m[0m assume_role_policy    = jsonencode(
+            {
+              [31m-[0m[0m Statement = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action    = "sts:AssumeRole"
+                      [31m-[0m[0m Effect    = "Allow"
+                      [31m-[0m[0m Principal = {
+                          [31m-[0m[0m Service = "eks.amazonaws.com"
+                        }
+                    },
+                ]
+              [31m-[0m[0m Version   = "2012-10-17"
+            }
+        ) [90m-> null[0m[0m
+      [31m-[0m[0m create_date           = "2026-10-30T12:17:12Z" [90m-> null[0m[0m
+      [31m-[0m[0m force_detach_policies = false [90m-> null[0m[0m
+      [31m-[0m[0m id                    = "durexec-bench-eks-cluster" [90m-> null[0m[0m
+      [31m-[0m[0m managed_policy_arns   = [
+          [31m-[0m[0m "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m max_session_duration  = 3600 [90m-> null[0m[0m
+      [31m-[0m[0m name                  = "durexec-bench-eks-cluster" [90m-> null[0m[0m
+      [31m-[0m[0m path                  = "/" [90m-> null[0m[0m
+      [31m-[0m[0m tags                  = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all              = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m unique_id             = "AROASVJZBKSCHKMU3BKCT" [90m-> null[0m[0m
+        [90m# (3 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_iam_role.db[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role" "db" {
+      [31m-[0m[0m arn                   = "arn:aws:iam::183192605828:role/durexec-bench-db-host" [90m-> null[0m[0m
+      [31m-[0m[0m assume_role_policy    = jsonencode(
+            {
+              [31m-[0m[0m Statement = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action    = "sts:AssumeRole"
+                      [31m-[0m[0m Effect    = "Allow"
+                      [31m-[0m[0m Principal = {
+                          [31m-[0m[0m Service = "ec2.amazonaws.com"
+                        }
+                    },
+                ]
+              [31m-[0m[0m Version   = "2012-10-17"
+            }
+        ) [90m-> null[0m[0m
+      [31m-[0m[0m create_date           = "2026-10-30T12:17:12Z" [90m-> null[0m[0m
+      [31m-[0m[0m force_detach_policies = false [90m-> null[0m[0m
+      [31m-[0m[0m id                    = "durexec-bench-db-host" [90m-> null[0m[0m
+      [31m-[0m[0m managed_policy_arns   = [] [90m-> null[0m[0m
+      [31m-[0m[0m max_session_duration  = 3600 [90m-> null[0m[0m
+      [31m-[0m[0m name                  = "durexec-bench-db-host" [90m-> null[0m[0m
+      [31m-[0m[0m path                  = "/" [90m-> null[0m[0m
+      [31m-[0m[0m tags                  = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all              = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m unique_id             = "AROASVJZBKSCOUYUA75RM" [90m-> null[0m[0m
+        [90m# (3 unchanged attributes hidden)[0m[0m
+
+      [31m-[0m[0m inline_policy {
+          [31m-[0m[0m name   = "read-db-secret" [90m-> null[0m[0m
+          [31m-[0m[0m policy = jsonencode(
+                {
+                  [31m-[0m[0m Statement = [
+                      [31m-[0m[0m {
+                          [31m-[0m[0m Action   = "secretsmanager:GetSecretValue"
+                          [31m-[0m[0m Effect   = "Allow"
+                          [31m-[0m[0m Resource = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG"
+                        },
+                    ]
+                  [31m-[0m[0m Version   = "2012-10-17"
+                }
+            ) [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_iam_role.ebs_csi[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role" "ebs_csi" {
+      [31m-[0m[0m arn                   = "arn:aws:iam::183192605828:role/durexec-bench-ebs-csi" [90m-> null[0m[0m
+      [31m-[0m[0m assume_role_policy    = jsonencode(
+            {
+              [31m-[0m[0m Statement = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action    = [
+                          [31m-[0m[0m "sts:TagSession",
+                          [31m-[0m[0m "sts:AssumeRole",
+                        ]
+                      [31m-[0m[0m Condition = {
+                          [31m-[0m[0m ArnEquals    = {
+                              [31m-[0m[0m "aws:SourceArn" = "arn:aws:eks:us-east-1:183192605828:cluster/durexec-bench"
+                            }
+                          [31m-[0m[0m StringEquals = {
+                              [31m-[0m[0m "aws:SourceAccount" = "183192605828"
+                            }
+                        }
+                      [31m-[0m[0m Effect    = "Allow"
+                      [31m-[0m[0m Principal = {
+                          [31m-[0m[0m Service = "pods.eks.amazonaws.com"
+                        }
+                    },
+                ]
+              [31m-[0m[0m Version   = "2012-10-17"
+            }
+        ) [90m-> null[0m[0m
+      [31m-[0m[0m create_date           = "2026-10-30T12:27:23Z" [90m-> null[0m[0m
+      [31m-[0m[0m force_detach_policies = false [90m-> null[0m[0m
+      [31m-[0m[0m id                    = "durexec-bench-ebs-csi" [90m-> null[0m[0m
+      [31m-[0m[0m managed_policy_arns   = [
+          [31m-[0m[0m "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m max_session_duration  = 3600 [90m-> null[0m[0m
+      [31m-[0m[0m name                  = "durexec-bench-ebs-csi" [90m-> null[0m[0m
+      [31m-[0m[0m path                  = "/" [90m-> null[0m[0m
+      [31m-[0m[0m tags                  = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all              = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m unique_id             = "AROASVJZBKSCHU6WKOXNP" [90m-> null[0m[0m
+        [90m# (3 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_iam_role.node[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role" "node" {
+      [31m-[0m[0m arn                   = "arn:aws:iam::183192605828:role/durexec-bench-eks-node" [90m-> null[0m[0m
+      [31m-[0m[0m assume_role_policy    = jsonencode(
+            {
+              [31m-[0m[0m Statement = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action    = "sts:AssumeRole"
+                      [31m-[0m[0m Effect    = "Allow"
+                      [31m-[0m[0m Principal = {
+                          [31m-[0m[0m Service = "ec2.amazonaws.com"
+                        }
+                    },
+                ]
+              [31m-[0m[0m Version   = "2012-10-17"
+            }
+        ) [90m-> null[0m[0m
+      [31m-[0m[0m create_date           = "2026-10-30T12:17:12Z" [90m-> null[0m[0m
+      [31m-[0m[0m force_detach_policies = false [90m-> null[0m[0m
+      [31m-[0m[0m id                    = "durexec-bench-eks-node" [90m-> null[0m[0m
+      [31m-[0m[0m managed_policy_arns   = [
+          [31m-[0m[0m "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+          [31m-[0m[0m "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+          [31m-[0m[0m "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m max_session_duration  = 3600 [90m-> null[0m[0m
+      [31m-[0m[0m name                  = "durexec-bench-eks-node" [90m-> null[0m[0m
+      [31m-[0m[0m path                  = "/" [90m-> null[0m[0m
+      [31m-[0m[0m tags                  = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all              = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m unique_id             = "AROASVJZBKSCBJLYSTLE2" [90m-> null[0m[0m
+        [90m# (3 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_iam_role.operator[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role" "operator" {
+      [31m-[0m[0m arn                   = "arn:aws:iam::183192605828:role/durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m assume_role_policy    = jsonencode(
+            {
+              [31m-[0m[0m Statement = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action    = "sts:AssumeRole"
+                      [31m-[0m[0m Effect    = "Allow"
+                      [31m-[0m[0m Principal = {
+                          [31m-[0m[0m Service = "ec2.amazonaws.com"
+                        }
+                    },
+                ]
+              [31m-[0m[0m Version   = "2012-10-17"
+            }
+        ) [90m-> null[0m[0m
+      [31m-[0m[0m create_date           = "2026-10-30T12:17:12Z" [90m-> null[0m[0m
+      [31m-[0m[0m force_detach_policies = false [90m-> null[0m[0m
+      [31m-[0m[0m id                    = "durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m managed_policy_arns   = [
+          [31m-[0m[0m "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m max_session_duration  = 3600 [90m-> null[0m[0m
+      [31m-[0m[0m name                  = "durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m path                  = "/" [90m-> null[0m[0m
+      [31m-[0m[0m tags                  = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all              = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m unique_id             = "AROASVJZBKSCJMY3RQUOT" [90m-> null[0m[0m
+        [90m# (3 unchanged attributes hidden)[0m[0m
+
+      [31m-[0m[0m inline_policy {
+          [31m-[0m[0m name   = "durexec-operator" [90m-> null[0m[0m
+          [31m-[0m[0m policy = jsonencode(
+                {
+                  [31m-[0m[0m Statement = [
+                      [31m-[0m[0m {
+                          [31m-[0m[0m Action   = "eks:DescribeCluster"
+                          [31m-[0m[0m Effect   = "Allow"
+                          [31m-[0m[0m Resource = "arn:aws:eks:us-east-1:183192605828:cluster/durexec-bench"
+                          [31m-[0m[0m Sid      = "Cluster"
+                        },
+                      [31m-[0m[0m {
+                          [31m-[0m[0m Action   = "ecr:GetAuthorizationToken"
+                          [31m-[0m[0m Effect   = "Allow"
+                          [31m-[0m[0m Resource = "*"
+                          [31m-[0m[0m Sid      = "EcrAuth"
+                        },
+                      [31m-[0m[0m {
+                          [31m-[0m[0m Action   = [
+                              [31m-[0m[0m "ecr:UploadLayerPart",
+                              [31m-[0m[0m "ecr:TagResource",
+                              [31m-[0m[0m "ecr:PutImage",
+                              [31m-[0m[0m "ecr:InitiateLayerUpload",
+                              [31m-[0m[0m "ecr:GetDownloadUrlForLayer",
+                              [31m-[0m[0m "ecr:DescribeRepositories",
+                              [31m-[0m[0m "ecr:DescribeImages",
+                              [31m-[0m[0m "ecr:CreateRepository",
+                              [31m-[0m[0m "ecr:CompleteLayerUpload",
+                              [31m-[0m[0m "ecr:BatchGetImage",
+                              [31m-[0m[0m "ecr:BatchCheckLayerAvailability",
+                            ]
+                          [31m-[0m[0m Effect   = "Allow"
+                          [31m-[0m[0m Resource = "arn:aws:ecr:us-east-1:183192605828:repository/durexec/*"
+                          [31m-[0m[0m Sid      = "EcrDurexecOnly"
+                        },
+                      [31m-[0m[0m {
+                          [31m-[0m[0m Action   = "secretsmanager:GetSecretValue"
+                          [31m-[0m[0m Effect   = "Allow"
+                          [31m-[0m[0m Resource = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG"
+                          [31m-[0m[0m Sid      = "DbSecret"
+                        },
+                      [31m-[0m[0m {
+                          [31m-[0m[0m Action   = "s3:ListBucket"
+                          [31m-[0m[0m Effect   = "Allow"
+                          [31m-[0m[0m Resource = "arn:aws:s3:::durexec-tfstate-183192605828"
+                          [31m-[0m[0m Sid      = "BucketList"
+                        },
+                      [31m-[0m[0m {
+                          [31m-[0m[0m Action   = "s3:GetObject"
+                          [31m-[0m[0m Effect   = "Allow"
+                          [31m-[0m[0m Resource = "arn:aws:s3:::durexec-tfstate-183192605828/eks/terraform.tfstate"
+                          [31m-[0m[0m Sid      = "StateRead"
+                        },
+                      [31m-[0m[0m {
+                          [31m-[0m[0m Action   = [
+                              [31m-[0m[0m "s3:PutObject",
+                              [31m-[0m[0m "s3:GetObject",
+                            ]
+                          [31m-[0m[0m Effect   = "Allow"
+                          [31m-[0m[0m Resource = "arn:aws:s3:::durexec-tfstate-183192605828/campaign/*"
+                          [31m-[0m[0m Sid      = "Evidence"
+                        },
+                    ]
+                  [31m-[0m[0m Version   = "2012-10-17"
+                }
+            ) [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_iam_role_policy.db_read_secret[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role_policy" "db_read_secret" {
+      [31m-[0m[0m id          = "durexec-bench-db-host:read-db-secret" [90m-> null[0m[0m
+      [31m-[0m[0m name        = "read-db-secret" [90m-> null[0m[0m
+      [31m-[0m[0m policy      = jsonencode(
+            {
+              [31m-[0m[0m Statement = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action   = "secretsmanager:GetSecretValue"
+                      [31m-[0m[0m Effect   = "Allow"
+                      [31m-[0m[0m Resource = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG"
+                    },
+                ]
+              [31m-[0m[0m Version   = "2012-10-17"
+            }
+        ) [90m-> null[0m[0m
+      [31m-[0m[0m role        = "durexec-bench-db-host" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_iam_role_policy.operator[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role_policy" "operator" {
+      [31m-[0m[0m id          = "durexec-bench-operator:durexec-operator" [90m-> null[0m[0m
+      [31m-[0m[0m name        = "durexec-operator" [90m-> null[0m[0m
+      [31m-[0m[0m policy      = jsonencode(
+            {
+              [31m-[0m[0m Statement = [
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action   = "eks:DescribeCluster"
+                      [31m-[0m[0m Effect   = "Allow"
+                      [31m-[0m[0m Resource = "arn:aws:eks:us-east-1:183192605828:cluster/durexec-bench"
+                      [31m-[0m[0m Sid      = "Cluster"
+                    },
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action   = "ecr:GetAuthorizationToken"
+                      [31m-[0m[0m Effect   = "Allow"
+                      [31m-[0m[0m Resource = "*"
+                      [31m-[0m[0m Sid      = "EcrAuth"
+                    },
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action   = [
+                          [31m-[0m[0m "ecr:UploadLayerPart",
+                          [31m-[0m[0m "ecr:TagResource",
+                          [31m-[0m[0m "ecr:PutImage",
+                          [31m-[0m[0m "ecr:InitiateLayerUpload",
+                          [31m-[0m[0m "ecr:GetDownloadUrlForLayer",
+                          [31m-[0m[0m "ecr:DescribeRepositories",
+                          [31m-[0m[0m "ecr:DescribeImages",
+                          [31m-[0m[0m "ecr:CreateRepository",
+                          [31m-[0m[0m "ecr:CompleteLayerUpload",
+                          [31m-[0m[0m "ecr:BatchGetImage",
+                          [31m-[0m[0m "ecr:BatchCheckLayerAvailability",
+                        ]
+                      [31m-[0m[0m Effect   = "Allow"
+                      [31m-[0m[0m Resource = "arn:aws:ecr:us-east-1:183192605828:repository/durexec/*"
+                      [31m-[0m[0m Sid      = "EcrDurexecOnly"
+                    },
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action   = "secretsmanager:GetSecretValue"
+                      [31m-[0m[0m Effect   = "Allow"
+                      [31m-[0m[0m Resource = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG"
+                      [31m-[0m[0m Sid      = "DbSecret"
+                    },
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action   = "s3:ListBucket"
+                      [31m-[0m[0m Effect   = "Allow"
+                      [31m-[0m[0m Resource = "arn:aws:s3:::durexec-tfstate-183192605828"
+                      [31m-[0m[0m Sid      = "BucketList"
+                    },
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action   = "s3:GetObject"
+                      [31m-[0m[0m Effect   = "Allow"
+                      [31m-[0m[0m Resource = "arn:aws:s3:::durexec-tfstate-183192605828/eks/terraform.tfstate"
+                      [31m-[0m[0m Sid      = "StateRead"
+                    },
+                  [31m-[0m[0m {
+                      [31m-[0m[0m Action   = [
+                          [31m-[0m[0m "s3:PutObject",
+                          [31m-[0m[0m "s3:GetObject",
+                        ]
+                      [31m-[0m[0m Effect   = "Allow"
+                      [31m-[0m[0m Resource = "arn:aws:s3:::durexec-tfstate-183192605828/campaign/*"
+                      [31m-[0m[0m Sid      = "Evidence"
+                    },
+                ]
+              [31m-[0m[0m Version   = "2012-10-17"
+            }
+        ) [90m-> null[0m[0m
+      [31m-[0m[0m role        = "durexec-bench-operator" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_iam_role_policy_attachment.cluster[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role_policy_attachment" "cluster" {
+      [31m-[0m[0m id         = "durexec-bench-eks-cluster-20261030121713292500000006" [90m-> null[0m[0m
+      [31m-[0m[0m policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy" [90m-> null[0m[0m
+      [31m-[0m[0m role       = "durexec-bench-eks-cluster" [90m-> null[0m[0m
+    }
+
+[1m  # aws_iam_role_policy_attachment.ebs_csi[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role_policy_attachment" "ebs_csi" {
+      [31m-[0m[0m id         = "durexec-bench-ebs-csi-2026103012272434430000000f" [90m-> null[0m[0m
+      [31m-[0m[0m policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy" [90m-> null[0m[0m
+      [31m-[0m[0m role       = "durexec-bench-ebs-csi" [90m-> null[0m[0m
+    }
+
+[1m  # aws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role_policy_attachment" "node" {
+      [31m-[0m[0m id         = "durexec-bench-eks-node-20261030121713357500000008" [90m-> null[0m[0m
+      [31m-[0m[0m policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly" [90m-> null[0m[0m
+      [31m-[0m[0m role       = "durexec-bench-eks-node" [90m-> null[0m[0m
+    }
+
+[1m  # aws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role_policy_attachment" "node" {
+      [31m-[0m[0m id         = "durexec-bench-eks-node-20261030121713344400000007" [90m-> null[0m[0m
+      [31m-[0m[0m policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy" [90m-> null[0m[0m
+      [31m-[0m[0m role       = "durexec-bench-eks-node" [90m-> null[0m[0m
+    }
+
+[1m  # aws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role_policy_attachment" "node" {
+      [31m-[0m[0m id         = "durexec-bench-eks-node-20261030121713215500000004" [90m-> null[0m[0m
+      [31m-[0m[0m policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy" [90m-> null[0m[0m
+      [31m-[0m[0m role       = "durexec-bench-eks-node" [90m-> null[0m[0m
+    }
+
+[1m  # aws_iam_role_policy_attachment.operator_ssm[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_iam_role_policy_attachment" "operator_ssm" {
+      [31m-[0m[0m id         = "durexec-bench-operator-20261030121713237200000005" [90m-> null[0m[0m
+      [31m-[0m[0m policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore" [90m-> null[0m[0m
+      [31m-[0m[0m role       = "durexec-bench-operator" [90m-> null[0m[0m
+    }
+
+[1m  # aws_instance.database[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_instance" "database" {
+      [31m-[0m[0m ami                                  = "ami-073f45061d35c86f0" [90m-> null[0m[0m
+      [31m-[0m[0m arn                                  = "arn:aws:ec2:us-east-1:183192605828:instance/i-05868ce4035cf1b0b" [90m-> null[0m[0m
+      [31m-[0m[0m associate_public_ip_address          = true [90m-> null[0m[0m
+      [31m-[0m[0m availability_zone                    = "us-east-1a" [90m-> null[0m[0m
+      [31m-[0m[0m cpu_core_count                       = 1 [90m-> null[0m[0m
+      [31m-[0m[0m cpu_threads_per_core                 = 2 [90m-> null[0m[0m
+      [31m-[0m[0m disable_api_stop                     = false [90m-> null[0m[0m
+      [31m-[0m[0m disable_api_termination              = false [90m-> null[0m[0m
+      [31m-[0m[0m ebs_optimized                        = false [90m-> null[0m[0m
+      [31m-[0m[0m get_password_data                    = false [90m-> null[0m[0m
+      [31m-[0m[0m hibernation                          = false [90m-> null[0m[0m
+      [31m-[0m[0m iam_instance_profile                 = "durexec-bench-db-host" [90m-> null[0m[0m
+      [31m-[0m[0m id                                   = "i-05868ce4035cf1b0b" [90m-> null[0m[0m
+      [31m-[0m[0m instance_initiated_shutdown_behavior = "stop" [90m-> null[0m[0m
+      [31m-[0m[0m instance_state                       = "running" [90m-> null[0m[0m
+      [31m-[0m[0m instance_type                        = "m7i-flex.large" [90m-> null[0m[0m
+      [31m-[0m[0m ipv6_address_count                   = 0 [90m-> null[0m[0m
+      [31m-[0m[0m ipv6_addresses                       = [] [90m-> null[0m[0m
+      [31m-[0m[0m monitoring                           = false [90m-> null[0m[0m
+      [31m-[0m[0m placement_partition_number           = 0 [90m-> null[0m[0m
+      [31m-[0m[0m primary_network_interface_id         = "eni-00b099d73ef14f613" [90m-> null[0m[0m
+      [31m-[0m[0m private_dns                          = "ip-10-91-0-99.ec2.internal" [90m-> null[0m[0m
+      [31m-[0m[0m private_ip                           = "10.91.0.99" [90m-> null[0m[0m
+      [31m-[0m[0m public_dns                           = "ec2-44-201-9-245.compute-1.amazonaws.com" [90m-> null[0m[0m
+      [31m-[0m[0m public_ip                            = "44.201.9.245" [90m-> null[0m[0m
+      [31m-[0m[0m secondary_private_ips                = [] [90m-> null[0m[0m
+      [31m-[0m[0m security_groups                      = [] [90m-> null[0m[0m
+      [31m-[0m[0m source_dest_check                    = true [90m-> null[0m[0m
+      [31m-[0m[0m subnet_id                            = "subnet-0937b901a3a669655" [90m-> null[0m[0m
+      [31m-[0m[0m tags                                 = {
+          [31m-[0m[0m "Name" = "durexec-bench-db"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                             = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-db"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tenancy                              = "default" [90m-> null[0m[0m
+      [31m-[0m[0m user_data                            = "4199aed5e92bb7084f9d48912a2ffc7dde6b58ed" [90m-> null[0m[0m
+      [31m-[0m[0m user_data_replace_on_change          = false [90m-> null[0m[0m
+      [31m-[0m[0m vpc_security_group_ids               = [
+          [31m-[0m[0m "sg-08eda0cf82c5b95e8",
+        ] [90m-> null[0m[0m
+        [90m# (7 unchanged attributes hidden)[0m[0m
+
+      [31m-[0m[0m capacity_reservation_specification {
+          [31m-[0m[0m capacity_reservation_preference = "open" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m cpu_options {
+          [31m-[0m[0m core_count       = 1 [90m-> null[0m[0m
+          [31m-[0m[0m threads_per_core = 2 [90m-> null[0m[0m
+            [90m# (1 unchanged attribute hidden)[0m[0m
+        }
+
+      [31m-[0m[0m ebs_block_device {
+          [31m-[0m[0m delete_on_termination = false [90m-> null[0m[0m
+          [31m-[0m[0m device_name           = "/dev/sdf" [90m-> null[0m[0m
+          [31m-[0m[0m encrypted             = true [90m-> null[0m[0m
+          [31m-[0m[0m iops                  = 3000 [90m-> null[0m[0m
+          [31m-[0m[0m kms_key_id            = "arn:aws:kms:us-east-1:183192605828:key/a138e9e8-d51e-4cab-9206-fcc69275856d" [90m-> null[0m[0m
+          [31m-[0m[0m tags                  = {
+              [31m-[0m[0m "Campaign"  = "k8s-scaling"
+              [31m-[0m[0m "Component" = "eks-benchmark"
+              [31m-[0m[0m "Env"       = "bench"
+              [31m-[0m[0m "ManagedBy" = "terraform"
+              [31m-[0m[0m "Name"      = "durexec-bench-pgdata"
+              [31m-[0m[0m "Project"   = "durexec"
+            } [90m-> null[0m[0m
+          [31m-[0m[0m tags_all              = {
+              [31m-[0m[0m "Campaign"  = "k8s-scaling"
+              [31m-[0m[0m "Component" = "eks-benchmark"
+              [31m-[0m[0m "Env"       = "bench"
+              [31m-[0m[0m "ManagedBy" = "terraform"
+              [31m-[0m[0m "Name"      = "durexec-bench-pgdata"
+              [31m-[0m[0m "Project"   = "durexec"
+            } [90m-> null[0m[0m
+          [31m-[0m[0m throughput            = 125 [90m-> null[0m[0m
+          [31m-[0m[0m volume_id             = "vol-00ea9c1a9ec41fa11" [90m-> null[0m[0m
+          [31m-[0m[0m volume_size           = 30 [90m-> null[0m[0m
+          [31m-[0m[0m volume_type           = "gp3" [90m-> null[0m[0m
+            [90m# (1 unchanged attribute hidden)[0m[0m
+        }
+
+      [31m-[0m[0m enclave_options {
+          [31m-[0m[0m enabled = false [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m maintenance_options {
+          [31m-[0m[0m auto_recovery = "default" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m metadata_options {
+          [31m-[0m[0m http_endpoint               = "enabled" [90m-> null[0m[0m
+          [31m-[0m[0m http_protocol_ipv6          = "disabled" [90m-> null[0m[0m
+          [31m-[0m[0m http_put_response_hop_limit = 2 [90m-> null[0m[0m
+          [31m-[0m[0m http_tokens                 = "required" [90m-> null[0m[0m
+          [31m-[0m[0m instance_metadata_tags      = "disabled" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m private_dns_name_options {
+          [31m-[0m[0m enable_resource_name_dns_a_record    = false [90m-> null[0m[0m
+          [31m-[0m[0m enable_resource_name_dns_aaaa_record = false [90m-> null[0m[0m
+          [31m-[0m[0m hostname_type                        = "ip-name" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m root_block_device {
+          [31m-[0m[0m delete_on_termination = true [90m-> null[0m[0m
+          [31m-[0m[0m device_name           = "/dev/xvda" [90m-> null[0m[0m
+          [31m-[0m[0m encrypted             = true [90m-> null[0m[0m
+          [31m-[0m[0m iops                  = 3000 [90m-> null[0m[0m
+          [31m-[0m[0m kms_key_id            = "arn:aws:kms:us-east-1:183192605828:key/a138e9e8-d51e-4cab-9206-fcc69275856d" [90m-> null[0m[0m
+          [31m-[0m[0m tags                  = {} [90m-> null[0m[0m
+          [31m-[0m[0m tags_all              = {
+              [31m-[0m[0m "Campaign"  = "k8s-scaling"
+              [31m-[0m[0m "Component" = "eks-benchmark"
+              [31m-[0m[0m "Env"       = "bench"
+              [31m-[0m[0m "ManagedBy" = "terraform"
+              [31m-[0m[0m "Project"   = "durexec"
+            } [90m-> null[0m[0m
+          [31m-[0m[0m throughput            = 125 [90m-> null[0m[0m
+          [31m-[0m[0m volume_id             = "vol-01a0494d15697c349" [90m-> null[0m[0m
+          [31m-[0m[0m volume_size           = 20 [90m-> null[0m[0m
+          [31m-[0m[0m volume_type           = "gp3" [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_instance.operator[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_instance" "operator" {
+      [31m-[0m[0m ami                                  = "ami-073f45061d35c86f0" [90m-> null[0m[0m
+      [31m-[0m[0m arn                                  = "arn:aws:ec2:us-east-1:183192605828:instance/i-0c5a7516d5d77b6e3" [90m-> null[0m[0m
+      [31m-[0m[0m associate_public_ip_address          = true [90m-> null[0m[0m
+      [31m-[0m[0m availability_zone                    = "us-east-1a" [90m-> null[0m[0m
+      [31m-[0m[0m cpu_core_count                       = 1 [90m-> null[0m[0m
+      [31m-[0m[0m cpu_threads_per_core                 = 2 [90m-> null[0m[0m
+      [31m-[0m[0m disable_api_stop                     = false [90m-> null[0m[0m
+      [31m-[0m[0m disable_api_termination              = false [90m-> null[0m[0m
+      [31m-[0m[0m ebs_optimized                        = false [90m-> null[0m[0m
+      [31m-[0m[0m get_password_data                    = false [90m-> null[0m[0m
+      [31m-[0m[0m hibernation                          = false [90m-> null[0m[0m
+      [31m-[0m[0m iam_instance_profile                 = "durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m id                                   = "i-0c5a7516d5d77b6e3" [90m-> null[0m[0m
+      [31m-[0m[0m instance_initiated_shutdown_behavior = "stop" [90m-> null[0m[0m
+      [31m-[0m[0m instance_state                       = "running" [90m-> null[0m[0m
+      [31m-[0m[0m instance_type                        = "c7i-flex.large" [90m-> null[0m[0m
+      [31m-[0m[0m ipv6_address_count                   = 0 [90m-> null[0m[0m
+      [31m-[0m[0m ipv6_addresses                       = [] [90m-> null[0m[0m
+      [31m-[0m[0m monitoring                           = false [90m-> null[0m[0m
+      [31m-[0m[0m placement_partition_number           = 0 [90m-> null[0m[0m
+      [31m-[0m[0m primary_network_interface_id         = "eni-0f98322c47cbc0b0f" [90m-> null[0m[0m
+      [31m-[0m[0m private_dns                          = "ip-10-91-0-161.ec2.internal" [90m-> null[0m[0m
+      [31m-[0m[0m private_ip                           = "10.91.0.161" [90m-> null[0m[0m
+      [31m-[0m[0m public_dns                           = "ec2-3-239-250-164.compute-1.amazonaws.com" [90m-> null[0m[0m
+      [31m-[0m[0m public_ip                            = "3.239.250.164" [90m-> null[0m[0m
+      [31m-[0m[0m secondary_private_ips                = [] [90m-> null[0m[0m
+      [31m-[0m[0m security_groups                      = [] [90m-> null[0m[0m
+      [31m-[0m[0m source_dest_check                    = true [90m-> null[0m[0m
+      [31m-[0m[0m subnet_id                            = "subnet-0937b901a3a669655" [90m-> null[0m[0m
+      [31m-[0m[0m tags                                 = {
+          [31m-[0m[0m "Name" = "durexec-bench-operator"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                             = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-operator"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tenancy                              = "default" [90m-> null[0m[0m
+      [31m-[0m[0m user_data                            = "92e5da705c1e6a7f5ebda4d901424404b238d08f" [90m-> null[0m[0m
+      [31m-[0m[0m user_data_replace_on_change          = false [90m-> null[0m[0m
+      [31m-[0m[0m vpc_security_group_ids               = [
+          [31m-[0m[0m "sg-08d404e7f6175f039",
+        ] [90m-> null[0m[0m
+        [90m# (7 unchanged attributes hidden)[0m[0m
+
+      [31m-[0m[0m capacity_reservation_specification {
+          [31m-[0m[0m capacity_reservation_preference = "open" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m cpu_options {
+          [31m-[0m[0m core_count       = 1 [90m-> null[0m[0m
+          [31m-[0m[0m threads_per_core = 2 [90m-> null[0m[0m
+            [90m# (1 unchanged attribute hidden)[0m[0m
+        }
+
+      [31m-[0m[0m enclave_options {
+          [31m-[0m[0m enabled = false [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m maintenance_options {
+          [31m-[0m[0m auto_recovery = "default" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m metadata_options {
+          [31m-[0m[0m http_endpoint               = "enabled" [90m-> null[0m[0m
+          [31m-[0m[0m http_protocol_ipv6          = "disabled" [90m-> null[0m[0m
+          [31m-[0m[0m http_put_response_hop_limit = 2 [90m-> null[0m[0m
+          [31m-[0m[0m http_tokens                 = "required" [90m-> null[0m[0m
+          [31m-[0m[0m instance_metadata_tags      = "disabled" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m private_dns_name_options {
+          [31m-[0m[0m enable_resource_name_dns_a_record    = false [90m-> null[0m[0m
+          [31m-[0m[0m enable_resource_name_dns_aaaa_record = false [90m-> null[0m[0m
+          [31m-[0m[0m hostname_type                        = "ip-name" [90m-> null[0m[0m
+        }
+
+      [31m-[0m[0m root_block_device {
+          [31m-[0m[0m delete_on_termination = true [90m-> null[0m[0m
+          [31m-[0m[0m device_name           = "/dev/xvda" [90m-> null[0m[0m
+          [31m-[0m[0m encrypted             = true [90m-> null[0m[0m
+          [31m-[0m[0m iops                  = 3000 [90m-> null[0m[0m
+          [31m-[0m[0m kms_key_id            = "arn:aws:kms:us-east-1:183192605828:key/a138e9e8-d51e-4cab-9206-fcc69275856d" [90m-> null[0m[0m
+          [31m-[0m[0m tags                  = {} [90m-> null[0m[0m
+          [31m-[0m[0m tags_all              = {
+              [31m-[0m[0m "Campaign"  = "k8s-scaling"
+              [31m-[0m[0m "Component" = "eks-benchmark"
+              [31m-[0m[0m "Env"       = "bench"
+              [31m-[0m[0m "ManagedBy" = "terraform"
+              [31m-[0m[0m "Project"   = "durexec"
+            } [90m-> null[0m[0m
+          [31m-[0m[0m throughput            = 125 [90m-> null[0m[0m
+          [31m-[0m[0m volume_id             = "vol-0cb4c41d8d5afb01d" [90m-> null[0m[0m
+          [31m-[0m[0m volume_size           = 30 [90m-> null[0m[0m
+          [31m-[0m[0m volume_type           = "gp3" [90m-> null[0m[0m
+        }
+    }
+
+[1m  # aws_internet_gateway.main[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_internet_gateway" "main" {
+      [31m-[0m[0m arn      = "arn:aws:ec2:us-east-1:183192605828:internet-gateway/igw-03918e349302abbab" [90m-> null[0m[0m
+      [31m-[0m[0m id       = "igw-03918e349302abbab" [90m-> null[0m[0m
+      [31m-[0m[0m owner_id = "183192605828" [90m-> null[0m[0m
+      [31m-[0m[0m tags     = {
+          [31m-[0m[0m "Name" = "durexec-bench-igw"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-igw"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m vpc_id   = "vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+    }
+
+[1m  # aws_route_table.public[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_route_table" "public" {
+      [31m-[0m[0m arn              = "arn:aws:ec2:us-east-1:183192605828:route-table/rtb-0a53fae3210fc08c9" [90m-> null[0m[0m
+      [31m-[0m[0m id               = "rtb-0a53fae3210fc08c9" [90m-> null[0m[0m
+      [31m-[0m[0m owner_id         = "183192605828" [90m-> null[0m[0m
+      [31m-[0m[0m propagating_vgws = [] [90m-> null[0m[0m
+      [31m-[0m[0m route            = [
+          [31m-[0m[0m {
+              [31m-[0m[0m cidr_block                 = "0.0.0.0/0"
+              [31m-[0m[0m gateway_id                 = "igw-03918e349302abbab"
+                [90m# (11 unchanged attributes hidden)[0m[0m
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m tags             = {
+          [31m-[0m[0m "Name" = "durexec-bench-public"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all         = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-public"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m vpc_id           = "vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+    }
+
+[1m  # aws_route_table_association.public[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_route_table_association" "public" {
+      [31m-[0m[0m id             = "rtbassoc-092f1d85bf8ea1d30" [90m-> null[0m[0m
+      [31m-[0m[0m route_table_id = "rtb-0a53fae3210fc08c9" [90m-> null[0m[0m
+      [31m-[0m[0m subnet_id      = "subnet-0937b901a3a669655" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_route_table_association.public[1][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_route_table_association" "public" {
+      [31m-[0m[0m id             = "rtbassoc-013fe2aaa0a8acddb" [90m-> null[0m[0m
+      [31m-[0m[0m route_table_id = "rtb-0a53fae3210fc08c9" [90m-> null[0m[0m
+      [31m-[0m[0m subnet_id      = "subnet-05ec4c5105f09df68" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_secretsmanager_secret.db[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_secretsmanager_secret" "db" {
+      [31m-[0m[0m arn                            = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG" [90m-> null[0m[0m
+      [31m-[0m[0m description                    = "durexec EKS pilot PostgreSQL credentials" [90m-> null[0m[0m
+      [31m-[0m[0m force_overwrite_replica_secret = false [90m-> null[0m[0m
+      [31m-[0m[0m id                             = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG" [90m-> null[0m[0m
+      [31m-[0m[0m name                           = "durexec-bench-db-20261030121712419800000001" [90m-> null[0m[0m
+      [31m-[0m[0m name_prefix                    = "durexec-bench-db-" [90m-> null[0m[0m
+      [31m-[0m[0m recovery_window_in_days        = 0 [90m-> null[0m[0m
+      [31m-[0m[0m tags                           = {} [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                       = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+        [90m# (2 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_secretsmanager_secret_version.db[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_secretsmanager_secret_version" "db" {
+      [31m-[0m[0m arn            = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG" [90m-> null[0m[0m
+      [31m-[0m[0m id             = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG|terraform-20261030121713004600000003" [90m-> null[0m[0m
+      [31m-[0m[0m secret_id      = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG" [90m-> null[0m[0m
+      [31m-[0m[0m secret_string  = (sensitive value) [90m-> null[0m[0m
+      [31m-[0m[0m version_id     = "terraform-20261030121713004600000003" [90m-> null[0m[0m
+      [31m-[0m[0m version_stages = [
+          [31m-[0m[0m "AWSCURRENT",
+        ] [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_security_group.database[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_security_group" "database" {
+      [31m-[0m[0m arn                    = "arn:aws:ec2:us-east-1:183192605828:security-group/sg-08eda0cf82c5b95e8" [90m-> null[0m[0m
+      [31m-[0m[0m description            = "PostgreSQL reachable only from EKS worker nodes" [90m-> null[0m[0m
+      [31m-[0m[0m egress                 = [
+          [31m-[0m[0m {
+              [31m-[0m[0m cidr_blocks      = [
+                  [31m-[0m[0m "0.0.0.0/0",
+                ]
+              [31m-[0m[0m description      = "pull the postgres image"
+              [31m-[0m[0m from_port        = 0
+              [31m-[0m[0m ipv6_cidr_blocks = []
+              [31m-[0m[0m prefix_list_ids  = []
+              [31m-[0m[0m protocol         = "-1"
+              [31m-[0m[0m security_groups  = []
+              [31m-[0m[0m self             = false
+              [31m-[0m[0m to_port          = 0
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m id                     = "sg-08eda0cf82c5b95e8" [90m-> null[0m[0m
+      [31m-[0m[0m ingress                = [
+          [31m-[0m[0m {
+              [31m-[0m[0m cidr_blocks      = []
+              [31m-[0m[0m description      = "PostgreSQL from EKS nodes"
+              [31m-[0m[0m from_port        = 5432
+              [31m-[0m[0m ipv6_cidr_blocks = []
+              [31m-[0m[0m prefix_list_ids  = []
+              [31m-[0m[0m protocol         = "tcp"
+              [31m-[0m[0m security_groups  = [
+                  [31m-[0m[0m "sg-08992c7bdfac3ed14",
+                ]
+              [31m-[0m[0m self             = false
+              [31m-[0m[0m to_port          = 5432
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m name                   = "durexec-bench-db" [90m-> null[0m[0m
+      [31m-[0m[0m owner_id               = "183192605828" [90m-> null[0m[0m
+      [31m-[0m[0m revoke_rules_on_delete = false [90m-> null[0m[0m
+      [31m-[0m[0m tags                   = {
+          [31m-[0m[0m "Name" = "durexec-bench-db"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all               = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-db"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m vpc_id                 = "vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_security_group.operator[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_security_group" "operator" {
+      [31m-[0m[0m arn                    = "arn:aws:ec2:us-east-1:183192605828:security-group/sg-08d404e7f6175f039" [90m-> null[0m[0m
+      [31m-[0m[0m description            = "In-VPC harness operator: no inbound, egress only" [90m-> null[0m[0m
+      [31m-[0m[0m egress                 = [
+          [31m-[0m[0m {
+              [31m-[0m[0m cidr_blocks      = [
+                  [31m-[0m[0m "0.0.0.0/0",
+                ]
+              [31m-[0m[0m description      = "SSM, ECR, S3, image builds"
+              [31m-[0m[0m from_port        = 0
+              [31m-[0m[0m ipv6_cidr_blocks = []
+              [31m-[0m[0m prefix_list_ids  = []
+              [31m-[0m[0m protocol         = "-1"
+              [31m-[0m[0m security_groups  = []
+              [31m-[0m[0m self             = false
+              [31m-[0m[0m to_port          = 0
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m id                     = "sg-08d404e7f6175f039" [90m-> null[0m[0m
+      [31m-[0m[0m ingress                = [] [90m-> null[0m[0m
+      [31m-[0m[0m name                   = "durexec-bench-operator" [90m-> null[0m[0m
+      [31m-[0m[0m owner_id               = "183192605828" [90m-> null[0m[0m
+      [31m-[0m[0m revoke_rules_on_delete = false [90m-> null[0m[0m
+      [31m-[0m[0m tags                   = {
+          [31m-[0m[0m "Name" = "durexec-bench-operator"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all               = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-operator"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m vpc_id                 = "vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+        [90m# (1 unchanged attribute hidden)[0m[0m
+    }
+
+[1m  # aws_subnet.public[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_subnet" "public" {
+      [31m-[0m[0m arn                                            = "arn:aws:ec2:us-east-1:183192605828:subnet/subnet-0937b901a3a669655" [90m-> null[0m[0m
+      [31m-[0m[0m assign_ipv6_address_on_creation                = false [90m-> null[0m[0m
+      [31m-[0m[0m availability_zone                              = "us-east-1a" [90m-> null[0m[0m
+      [31m-[0m[0m availability_zone_id                           = "use1-az1" [90m-> null[0m[0m
+      [31m-[0m[0m cidr_block                                     = "10.91.0.0/24" [90m-> null[0m[0m
+      [31m-[0m[0m enable_dns64                                   = false [90m-> null[0m[0m
+      [31m-[0m[0m enable_lni_at_device_index                     = 0 [90m-> null[0m[0m
+      [31m-[0m[0m enable_resource_name_dns_a_record_on_launch    = false [90m-> null[0m[0m
+      [31m-[0m[0m enable_resource_name_dns_aaaa_record_on_launch = false [90m-> null[0m[0m
+      [31m-[0m[0m id                                             = "subnet-0937b901a3a669655" [90m-> null[0m[0m
+      [31m-[0m[0m ipv6_native                                    = false [90m-> null[0m[0m
+      [31m-[0m[0m map_customer_owned_ip_on_launch                = false [90m-> null[0m[0m
+      [31m-[0m[0m map_public_ip_on_launch                        = true [90m-> null[0m[0m
+      [31m-[0m[0m owner_id                                       = "183192605828" [90m-> null[0m[0m
+      [31m-[0m[0m private_dns_hostname_type_on_launch            = "ip-name" [90m-> null[0m[0m
+      [31m-[0m[0m tags                                           = {
+          [31m-[0m[0m "Name" = "durexec-bench-public-0"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                                       = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-public-0"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m vpc_id                                         = "vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+        [90m# (4 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_subnet.public[1][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_subnet" "public" {
+      [31m-[0m[0m arn                                            = "arn:aws:ec2:us-east-1:183192605828:subnet/subnet-05ec4c5105f09df68" [90m-> null[0m[0m
+      [31m-[0m[0m assign_ipv6_address_on_creation                = false [90m-> null[0m[0m
+      [31m-[0m[0m availability_zone                              = "us-east-1b" [90m-> null[0m[0m
+      [31m-[0m[0m availability_zone_id                           = "use1-az2" [90m-> null[0m[0m
+      [31m-[0m[0m cidr_block                                     = "10.91.1.0/24" [90m-> null[0m[0m
+      [31m-[0m[0m enable_dns64                                   = false [90m-> null[0m[0m
+      [31m-[0m[0m enable_lni_at_device_index                     = 0 [90m-> null[0m[0m
+      [31m-[0m[0m enable_resource_name_dns_a_record_on_launch    = false [90m-> null[0m[0m
+      [31m-[0m[0m enable_resource_name_dns_aaaa_record_on_launch = false [90m-> null[0m[0m
+      [31m-[0m[0m id                                             = "subnet-05ec4c5105f09df68" [90m-> null[0m[0m
+      [31m-[0m[0m ipv6_native                                    = false [90m-> null[0m[0m
+      [31m-[0m[0m map_customer_owned_ip_on_launch                = false [90m-> null[0m[0m
+      [31m-[0m[0m map_public_ip_on_launch                        = true [90m-> null[0m[0m
+      [31m-[0m[0m owner_id                                       = "183192605828" [90m-> null[0m[0m
+      [31m-[0m[0m private_dns_hostname_type_on_launch            = "ip-name" [90m-> null[0m[0m
+      [31m-[0m[0m tags                                           = {
+          [31m-[0m[0m "Name" = "durexec-bench-public-1"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                                       = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-public-1"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m vpc_id                                         = "vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+        [90m# (4 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_volume_attachment.pgdata[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_volume_attachment" "pgdata" {
+      [31m-[0m[0m device_name  = "/dev/sdf" [90m-> null[0m[0m
+      [31m-[0m[0m force_detach = true [90m-> null[0m[0m
+      [31m-[0m[0m id           = "vai-3931952371" [90m-> null[0m[0m
+      [31m-[0m[0m instance_id  = "i-05868ce4035cf1b0b" [90m-> null[0m[0m
+      [31m-[0m[0m volume_id    = "vol-00ea9c1a9ec41fa11" [90m-> null[0m[0m
+    }
+
+[1m  # aws_vpc.main[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_vpc" "main" {
+      [31m-[0m[0m arn                                  = "arn:aws:ec2:us-east-1:183192605828:vpc/vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+      [31m-[0m[0m assign_generated_ipv6_cidr_block     = false [90m-> null[0m[0m
+      [31m-[0m[0m cidr_block                           = "10.91.0.0/16" [90m-> null[0m[0m
+      [31m-[0m[0m default_network_acl_id               = "acl-0defe8630ae688205" [90m-> null[0m[0m
+      [31m-[0m[0m default_route_table_id               = "rtb-0dc34fbdc88542aae" [90m-> null[0m[0m
+      [31m-[0m[0m default_security_group_id            = "sg-064545545e2e4c5e3" [90m-> null[0m[0m
+      [31m-[0m[0m dhcp_options_id                      = "dopt-00d784bbc758bf323" [90m-> null[0m[0m
+      [31m-[0m[0m enable_dns_hostnames                 = true [90m-> null[0m[0m
+      [31m-[0m[0m enable_dns_support                   = true [90m-> null[0m[0m
+      [31m-[0m[0m enable_network_address_usage_metrics = false [90m-> null[0m[0m
+      [31m-[0m[0m id                                   = "vpc-092e3eea33b730d5d" [90m-> null[0m[0m
+      [31m-[0m[0m instance_tenancy                     = "default" [90m-> null[0m[0m
+      [31m-[0m[0m ipv6_netmask_length                  = 0 [90m-> null[0m[0m
+      [31m-[0m[0m main_route_table_id                  = "rtb-0dc34fbdc88542aae" [90m-> null[0m[0m
+      [31m-[0m[0m owner_id                             = "183192605828" [90m-> null[0m[0m
+      [31m-[0m[0m tags                                 = {
+          [31m-[0m[0m "Name" = "durexec-bench-eks"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                             = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Name"      = "durexec-bench-eks"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+        [90m# (4 unchanged attributes hidden)[0m[0m
+    }
+
+[1m  # aws_vpc_security_group_egress_rule.db_all[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_vpc_security_group_egress_rule" "db_all" {
+      [31m-[0m[0m arn                    = "arn:aws:ec2:us-east-1:183192605828:security-group-rule/sgr-052dd86d69e097baa" [90m-> null[0m[0m
+      [31m-[0m[0m cidr_ipv4              = "0.0.0.0/0" [90m-> null[0m[0m
+      [31m-[0m[0m description            = "pull the postgres image" [90m-> null[0m[0m
+      [31m-[0m[0m id                     = "sgr-052dd86d69e097baa" [90m-> null[0m[0m
+      [31m-[0m[0m ip_protocol            = "-1" [90m-> null[0m[0m
+      [31m-[0m[0m security_group_id      = "sg-08eda0cf82c5b95e8" [90m-> null[0m[0m
+      [31m-[0m[0m security_group_rule_id = "sgr-052dd86d69e097baa" [90m-> null[0m[0m
+      [31m-[0m[0m tags_all               = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+    }
+
+[1m  # aws_vpc_security_group_egress_rule.operator_all[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_vpc_security_group_egress_rule" "operator_all" {
+      [31m-[0m[0m arn                    = "arn:aws:ec2:us-east-1:183192605828:security-group-rule/sgr-0aa9f19baa2d03c64" [90m-> null[0m[0m
+      [31m-[0m[0m cidr_ipv4              = "0.0.0.0/0" [90m-> null[0m[0m
+      [31m-[0m[0m description            = "SSM, ECR, S3, image builds" [90m-> null[0m[0m
+      [31m-[0m[0m id                     = "sgr-0aa9f19baa2d03c64" [90m-> null[0m[0m
+      [31m-[0m[0m ip_protocol            = "-1" [90m-> null[0m[0m
+      [31m-[0m[0m security_group_id      = "sg-08d404e7f6175f039" [90m-> null[0m[0m
+      [31m-[0m[0m security_group_rule_id = "sgr-0aa9f19baa2d03c64" [90m-> null[0m[0m
+      [31m-[0m[0m tags_all               = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+    }
+
+[1m  # aws_vpc_security_group_ingress_rule.cluster_api_from_operator[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_vpc_security_group_ingress_rule" "cluster_api_from_operator" {
+      [31m-[0m[0m arn                          = "arn:aws:ec2:us-east-1:183192605828:security-group-rule/sgr-0746497df6f5918a3" [90m-> null[0m[0m
+      [31m-[0m[0m description                  = "Kubernetes API (private endpoint) from the in-VPC operator" [90m-> null[0m[0m
+      [31m-[0m[0m from_port                    = 443 [90m-> null[0m[0m
+      [31m-[0m[0m id                           = "sgr-0746497df6f5918a3" [90m-> null[0m[0m
+      [31m-[0m[0m ip_protocol                  = "tcp" [90m-> null[0m[0m
+      [31m-[0m[0m referenced_security_group_id = "sg-08d404e7f6175f039" [90m-> null[0m[0m
+      [31m-[0m[0m security_group_id            = "sg-08992c7bdfac3ed14" [90m-> null[0m[0m
+      [31m-[0m[0m security_group_rule_id       = "sgr-0746497df6f5918a3" [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                     = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m to_port                      = 443 [90m-> null[0m[0m
+    }
+
+[1m  # aws_vpc_security_group_ingress_rule.db_from_nodes[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "aws_vpc_security_group_ingress_rule" "db_from_nodes" {
+      [31m-[0m[0m arn                          = "arn:aws:ec2:us-east-1:183192605828:security-group-rule/sgr-0c3ff6b55a40d8f01" [90m-> null[0m[0m
+      [31m-[0m[0m description                  = "PostgreSQL from EKS nodes" [90m-> null[0m[0m
+      [31m-[0m[0m from_port                    = 5432 [90m-> null[0m[0m
+      [31m-[0m[0m id                           = "sgr-0c3ff6b55a40d8f01" [90m-> null[0m[0m
+      [31m-[0m[0m ip_protocol                  = "tcp" [90m-> null[0m[0m
+      [31m-[0m[0m referenced_security_group_id = "sg-08992c7bdfac3ed14" [90m-> null[0m[0m
+      [31m-[0m[0m security_group_id            = "sg-08eda0cf82c5b95e8" [90m-> null[0m[0m
+      [31m-[0m[0m security_group_rule_id       = "sgr-0c3ff6b55a40d8f01" [90m-> null[0m[0m
+      [31m-[0m[0m tags_all                     = {
+          [31m-[0m[0m "Campaign"  = "k8s-scaling"
+          [31m-[0m[0m "Component" = "eks-benchmark"
+          [31m-[0m[0m "Env"       = "bench"
+          [31m-[0m[0m "ManagedBy" = "terraform"
+          [31m-[0m[0m "Project"   = "durexec"
+        } [90m-> null[0m[0m
+      [31m-[0m[0m to_port                      = 5432 [90m-> null[0m[0m
+    }
+
+[1m  # random_password.postgres[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "random_password" "postgres" {
+      [31m-[0m[0m bcrypt_hash = (sensitive value) [90m-> null[0m[0m
+      [31m-[0m[0m id          = "none" [90m-> null[0m[0m
+      [31m-[0m[0m length      = 32 [90m-> null[0m[0m
+      [31m-[0m[0m lower       = true [90m-> null[0m[0m
+      [31m-[0m[0m min_lower   = 0 [90m-> null[0m[0m
+      [31m-[0m[0m min_numeric = 0 [90m-> null[0m[0m
+      [31m-[0m[0m min_special = 0 [90m-> null[0m[0m
+      [31m-[0m[0m min_upper   = 0 [90m-> null[0m[0m
+      [31m-[0m[0m number      = true [90m-> null[0m[0m
+      [31m-[0m[0m numeric     = true [90m-> null[0m[0m
+      [31m-[0m[0m result      = (sensitive value) [90m-> null[0m[0m
+      [31m-[0m[0m special     = false [90m-> null[0m[0m
+      [31m-[0m[0m upper       = true [90m-> null[0m[0m
+    }
+
+[1m  # random_password.replication[0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "random_password" "replication" {
+      [31m-[0m[0m bcrypt_hash = (sensitive value) [90m-> null[0m[0m
+      [31m-[0m[0m id          = "none" [90m-> null[0m[0m
+      [31m-[0m[0m length      = 32 [90m-> null[0m[0m
+      [31m-[0m[0m lower       = true [90m-> null[0m[0m
+      [31m-[0m[0m min_lower   = 0 [90m-> null[0m[0m
+      [31m-[0m[0m min_numeric = 0 [90m-> null[0m[0m
+      [31m-[0m[0m min_special = 0 [90m-> null[0m[0m
+      [31m-[0m[0m min_upper   = 0 [90m-> null[0m[0m
+      [31m-[0m[0m number      = true [90m-> null[0m[0m
+      [31m-[0m[0m numeric     = true [90m-> null[0m[0m
+      [31m-[0m[0m result      = (sensitive value) [90m-> null[0m[0m
+      [31m-[0m[0m special     = false [90m-> null[0m[0m
+      [31m-[0m[0m upper       = true [90m-> null[0m[0m
+    }
+
+[1mPlan:[0m 0 to add, 0 to change, 44 to destroy.
+[0m
+Changes to Outputs:
+  [31m-[0m[0m cluster_endpoint         = "https://AAAD676DAC708B6663173FA14CAD92FA.gr7.us-east-1.eks.amazonaws.com" [90m-> null[0m[0m
+  [31m-[0m[0m cluster_name             = "durexec-bench" [90m-> null[0m[0m
+  [31m-[0m[0m cluster_version          = "1.37" [90m-> null[0m[0m
+  [31m-[0m[0m database_instance_id     = "i-05868ce4035cf1b0b" [90m-> null[0m[0m
+  [31m-[0m[0m database_private_ip      = "10.91.0.99" [90m-> null[0m[0m
+  [31m-[0m[0m database_secret_arn      = "arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG" [90m-> null[0m[0m
+  [31m-[0m[0m database_url_template    = "postgres://durexec:<password>@10.91.0.99:5432/durexec?sslmode=disable" [90m-> null[0m[0m
+  [31m-[0m[0m hourly_cost_estimate_usd = "control plane $0.10 + 3 x m7i-flex.large engine + 1 x c7i-flex.large harness; verify against INSTANCE-COMPARISON.md. EXCLUDES the external PostgreSQL EC2 host." [90m-> null[0m[0m
+  [31m-[0m[0m kubeconfig_command       = "aws eks update-kubeconfig --region us-east-1 --name durexec-bench" [90m-> null[0m[0m
+  [31m-[0m[0m operator_instance_id     = "i-0c5a7516d5d77b6e3" [90m-> null[0m[0m
+  [31m-[0m[0m teardown_warning         = "terraform destroy leaves nothing billable EXCEPT any EBS volume a released PersistentVolume left behind, and any snapshot. Check both before declaring the campaign over." [90m-> null[0m[0m
+[0m[1maws_route_table_association.public[0]: Destroying... [id=rtbassoc-092f1d85bf8ea1d30][0m[0m
+[0m[1maws_eks_addon.vpc_cni: Destroying... [id=durexec-bench:vpc-cni][0m[0m
+[0m[1maws_route_table_association.public[1]: Destroying... [id=rtbassoc-013fe2aaa0a8acddb][0m[0m
+[0m[1maws_eks_node_group.harness: Destroying... [id=durexec-bench:harness][0m[0m
+[0m[1maws_iam_role_policy.operator[0]: Destroying... [id=durexec-bench-operator:durexec-operator][0m[0m
+[0m[1maws_vpc_security_group_ingress_rule.cluster_api_from_operator[0]: Destroying... [id=sgr-0746497df6f5918a3][0m[0m
+[0m[1maws_vpc_security_group_egress_rule.db_all: Destroying... [id=sgr-052dd86d69e097baa][0m[0m
+[0m[1maws_eks_addon.ebs_csi: Destroying... [id=durexec-bench:aws-ebs-csi-driver][0m[0m
+[0m[1maws_vpc_security_group_egress_rule.operator_all[0]: Destroying... [id=sgr-0aa9f19baa2d03c64][0m[0m
+[0m[1maws_instance.operator[0]: Destroying... [id=i-0c5a7516d5d77b6e3][0m[0m
+[0m[1maws_iam_role_policy.operator[0]: Destruction complete after 1s[0m
+[0m[1maws_iam_role_policy_attachment.operator_ssm[0]: Destroying... [id=durexec-bench-operator-20261030121713237200000005][0m[0m
+[0m[1maws_iam_role_policy_attachment.operator_ssm[0]: Destruction complete after 0s[0m
+[0m[1maws_volume_attachment.pgdata: Destroying... [id=vai-3931952371][0m[0m
+[0m[1maws_route_table_association.public[1]: Destruction complete after 1s[0m
+[0m[1maws_vpc_security_group_ingress_rule.db_from_nodes: Destroying... [id=sgr-0c3ff6b55a40d8f01][0m[0m
+[0m[1maws_vpc_security_group_ingress_rule.cluster_api_from_operator[0]: Destruction complete after 1s[0m
+[0m[1maws_eks_access_policy_association.operator[0]: Destroying... [id=durexec-bench#arn:aws:iam::183192605828:role/durexec-bench-operator#arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy][0m[0m
+[0m[1maws_vpc_security_group_egress_rule.operator_all[0]: Destruction complete after 1s[0m
+[0m[1maws_vpc_security_group_egress_rule.db_all: Destruction complete after 1s[0m
+[0m[1maws_route_table_association.public[0]: Destruction complete after 1s[0m
+[0m[1maws_route_table.public: Destroying... [id=rtb-0a53fae3210fc08c9][0m[0m
+[0m[1maws_vpc_security_group_ingress_rule.db_from_nodes: Destruction complete after 0s[0m
+[0m[1maws_eks_access_policy_association.operator[0]: Destruction complete after 0s[0m
+[0m[1maws_eks_access_entry.operator[0]: Destroying... [id=durexec-bench:arn:aws:iam::183192605828:role/durexec-bench-operator][0m[0m
+[0m[1maws_route_table.public: Destruction complete after 0s[0m
+[0m[1maws_internet_gateway.main: Destroying... [id=igw-03918e349302abbab][0m[0m
+[0m[1maws_eks_access_entry.operator[0]: Destruction complete after 1s[0m
+[0m[1maws_eks_addon.vpc_cni: Destruction complete after 2s[0m
+[0m[1maws_eks_addon.ebs_csi: Destruction complete after 8s[0m
+[0m[1maws_iam_role_policy_attachment.ebs_csi: Destroying... [id=durexec-bench-ebs-csi-2026103012272434430000000f][0m[0m
+[0m[1maws_eks_addon.pod_identity_agent: Destroying... [id=durexec-bench:eks-pod-identity-agent][0m[0m
+[0m[1maws_iam_role_policy_attachment.ebs_csi: Destruction complete after 0s[0m
+[0m[1maws_iam_role.ebs_csi: Destroying... [id=durexec-bench-ebs-csi][0m[0m
+[0m[1maws_iam_role.ebs_csi: Destruction complete after 1s[0m
+[0m[1maws_eks_addon.pod_identity_agent: Destruction complete after 2s[0m
+[0m[1maws_eks_node_group.engine: Destroying... [id=durexec-bench:engine][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 10s elapsed][0m[0m
+[0m[1maws_instance.operator[0]: Still destroying... [id=i-0c5a7516d5d77b6e3, 10s elapsed][0m[0m
+[0m[1maws_volume_attachment.pgdata: Still destroying... [id=vai-3931952371, 10s elapsed][0m[0m
+[0m[1maws_volume_attachment.pgdata: Destruction complete after 10s[0m
+[0m[1maws_ebs_volume.pgdata: Destroying... [id=vol-00ea9c1a9ec41fa11][0m[0m
+[0m[1maws_instance.database: Destroying... [id=i-05868ce4035cf1b0b][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 10s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 10s elapsed][0m[0m
+[0m[1maws_instance.operator[0]: Still destroying... [id=i-0c5a7516d5d77b6e3, 20s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 20s elapsed][0m[0m
+[0m[1maws_instance.operator[0]: Destruction complete after 21s[0m
+[0m[1maws_iam_instance_profile.operator[0]: Destroying... [id=durexec-bench-operator][0m[0m
+[0m[1maws_security_group.operator[0]: Destroying... [id=sg-08d404e7f6175f039][0m[0m
+[0m[1maws_iam_instance_profile.operator[0]: Destruction complete after 0s[0m
+[0m[1maws_security_group.operator[0]: Destruction complete after 0s[0m
+[0m[1maws_iam_role.operator[0]: Destroying... [id=durexec-bench-operator][0m[0m
+[0m[1maws_ebs_volume.pgdata: Still destroying... [id=vol-00ea9c1a9ec41fa11, 10s elapsed][0m[0m
+[0m[1maws_instance.database: Still destroying... [id=i-05868ce4035cf1b0b, 10s elapsed][0m[0m
+[0m[1maws_iam_role.operator[0]: Destruction complete after 0s[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 20s elapsed][0m[0m
+[0m[1maws_ebs_volume.pgdata: Destruction complete after 11s[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 20s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 30s elapsed][0m[0m
+[0m[1maws_instance.database: Still destroying... [id=i-05868ce4035cf1b0b, 20s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 30s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 30s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 40s elapsed][0m[0m
+[0m[1maws_instance.database: Still destroying... [id=i-05868ce4035cf1b0b, 30s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 40s elapsed][0m[0m
+[0m[1maws_instance.database: Destruction complete after 31s[0m
+[0m[1maws_iam_instance_profile.db: Destroying... [id=durexec-bench-db-host][0m[0m
+[0m[1maws_iam_role_policy.db_read_secret: Destroying... [id=durexec-bench-db-host:read-db-secret][0m[0m
+[0m[1maws_secretsmanager_secret_version.db: Destroying... [id=arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG|terraform-20261030121713004600000003][0m[0m
+[0m[1maws_security_group.database: Destroying... [id=sg-08eda0cf82c5b95e8][0m[0m
+[0m[1maws_iam_role_policy.db_read_secret: Destruction complete after 1s[0m
+[0m[1maws_iam_instance_profile.db: Destruction complete after 1s[0m
+[0m[1maws_iam_role.db: Destroying... [id=durexec-bench-db-host][0m[0m
+[0m[1maws_secretsmanager_secret_version.db: Destruction complete after 1s[0m
+[0m[1maws_secretsmanager_secret.db: Destroying... [id=arn:aws:secretsmanager:us-east-1:183192605828:secret:durexec-bench-db-20261030121712419800000001-QuR4SG][0m[0m
+[0m[1mrandom_password.postgres: Destroying... [id=none][0m[0m
+[0m[1mrandom_password.replication: Destroying... [id=none][0m[0m
+[0m[1mrandom_password.postgres: Destruction complete after 0s[0m
+[0m[1mrandom_password.replication: Destruction complete after 0s[0m
+[0m[1maws_secretsmanager_secret.db: Destruction complete after 0s[0m
+[0m[1maws_iam_role.db: Destruction complete after 0s[0m
+[0m[1maws_security_group.database: Destruction complete after 1s[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 40s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 50s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 50s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 50s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 1m0s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 1m0s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 1m0s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 1m10s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 1m10s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 1m10s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 1m20s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 1m20s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 1m20s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 1m30s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 1m30s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 1m30s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 1m40s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 1m40s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 1m40s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 1m50s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 1m50s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 1m50s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 2m0s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 2m0s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 2m0s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Still destroying... [id=durexec-bench:harness, 2m10s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 2m10s elapsed][0m[0m
+[0m[1maws_eks_node_group.harness: Destruction complete after 2m16s[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 2m10s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 2m20s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 2m20s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 2m30s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 2m30s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 2m40s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 2m40s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 2m50s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 2m50s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 3m0s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 3m0s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 3m10s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 3m10s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 3m20s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 3m20s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 3m31s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 3m30s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 3m41s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 3m40s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 3m51s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 3m50s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 4m1s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 4m0s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 4m11s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 4m10s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 4m21s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 4m20s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 4m31s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 4m30s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 4m41s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 4m40s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 4m51s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 4m50s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 5m1s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 5m0s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 5m11s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 5m10s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 5m21s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 5m20s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 5m31s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 5m30s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 5m41s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 5m40s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 5m51s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 5m50s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 6m1s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 6m0s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 6m11s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 6m10s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 6m21s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 6m20s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Still destroying... [id=igw-03918e349302abbab, 6m31s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 6m30s elapsed][0m[0m
+[0m[1maws_internet_gateway.main: Destruction complete after 6m39s[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 6m40s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 6m50s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 7m0s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 7m10s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 7m20s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 7m30s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 7m40s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 7m50s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 8m0s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Still destroying... [id=durexec-bench:engine, 8m10s elapsed][0m[0m
+[0m[1maws_eks_node_group.engine: Destruction complete after 8m12s[0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"]: Destroying... [id=durexec-bench-eks-node-20261030121713357500000008][0m[0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"]: Destroying... [id=durexec-bench-eks-node-20261030121713215500000004][0m[0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"]: Destroying... [id=durexec-bench-eks-node-20261030121713344400000007][0m[0m
+[0m[1maws_eks_cluster.main: Destroying... [id=durexec-bench][0m[0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"]: Destruction complete after 0s[0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"]: Destruction complete after 0s[0m
+[0m[1maws_iam_role_policy_attachment.node["arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"]: Destruction complete after 0s[0m
+[0m[1maws_iam_role.node: Destroying... [id=durexec-bench-eks-node][0m[0m
+[0m[1maws_iam_role.node: Destruction complete after 1s[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 10s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 20s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 30s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 40s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 50s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 1m0s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 1m10s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 1m20s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 1m30s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 1m40s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 1m50s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 2m0s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 2m10s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 2m20s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 2m30s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 2m40s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 2m50s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 3m0s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 3m10s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 3m20s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 3m30s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 3m40s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 3m50s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 4m0s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 4m10s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 4m20s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 4m30s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 4m40s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Still destroying... [id=durexec-bench, 4m50s elapsed][0m[0m
+[0m[1maws_eks_cluster.main: Destruction complete after 4m51s[0m
+[0m[1maws_iam_role_policy_attachment.cluster: Destroying... [id=durexec-bench-eks-cluster-20261030121713292500000006][0m[0m
+[0m[1maws_subnet.public[1]: Destroying... [id=subnet-05ec4c5105f09df68][0m[0m
+[0m[1maws_subnet.public[0]: Destroying... [id=subnet-0937b901a3a669655][0m[0m
+[0m[1maws_iam_role_policy_attachment.cluster: Destruction complete after 0s[0m
+[0m[1maws_iam_role.cluster: Destroying... [id=durexec-bench-eks-cluster][0m[0m
+[0m[1maws_iam_role.cluster: Destruction complete after 1s[0m
+[0m[1maws_subnet.public[1]: Destruction complete after 1s[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 1m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 1m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 1m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 1m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 1m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 1m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 2m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 2m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 2m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 2m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 2m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 2m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 3m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 3m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 3m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 3m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 3m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 3m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 4m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 4m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 4m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 4m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 4m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 4m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 5m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 5m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 5m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 5m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 5m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 5m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 6m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 6m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 6m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 6m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 6m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 6m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 7m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 7m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 7m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 7m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 7m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 7m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 8m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 8m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 8m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 8m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 8m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 8m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 9m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 9m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 9m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 9m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 9m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 9m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 10m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 10m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 10m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 10m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 10m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 10m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 11m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 11m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 11m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 11m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 11m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 11m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 12m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 12m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 12m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 12m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 12m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 12m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 13m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 13m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 13m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 13m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 13m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 13m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 14m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 14m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 14m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 14m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 14m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 14m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 15m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 15m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 15m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 15m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 15m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 15m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 16m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 16m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 16m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 16m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 16m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 16m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 17m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 17m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 17m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 17m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 17m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 17m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 18m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 18m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 18m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 18m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 18m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 18m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 19m0s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 19m10s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 19m20s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 19m30s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 19m40s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 19m50s elapsed][0m[0m
+[0m[1maws_subnet.public[0]: Still destroying... [id=subnet-0937b901a3a669655, 20m0s elapsed][0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mdeleting EC2 Subnet (subnet-0937b901a3a669655): operation error EC2: DeleteSubnet, https response error StatusCode: 400, RequestID: 38f26d17-30d9-4e88-8bd2-4530bcda1429, api error DependencyViolation: The subnet 'subnet-0937b901a3a669655' has dependencies and cannot be deleted.[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m
+[31m╵[0m[0m
