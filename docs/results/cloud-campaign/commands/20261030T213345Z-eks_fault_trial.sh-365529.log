@@ -1,0 +1,9 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T213345Z-eks_fault_trial.sh-365529.log
+run_id=20261030T213345Z scenario=drain trial=2 victim=durexec-2 git=62264f725efd2752f6cc5762deb26f58a6a8d57b image=cf986fb
+load: 65.6 wf/s for 180s (job loadgen-fault-20261030t213345z)
+t_inject=1793396062286 shards=2,14 tokens=6;6
+mark 1793396063626 drain ip-10-91-0-67.ec2.internal
+mark 1793396102367 uncordon ip-10-91-0-67.ec2.internal
+t_expire=8328 t_claim=23689 t_progress=13
+verdict=ok
+drain t2 victim=durexec-2 expire=8328 claim=23689 progress=13 ring=47842 verdict=ok

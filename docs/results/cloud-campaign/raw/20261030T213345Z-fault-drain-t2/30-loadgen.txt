@@ -1,0 +1,37 @@
+cluster: durexec-0.durexec-hl=http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-1.durexec-hl=http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-2.durexec-hl=http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080
+
+--- arrival: 65.60 wf/s offered to 16 shard(s) [0,2,3,1,4,5,6,7,8,9,10,11,12,13,14,15] owned by [durexec-0.durexec-hl durexec-2.durexec-hl durexec-1.durexec-hl] ---
+    window 2m55s (after 5s warm-up), grace 2m0s, service floor 2.2086s
+    scheduled 11480, issued 11480, dropped 0, accepted 11632, completed 11302, rejected 176, timed out 2, errored 176
+    completed 63.94 wf/s (offered 65.60), p50 1.610s, in-flight p50 109 max 385 slope -0.32/s, lag p99 1.1ms
+    VERDICT NOT_SATURATED: p50 was 1.610s, not more than 5% above the declared 2.209s service floor: the engine drained its queue and was waiting for work, so 63.94 wf/s is a LOWER BOUND on capacity, not a measurement of it; NOTE p50 is 27% BELOW the declared floor, so the declared floor does not describe this deployment: recalibrate it at a low rate before trusting verdicts
+    first error: after 6 routing attempts: POST /v1/workflows: 409 NotOwner, shard currently unowned
+
+NFR    METRIC                               VALUE                                                                                            TARGET                                VERDICT      KIND
+---    ------                               -----                                                                                            ------                                -------      ----
+NFR-5  saturation_verdict @16shard@65.6rps  NOT_SATURATED                                                                                    -                                     NO EVIDENCE  derived
+NFR-5  completed_per_sec @16shard@65.6rps   63.943 wf/s                                                                                      no absolute target; NFR-5 is a ratio  NO EVIDENCE  measured
+-      offered_per_sec @16shard@65.6rps     65.600 wf/s                                                                                      -                                     -            measured
+-      accounting @16shard@65.6rps          11480/11480/11632/11302/176/2/176 scheduled/issued/accepted/completed/rejected/timedout/errored  -                                     -            measured
+-      generator_lag_p99 @16shard@65.6rps   0.0011 s                                                                                         -                                     -            measured
+-      in_flight_slope @16shard@65.6rps     -0.319 wf/s                                                                                      -                                     -            measured
+NFR-5  latency_p50 @16shard@65.6rps         1.6097 s                                                                                         -                                     -            measured
+NFR-5  latency_p95 @16shard@65.6rps         3.3364 s                                                                                         -                                     -            measured
+NFR-5  latency_p99 @16shard@65.6rps         6.6081 s                                                                                         -                                     -            measured
+
+notes
+  saturation_verdict @16shard@65.6rps p50 was 1.610s, not more than 5% above the declared 2.209s service floor: the engine drained its queue and was waiting for work, so 63.94 wf/s is a LOWER BOUND on capacity, not a measurement of it; NOTE p50 is 27% BELOW the declared floor, so the declared floor does not describe this deployment: recalibrate it at a low rate before trusting verdicts
+  completed_per_sec @16shard@65.6rps shards 0,2,3,1,4,5,6,7,8,9,10,11,12,13,14,15 owned by 3 node(s): [durexec-0.durexec-hl durexec-2.durexec-hl durexec-1.durexec-hl]; verdict NOT_SATURATED — p50 was 1.610s, not more than 5% above the declared 2.209s service floor: the engine drained its queue and was waiting for work, so 63.94 wf/s is a LOWER BOUND on capacity, not a measurement of it; NOTE p50 is 27% BELOW the declared floor, so the declared floor does not describe this deployment: recalibrate it at a low rate before trusting verdicts
+  offered_per_sec @16shard@65.6rps   asked for 65.600/s; 11480 scheduled, 11480 issued, 0 dropped (an arrival with no free generator worker is dropped, never queued)
+  accounting @16shard@65.6rps        0 reached a terminal status other than COMPLETED; 11190 of the 11302 completions finished inside the window and only those count as throughput, the rest drained during the 120.000s grace period
+  generator_lag_p99 @16shard@65.6rps p50 336us, max 6.4ms; the gap between an arrival's due time and its actual start. A generator that cannot keep its schedule is measuring itself
+  in_flight_slope @16shard@65.6rps   in-flight p50 109, max 385, sampled every 100ms. A positive slope means the queue was still growing when the window closed
+  latency_p50 @16shard@65.6rps       11302 samples; declared service floor 2.209s; a p50 on the floor means the engine was idling, not saturated
+  latency_p99 @16shard@65.6rps       11302 samples
+
+how to read the 'kind' column
+  measured      an observation taken from the running cluster in this run
+  derived       arithmetic over this run's measurements (a ratio, a percentile)
+  assumed       a value this tool was told, not something it checked
+  not-measured  this run produced no evidence; the target column still shows
+                what the design document asks for, and the value column is empty

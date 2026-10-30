@@ -1,0 +1,9 @@
+run_id=20261030T212046Z scenario=freeze trial=1 victim=durexec-1 git=62264f725efd2752f6cc5762deb26f58a6a8d57b image=cf986fb
+load: 65.6 wf/s for 180s (job loadgen-fault-20261030t212046z)
+t_inject=1793395283061 shards=3,5,6,7,9,10,11,12,13 tokens=5;5;5;5;5;5;5;5;5
+mark 1793395283316 freeze durexec-1
+Warning: metadata.name: this is used in the Pod's hostname, which can result in surprising behavior; a DNS label is recommended: [must not contain dots]
+Warning: metadata.name: this is used in the Pod's hostname, which can result in surprising behavior; a DNS label is recommended: [must not contain dots]
+mark 1793395327987 thaw durexec-1
+t_expire=12580 t_claim=47699 t_progress=2
+verdict=ok
