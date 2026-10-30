@@ -1,0 +1,25 @@
+5309624|13460950.8ms|2.535ms|SELECT fencing_token FROM shard_leases WHERE shard_id = $1 FOR UPDATE
+1495770|4144132.4ms|2.771ms|SELECT fencing_token FROM shard_leases WHERE shard_id = $1 FOR UPDATE
+1474134|2015393.7ms|1.367ms|SELECT fencing_token FROM shard_leases WHERE shard_id = $1 FOR UPDATE
+10487165|1518616.1ms|0.145ms|WITH pick AS ( SELECT shard_id, task_id FROM tasks WHERE shard_id=$1 AND task_type=$2 AND GREATEST(visible_at, COALESCE(locked_until, $4::timestam
+1393811|1191822.3ms|0.855ms|SELECT fencing_token FROM shard_leases WHERE shard_id = $1 FOR UPDATE
+398247|1165072.7ms|2.926ms|SELECT fencing_token FROM shard_leases WHERE shard_id = $1 FOR UPDATE
+1318891|977393.8ms|0.741ms|SELECT fencing_token FROM shard_leases WHERE shard_id = $1 FOR UPDATE
+21712477|681127.4ms|0.031ms|SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at FROM executions WHERE shard_id = $1 AND workflow_id = $2
+3218720|569353.5ms|0.177ms|WITH pick AS ( SELECT shard_id, task_id FROM tasks WHERE shard_id=$1 AND task_type=$2 AND GREATEST(visible_at, COALESCE(locked_until, $4::timestam
+29267533|375826.0ms|0.013ms|SELECT shard_id, COALESCE(owner_node, $2), fencing_token, expires_at FROM shard_leases WHERE shard_id = $1
+4827132|365498.0ms|0.076ms|SELECT shard_id, workflow_id, run_id::text, seq, event_type, payload, created_at FROM events WHERE shard_id = $1 AND workflow_id = $2 AND run_id = $3 ORDER 
+3044370|362810.4ms|0.119ms|WITH pick AS ( SELECT shard_id, task_id FROM tasks WHERE shard_id=$1 AND task_type=$2 AND GREATEST(visible_at, COALESCE(locked_until, $4::timestam
+2811980|322193.3ms|0.115ms|WITH pick AS ( SELECT shard_id, task_id FROM tasks WHERE shard_id=$1 AND task_type=$2 AND GREATEST(visible_at, COALESCE(locked_until, $4::timestam
+5792311|286988.8ms|0.050ms|INSERT INTO events (shard_id, workflow_id, run_id, seq, event_type, payload, created_at) VALUES ($1, $2, $3::uuid, $4, $5, $6::jsonb, COALESCE($7, now()))
+5309610|271698.5ms|0.051ms|UPDATE executions SET status = COALESCE(NULLIF($3, $5), status), last_seq = GREATEST(executions.last_seq, $4), updated_at = now() WHERE shard_
+4826924|233743.5ms|0.048ms|INSERT INTO tasks (shard_id, task_type, workflow_id, run_id, scheduled_event_seq, visible_at) VALUES ($1, $2, $3, $4::uuid, $5, COALESCE($6, now()))
+2505866|232689.5ms|0.093ms|WITH pick AS ( SELECT shard_id, task_id FROM tasks WHERE shard_id=$1 AND task_type=$2 AND GREATEST(visible_at, COALESCE(locked_until, $4::timestam
+6672361|185606.9ms|0.028ms|SELECT shard_id, COALESCE(owner_node, $2), fencing_token, expires_at FROM shard_leases WHERE shard_id = $1
+4826913|161399.0ms|0.033ms|DELETE FROM tasks WHERE shard_id = $1 AND task_id = $2
+5053355|147970.7ms|0.029ms|SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at FROM executions WHERE shard_id = $1 AND workflow_id = $2
+5084120|147089.8ms|0.029ms|SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at FROM executions WHERE shard_id = $1 AND workflow_id = $2
+4908860|144841.5ms|0.030ms|SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at FROM executions WHERE shard_id = $1 AND workflow_id = $2
+4670572|123148.9ms|0.026ms|SELECT shard_id, workflow_id, run_id::text, workflow_type, status, last_seq, created_at FROM executions WHERE shard_id = $1 AND workflow_id = $2
+6526448|103588.3ms|0.016ms|SELECT shard_id, COALESCE(owner_node, $2), fencing_token, expires_at FROM shard_leases WHERE shard_id = $1
+1359790|98883.6ms|0.073ms|SELECT shard_id, workflow_id, run_id::text, seq, event_type, payload, created_at FROM events WHERE shard_id = $1 AND workflow_id = $2 AND run_id = $3 ORDER 

@@ -1,0 +1,7 @@
+campaign    : campaign3-before-faults
+collected_at: 20261030T202828Z
+context     : arn:aws:eks:us-east-1:<ACCT>:cluster/durexec-bench
+namespace   : durexec-lab
+git_sha     : 0a343902
+git_tree    : clean
+aws_identity: arn:aws:sts::<ACCT>:assumed-role/durexec-bench-operator/i-079bac0ce945144bc

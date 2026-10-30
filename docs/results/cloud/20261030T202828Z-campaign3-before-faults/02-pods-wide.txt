@@ -1,0 +1,5 @@
+NAME            READY   STATUS    RESTARTS   AGE     IP            NODE                          NOMINATED NODE   READINESS GATES
+durexec-0       1/1     Running   0          12m     10.91.0.239   ip-10-91-0-39.ec2.internal    <none>           <none>
+durexec-1       1/1     Running   0          12m     10.91.0.122   ip-10-91-0-67.ec2.internal    <none>           <none>
+durexec-2       1/1     Running   0          12m     10.91.0.35    ip-10-91-0-43.ec2.internal    <none>           <none>
+durexec-probe   1/1     Running   0          4h51m   10.91.0.41    ip-10-91-0-252.ec2.internal   <none>           <none>

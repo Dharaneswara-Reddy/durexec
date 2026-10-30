@@ -65,3 +65,11 @@ check_pod() { PATH="$tmp/kbin:$PATH" NS=durexec-lab bash -c '
 check_pod durexec-1 || { echo "FAIL: engine_pod rejects a real engine pod"; exit 1; }
 if check_pod other 2>/dev/null; then echo "FAIL: engine_pod accepts a non-engine pod"; exit 1; fi
 echo "fault injector engine-pod check self-test: PASS"
+
+# Campaign 3: busybox `pgrep -x engined` never matched /engined, so no kill or
+# freeze was injected; and drain's cleanup resolved the node through the
+# evicted (Pending) pod, leaving the node cordoned. Neither may return.
+if grep -n 'pgrep -x engined' scripts/aws/eks_fault.sh; then echo "FAIL: pgrep -x cannot find /engined under busybox"; exit 1; fi
+grep -q 'drain)     "$FAULT" uncordon "$VNODE"' scripts/aws/eks_fault_trial.sh \
+  || { echo "FAIL: drain cleanup must uncordon the node recorded before injection"; exit 1; }
+echo "fault injector process lookup and drain cleanup self-test: PASS"

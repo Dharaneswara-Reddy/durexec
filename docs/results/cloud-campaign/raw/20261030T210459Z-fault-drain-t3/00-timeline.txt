@@ -1,0 +1,2 @@
+run_id=20261030T210459Z scenario=drain trial=3 victim=durexec-0 git=0a34390296ce2248d752cd81b99a40c15ed9f402 image=cf986fb
+verdict=INVALID_ring_not_healthy_before_start (not started)

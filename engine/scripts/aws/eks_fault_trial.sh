@@ -148,7 +148,10 @@ heal() {
     freeze)    "$FAULT" thaw "$VICTIM" ;;
     netem)     "$FAULT" netem-clear "$VICTIM" ;;
     partition) "$FAULT" heal "$VICTIM" ;;
-    drain)     "$FAULT" uncordon "$VICTIM" ;;
+    # The node recorded before injection: after a drain the victim pod is
+    # Pending with no node, so resolving it through the pod found nothing and
+    # the node stayed cordoned (campaign 3).
+    drain)     "$FAULT" uncordon "$VNODE" ;;
   esac 2>&1 | tee -a "$RAW/00-timeline.txt"
 }
 trap 'heal; drop_job' EXIT

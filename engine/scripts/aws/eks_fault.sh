@@ -77,7 +77,10 @@ on_node() {
 signal_engined() { # pod signal
   engine_pod "$1"; local n; n=$(node_of "$1"); engine_node "$n"
   # Exactly one engined per node is guaranteed by required anti-affinity; refuse otherwise.
-  on_node "$n" "$DEBUG_IMAGE" "c=\$(pgrep -x engined | wc -l); [ \"\$c\" = 1 ] || { echo \"found \$c engined\"; exit 3; }; kill -$2 \$(pgrep -x engined)"
+  # pidof, not `pgrep -x`: busybox's pgrep -x compares against the full
+  # command line ("/engined"), so it found nothing and every kill/freeze
+  # failed (campaign 3); pidof matches the process name, verified on the node.
+  on_node "$n" "$DEBUG_IMAGE" "p=\$(pidof engined); c=\$(echo \$p | wc -w); [ \"\$c\" = 1 ] || { echo \"found \$c engined\"; exit 3; }; kill -$2 \$p"
 }
 
 policy_name() { echo "durexec-fault-deny-db-$1"; }
