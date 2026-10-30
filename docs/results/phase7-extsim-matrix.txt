@@ -1,0 +1,84 @@
+========================================================================
+durexec Phase 7 — external-effect failure matrix   2026-10-27T17:27:56+05:30
+commit=fde6ae096ccb4f4d1e12650fe3cfc0f3ac49c2ac
+engine image=durexec-engine:phase7
+RESUME: OUT=/home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/docs/results/phase7-extsim-matrix.txt /home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/experiments/scripts/extsim-matrix.sh <scenario|all>
+========================================================================
+
+---- A. ambiguous outcome: effect lands, response discarded (wf=p7-ambiguous-1793102276) ----
+  start http=201
+  fault confirmed fired : simulator Injected=1 (expect >=1)
+  LEDGER (separate process, survives engine death):
+    counters            : {"Requests":2,"Performed":1,"Replayed":1,"Unkeyed":0,"Injected":1}
+    (ledger unreadable)
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=COMPLETED
+    ActivityTaskScheduled=1 Completed=1 Failed=0 dup(run_id,seq)=0
+
+---- B. transient failure before the effect, twice (wf=p7-transient-1793102323) ----
+  start http=201
+  fault confirmed fired : simulator Injected=2 (expect 2)
+  LEDGER (separate process, survives engine death):
+    counters            : {"Requests":3,"Performed":1,"Replayed":0,"Unkeyed":0,"Injected":2}
+    (ledger unreadable)
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=COMPLETED
+    ActivityTaskScheduled=1 Completed=1 Failed=0 dup(run_id,seq)=0
+
+---- C. journaled, then crash before task ack (wf=p7-journaled-1793102389) ----
+  start http=201
+  fault confirmed fired : engine crash lines=1 (expect >=1)
+  LEDGER (separate process, survives engine death):
+    counters            : {"Requests":1,"Performed":1,"Replayed":0,"Unkeyed":0,"Injected":0}
+    (ledger unreadable)
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=COMPLETED
+    ActivityTaskScheduled=1 Completed=1 Failed=0 dup(run_id,seq)=0
+
+---- D. crash before the operation is ever invoked (wf=p7-noinvoke-1793102462) ----
+  start http=500 (expect 500: the creation was abandoned)
+  fault confirmed fired : start returned 500
+  LEDGER (separate process, survives engine death):
+    counters            : {"Requests":0,"Performed":0,"Replayed":0,"Unkeyed":0,"Injected":0}
+    (ledger unreadable)
+  ENGINE durable state:
+    executions=0 events=0 tasks_pending=0 status=-
+    ActivityTaskScheduled=0 Completed=0 Failed=0 dup(run_id,seq)=0
+
+---- E. later step fails after the effect landed (wf=p7-saga-1793102503) ----
+  start http=201
+  fault confirmed fired : n/a (no fault injected; the workflow fails itself)
+  LEDGER (separate process, survives engine death):
+    counters            : {"Requests":1,"Performed":1,"Replayed":0,"Unkeyed":0,"Injected":0}
+    (ledger unreadable)
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=FAILED
+    ActivityTaskScheduled=1 Completed=1 Failed=0 dup(run_id,seq)=0
+  compensation events for this run: 0
+  NOTE: ExternalPayment registers no compensation (see PayDefinition).
+        A refund is itself an external effect needing its own dedup key,
+        and the relationship between an effect key and its compensation
+        key is a design question this engine has not answered.
+
+---- F. task claim expires while the operation is in flight (wf=p7-lockexpiry-1793102568, TASK_LOCK=30s) ----
+  start http=201
+  fault confirmed fired : simulator Injected=1 (hang armed)
+  LEDGER (separate process, survives engine death):
+    counters            : {"Requests":2,"Performed":1,"Replayed":1,"Unkeyed":0,"Injected":1}
+    (ledger unreadable)
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=COMPLETED
+    ActivityTaskScheduled=1 Completed=1 Failed=0 dup(run_id,seq)=0
+
+---- G. SIGKILL the owner while the effect is in flight (wf=p7-killmid-1793102694) ----
+  start http=201
+  ledger before the kill: {"Requests":2,"Performed":1,"Replayed":1,"Unkeyed":0,"Injected":1}
+  shard owner=durexec-1.durexec-hl -> killing pod durexec-1 with a node-level SIGKILL
+  SIGKILLed container 1321fa78de70
+  fault confirmed fired : SIGKILL delivered to durexec-1 (container 1321fa78de70)
+  LEDGER (separate process, survives engine death):
+    counters            : {"Requests":2,"Performed":1,"Replayed":1,"Unkeyed":0,"Injected":1}
+    (ledger unreadable)
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=COMPLETED
+    ActivityTaskScheduled=1 Completed=1 Failed=0 dup(run_id,seq)=0

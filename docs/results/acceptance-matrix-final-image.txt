@@ -1,0 +1,245 @@
+Acceptance matrix, run on the FINAL image — the one that also carries the two
+"green but wrong" fixes (the lease-row-deleting test, and /healthz reporting
+owned_shards=16 on every node). See green-but-wrong-findings.txt.
+
+Does NOT replace docs/results/acceptance-matrix.txt or
+acceptance-matrix-after-liveness-fix.txt. This run exists because the API
+changed between them: /healthz gained a cluster_shards field and owned_shards
+started being measured rather than assumed, and cmd/acceptance reads /healthz.
+The point is to show that no FR, NFR or C row moved.
+
+resume: cd engine && go run ./cmd/acceptance -inject -csv ../docs/results/acceptance-matrix-final-image.csv
+
+acceptance: asking 3 node(s) for /healthz
+acceptance: 3 of 3 node(s) healthy
+acceptance: starting DeliveryOrder acceptance-delivery-20261019T181857-4ffb (durable sleep 2s)
+acceptance: starting TravelAgent acceptance-agent-20261019T181857-4ffb and sending HumanApproval immediately
+acceptance: starting acceptance-compensate-20261019T181857-4ffb and arming a failure on DispatchDriver (-inject)
+acceptance: waiting up to 1m30s for the driven workflows to finish
+acceptance: reading the event log (up to 500000 rows)
+Acceptance matrix  run 20261019T181857-4ffb  cluster http://localhost:8081,http://localhost:8082,http://localhost:8083
+
+FUNCTIONAL REQUIREMENTS
+ID      OUTCOME  REQUIREMENT
+------  -------  --------------------------------------------
+FR-1    MANUAL   Immutable ordered event before acting
+                 measured: seq runs 1..n with no gap, repeat or backward step in all 11778 runs
+                           (141370 events). Necessary, not the byte-identical-replay-after-kill
+                           condition; this tool kills nothing.
+                 to do:    kill the owning node mid-workflow (make kill-owner), let the run
+                           finish, and check GET /v1/workflows/{id}/history before and after the
+                           kill agree event for event; replay determinism is unit-tested in
+                           internal/bench/replay_test.go (TestReplayIsDeterministic)
+FR-2    MANUAL   Resume crashed run, no step re-run
+                 measured: C-2: 0 steps completed twice across 11778 runs; fencing tokens record
+                           at least 1232 ownership changes, but this tool did not kill anything
+                           itself.
+                 to do:    kill a node mid-workflow (make kill-owner) and re-run this tool; not
+                           re-running a completed step on replay is unit-tested in
+                           internal/workflow/dispatcher_test.go
+                           (TestSideEffectNotReinvokedOnReplay)
+FR-3    BLOCKED  Retry with backoff + non-retryable class
+                 measured: most failures before one success on any step: 0, across 11778 runs
+                 needs:    a step in history that failed at least 3 times and then succeeded
+                           (POST /v1/admin/fail-step with attempts=3 on a FAULT_INJECTION node);
+                           backoff itself is unit-tested (TestBackoffCeilingGrowsAndIsBounded)
+FR-4    MANUAL   Durable sleep, no thread held
+                 measured: C-6 PASS: 1 timer(s) fired in completed runs (the driven run
+                           acceptance-delivery-20261019T181857-4ffb), none early; e.g. shard 8 /
+                           acceptance-delivery-20261019T181857-4ffb / run b8c76c4a k=3 asked
+                           2.0s, fired after 3.3s. This tool does not restart the cluster.
+                 to do:    start a workflow with a 2-minute sleep, restart the whole cluster
+                           during the sleep (make down && make up), and confirm TimerFired is
+                           journaled and the run completes
+FR-5    PASS     External signals incl. human approval
+                 measured: HumanApproval journaled at seq 2, before the last pre-wait step
+                           completed at seq 12, so before the wait began; the run later read it
+                           and completed approved=true. Buffered, not lost.
+FR-6    PASS     Sharding + consistent-hash assignment
+                 measured: 16 shards over 3 live owners (node-a=4, node-b=9, node-c=3); asked
+                           directly with no retry, each of the 3 nodes answered for
+                           acceptance-delivery-20261019T181857-4ffb (shard 8) correctly.
+FR-7    MANUAL   Automatic shard ownership transfer
+                 measured: fencing tokens show at least 1232 past ownership changes over 16
+                           shards; 3 of 3 nodes healthy now. This tool cannot kill a node.
+                 to do:    docker kill the owner of a shard (make kill-owner), wait out the 10 s
+                           lease, and confirm another node owns the shard and in-flight
+                           workflows on it finish without intervention
+FR-8    MANUAL   Fencing: stale owner cannot write
+                 measured: C-2 (REAL check): 0 steps completed twice in 11778 runs; C-1 (PK,
+                           weak): 0 duplicate keys; C-5: no token decrease; fencing tokens show
+                           at least 1232 ownership changes; fencing_rejections_total=not
+                           exported yet. Whether those changes were induced failovers under load
+                           cannot be told from here.
+                 to do:    induce 20 failovers under load (go run ./cmd/loadgen -mode
+                           duplicates, or make kill-owner 20 times) and re-run this tool;
+                           stale-token refusal is unit-tested in
+                           internal/eventlog/integration_test.go
+                           (TestCommitDecisionRejectsStaleToken)
+FR-9    MANUAL   Replication + follower promotion
+                 measured: streaming replicas on the leader: 1; standby in recovery=true, replay
+                           lag 1.0s. This tool cannot stop the leader.
+                 to do:    stop postgres-leader, promote postgres-standby (see
+                           deploy/check_replication.sh), point DATABASE_URL at it, and record
+                           recovery time over repeated trials for p50/p99
+FR-10   PASS     Saga compensation in LIFO order
+                 measured: 4 of 4 compensated runs checked, all strictly LIFO; e.g. shard 0 /
+                           loadgen-1792433862-s4-13165 / run dcc52938: [CancelRestaurantOrder
+                           ReleaseInventory RefundPayment] (undoing steps k=[2 1 0], strictly
+                           decreasing).
+FR-11   MANUAL   Explicit COMPENSATING_FAILED state
+                 measured: 0 executions are COMPENSATING_FAILED in the database. Visibility in
+                           the panel is a human judgement.
+                 to do:    open the admin panel and confirm a COMPENSATING_FAILED run is shown
+                           (make one by arming fail-step, non_retryable, on RefundPayment); the
+                           status itself is unit-tested in internal/workflow/dispatcher_test.go
+                           (TestCompensationFailureIsItsOwnStatus)
+FR-12   MANUAL   Stable dedup key on every call
+                 measured: all 47128 scheduled activities carry a dedup_key (e.g. shard 0 /
+                           acceptance-delivery-20261019T094714-5c16 / run 5424592c k=0
+                           ChargePayment ->
+                           "dx1:e4e4d69ff6b580bc96b418a7bcc5d7c2587cf2a2cbf942f3d1e7559fcc45d2c8").
+                           The log holds one copy per step, so identity across replays cannot be
+                           seen here.
+                 to do:    record the keys a stub external API receives across a crash and
+                           replay and confirm they are identical; key stability is unit-tested
+                           in internal/activity/dedup_test.go (TestDedupKeyIsStable)
+FR-13   BLOCKED  Semantic repeat detected before execution
+                 measured: 8 verdicts journaled, none DUPLICATE and suppressed
+                 needs:    a DUPLICATE verdict in history (the travel agent's double-booking
+                           scenario, app/agent/fixture.go, with semantic dedup on)
+FR-14   PASS     Verdicts journaled with score+threshold
+                 measured: all 8 journaled verdicts carry similarity, tau_high, tau_low,
+                           matched_k and model; verdicts: DISTINCT=8; models:
+                           all-MiniLM-L6-v2=4, fake-hash-all-MiniLM-L6-v2=4.
+FR-15   PASS     Status + history without a read model
+                 measured: GET /v1/workflows/acceptance-delivery-20261019T181857-4ffb/history
+                           returned 12 events identical to the events table (seq, type, run,
+                           created_at, payload).
+FR-16   PASS     Two applications, one binary
+                 measured: DeliveryOrder acceptance-delivery-20261019T181857-4ffb and
+                           TravelAgent acceptance-agent-20261019T181857-4ffb both COMPLETED on
+                           the same running nodes (node-a, node-b, node-c), with no rebuild in
+                           between.
+
+NON-FUNCTIONAL REQUIREMENTS
+ID      OUTCOME  REQUIREMENT
+------  -------  --------------------------------------------
+NFR-1   MANUAL   Durability of committed work
+                 measured: 20 RUNNING executions have no queued task and no timer (a run waiting
+                           on a signal looks the same, so a human must tell them apart);
+                           executions by status: COMPLETED=11773, FAILED=4, RUNNING=20.
+                 to do:    count completed steps (ActivityTaskCompleted) before and after 20
+                           induced kills (go run ./cmd/loadgen -mode recovery) and confirm none
+                           is lost
+NFR-2   MANUAL   Recovery time after node loss
+                 measured: shard_recovery_seconds: served, no observations yet. This histogram
+                           starts when a lease has already expired, so it leaves out the
+                           up-to-10 s from the kill to expiry; it cannot be compared with the
+                           target directly.
+                 to do:    measure from the kill, over 20 kills: go run ./cmd/loadgen -mode
+                           recovery (make kill-owner between probes)
+NFR-3   MANUAL   Duplicate side effects (exact mode)
+                 measured: C-2 (REAL check): 0 steps completed twice across 11778 runs.
+                           Necessary but not sufficient: an activity that ran twice and was
+                           journaled once is invisible in the log.
+                 to do:    count real invocations at a stub external API over 1 000 runs (go run
+                           ./cmd/loadgen -mode duplicates)
+NFR-4   MANUAL   Availability gap during failover
+                 measured: configured LEASE_TTL=10s; one shard is 1/16 of workflows. The gap
+                           needs a kill, which this tool does not do.
+                 to do:    kill a shard's owner and time the window in which that shard's
+                           requests fail (go run ./cmd/loadgen -mode recovery samples
+                           /v1/shards)
+NFR-5   MANUAL   Throughput scaling 1 -> 2 shards
+                 measured: workflow_completed_total=614 across 3 node(s); throughput needs a
+                           controlled load, which this tool does not generate.
+                 to do:    run go run ./cmd/loadgen -mode scaling at 1, 2 and 4 shards and
+                           compare completed workflows per second
+NFR-6   MANUAL   Replay latency at 200 events
+                 measured: replay_duration_seconds: 13289 observations, p50 ~0.000s (bucket to
+                           0.001 s), p99 ~0.000s (bucket to 0.001 s); longest run in the table
+                           has 18 events (0 runs at 200 or more). The histogram mixes all
+                           history lengths, so it cannot state the 200-event figure.
+                 to do:    run go test ./internal/bench -run TestNFR6ReplayBudget -bench
+                           BenchmarkReplayLongHistories, which times replay at 200 events
+NFR-7   BLOCKED  Semantic check added latency
+                 measured: dedup_latency_seconds: 2 observations, p50 ~0.064s (bucket to 0.064
+                           s), p99 ~0.507s (bucket to 0.512 s)
+                 needs:    at least 100 semantic checks recorded, for a meaningful p99
+NFR-8   MANUAL   Semantic false-positive rate
+                 measured: journaled verdicts: DISTINCT=8. A false positive needs a human label,
+                           which the log does not hold.
+                 to do:    run make experiment (go run ./cmd/experiment -embedder=http) over the
+                           hand-labelled retry pairs and read the false-positive rate at
+                           tau=0.90
+NFR-9   MANUAL   Operational footprint
+                 measured: deploy/docker-compose.yml caps 7 of 7 services at mem_limit totalling
+                           2300 MB (target 3072 MB). Limits are not usage, and this tool may not
+                           ask docker what is running.
+                 to do:    on the host, run docker stats --no-stream and sum MEM USAGE over the
+                           stack's containers
+NFR-10  PASS     External dependency count
+                 measured: one external dependency, PostgreSQL. PostgreSQL: postgres-leader,
+                           postgres-standby; engine: node-a, node-b, node-c; observability
+                           (scrapes the engine, not called by it): prometheus, grafana; the only
+                           *_URL setting in the compose file is DATABASE_URL; C-10 found no
+                           broker, coordinator or consensus service in the compose file, go.mod
+                           or live /metrics.
+
+SUPPORTING CHECKS (the measurements behind the rows above)
+ID      OUTCOME  REQUIREMENT
+------  -------  --------------------------------------------
+C-1     PASS     Unique (shard,wf,run,seq) [PK: weak]
+                 measured: 0 duplicated (shard_id, workflow_id, run_id, seq) tuples in the whole
+                           events table. PRIMARY-KEY-ENFORCED, THEREFORE WEAK EVIDENCE: this
+                           cannot fail while the key exists.
+C-2     PASS     No step completed twice at one k [REAL]
+                 measured: REAL duplicate-side-effect check: 0 steps completed twice at the same
+                           k, across 11778 runs (141370 events).
+C-3     PASS     API-started workflow reaches terminal
+                 measured: DeliveryOrder acceptance-delivery-20261019T181857-4ffb (shard 8)
+                           started via [http://localhost:8081] and reached COMPLETED after 5.5s
+                           of polling.
+C-4     PASS     Shards spread over more than one node
+                 measured: 16 shards held by 3 live owners (node-a=4, node-b=9, node-c=3), read
+                           from GET /v1/shards on http://localhost:8081.
+C-5     PASS     Fencing tokens never decrease
+                 measured: 16 samples of every shard's fencing token over 6.2s (database and
+                           each node's /v1/shards); none decreased. Covers this run's window
+                           only.
+C-6     PASS     Durable timer fired in completed run
+                 measured: 1 timer(s) fired in completed runs (the driven run
+                           acceptance-delivery-20261019T181857-4ffb), none early; e.g. shard 8 /
+                           acceptance-delivery-20261019T181857-4ffb / run b8c76c4a k=3 asked
+                           2.0s, fired after 3.3s.
+C-7     PASS     Compensation LIFO, read from journal
+                 measured: 4 of 4 compensated runs checked, all strictly LIFO; e.g. shard 0 /
+                           loadgen-1792433862-s4-13165 / run dcc52938: [CancelRestaurantOrder
+                           ReleaseInventory RefundPayment] (undoing steps k=[2 1 0], strictly
+                           decreasing).
+C-8     PASS     Verdicts carry score, tau, k, model
+                 measured: all 8 journaled verdicts carry similarity, tau_high, tau_low,
+                           matched_k and model; verdicts: DISTINCT=8; models:
+                           all-MiniLM-L6-v2=4, fake-hash-all-MiniLM-L6-v2=4.
+C-9     MANUAL   Every internal/obs metric on /metrics
+                 measured: 7 of 8 metrics served by 3 node(s); missing only labelled vectors
+                           that have no series yet, which Prometheus omits until first use:
+                           fencing_rejections_total
+                 to do:    trigger the event behind each (e.g. a fencing rejection for
+                           fencing_rejections_total) and re-run
+C-10    PASS     No coordination service configured
+                 measured: none of 16 denylisted products (zookeeper, etcd, consul, kafka,
+                           rabbitmq, nats, pulsar, redis, memcached, temporal, cadence, raft,
+                           paxos, serf, chubby, curator) in deploy/docker-compose.yml (7
+                           services), go.mod (16 modules), or /metrics of 3 node(s).
+
+SUMMARY
+FR + NFR            26 rows   PASS  7   FAIL  0   MANUAL 16   BLOCKED  3
+Supporting checks   10 rows   PASS  9   FAIL  0   MANUAL  1   BLOCKED  0
+  Verified automatically (PASS/FAIL): FR-5, FR-6, FR-10, FR-14, FR-15, FR-16, NFR-10
+  Needs a person (MANUAL):           FR-1, FR-2, FR-4, FR-7, FR-8, FR-9, FR-11, FR-12, NFR-1, NFR-2, NFR-3, NFR-4, NFR-5, NFR-6, NFR-8, NFR-9
+  Could not run here (BLOCKED):      FR-3, FR-13, NFR-7
+
+CSV written to ../docs/results/acceptance-matrix-final-image.csv
+[exited with code 0]

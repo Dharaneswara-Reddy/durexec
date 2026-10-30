@@ -1,0 +1,19 @@
+23:37:55 RUN r1 n=300 duration=60.0s plan=10:stop:node-c,25:start:node-c,35:kill:node-b,50:start:node-b  (resume: same command; ids already in chaos-r1.csv are skipped)
+23:38:05 CHAOS t=10.0s docker stop node-c
+23:38:20 CHAOS t=25.0s docker start node-c
+23:38:30 CHAOS t=35.0s docker kill node-b
+23:38:45 CHAOS t=50.0s docker start node-b
+23:38:55 submission and chaos finished; waiting for cluster to settle
+23:38:55 live lease rows: 16/16
+23:39:03 SUMMARY run=r1 (recomputed from chaos-r1.csv and the live DB)
+23:39:03   submitted ids in CSV              300
+23:39:03   accepted by client (HTTP 200/201) 288   (31 needed a retry)
+23:39:03   never accepted (10 attempts)      12
+23:39:03   execution status in DB            COMPLETED|288
+23:39:03   ORPHANS (RUNNING, last_seq=0)     0
+23:39:03   stuck RUNNING with history        0
+23:39:03   accepted but no DB row            0 []
+23:39:03   never-accepted but DB row exists  0 []
+23:39:03   ActivityTaskCompleted total       1152
+23:39:03   duplicate (shard,wf,run,k)        0
+23:39:03   COMPLETED runs with !=4 activities 0

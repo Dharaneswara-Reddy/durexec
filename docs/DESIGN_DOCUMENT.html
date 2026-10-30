@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  /* mirrors the tiny reset the Artifact host applies, so the local file
+     and the published page render identically */
+  :root{color-scheme:light}
+  body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;background:#faf9f7}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+<title>Sharded Durable Execution Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Spectral:wght@500;600&display=swap">
+
+<style>
+:root{
+  --ground:#F5F8F7; --surface:#FFFFFF; --surface-2:#EDF2F0; --sunk:#E4EBE9;
+  --ink:#0F1E1B; --ink-2:#31433F; --muted:#5F726E; --faint:#8A9B97;
+  --rule:#D6E1DD; --rule-2:#BDCCC7;
+  --teal:#0A5D5A; --teal-2:#0A5D5A; --teal-soft:#DFEDEA;
+  --amber:#95500F; --amber-soft:#FAE7D2;
+  --crit:#8B2A2A; --crit-soft:#F7E2E2; --ok:#1C6440;
+  --shadow:0 1px 2px rgba(15,30,27,.05), 0 8px 24px -14px rgba(15,30,27,.18);
+  --dg-ink:#101E1C; --dg-mut:#61736F; --dg-rul:#CFDCD8; --dg-sur:#FFFFFF; --dg-bg:#FFFFFF;
+  --dg-tea:#0A5D5A; --dg-teas:#DFEDEA; --dg-amb:#95500F; --dg-ambs:#FAE7D2;
+  --dg-sla:#4C5F6B; --dg-slas:#E9EEF1; --dg-crt:#8B2A2A; --dg-crts:#F7E2E2;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1615; --surface:#141F1D; --surface-2:#1A2624; --sunk:#101A18;
+    --ink:#E9F0ED; --ink-2:#C6D3CF; --muted:#93A5A1; --faint:#6F817D;
+    --rule:#26332F; --rule-2:#33443F;
+    --teal:#63C4B7; --teal-2:#63C4B7; --teal-soft:#11302D;
+    --amber:#E0A162; --amber-soft:#33240F;
+    --crit:#E58E8E; --crit-soft:#331C1C; --ok:#6CC292;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -16px rgba(0,0,0,.7);
+    --dg-ink:#E9F0ED; --dg-mut:#93A5A1; --dg-rul:#2E3F3A; --dg-sur:#182422; --dg-bg:#141F1D;
+    --dg-tea:#63C4B7; --dg-teas:#11302D; --dg-amb:#E0A162; --dg-ambs:#33240F;
+    --dg-sla:#93A9B3; --dg-slas:#1B2A2E; --dg-crt:#E58E8E; --dg-crts:#331C1C;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1615; --surface:#141F1D; --surface-2:#1A2624; --sunk:#101A18;
+  --ink:#E9F0ED; --ink-2:#C6D3CF; --muted:#93A5A1; --faint:#6F817D;
+  --rule:#26332F; --rule-2:#33443F;
+  --teal:#63C4B7; --teal-2:#63C4B7; --teal-soft:#11302D;
+  --amber:#E0A162; --amber-soft:#33240F;
+  --crit:#E58E8E; --crit-soft:#331C1C; --ok:#6CC292;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -16px rgba(0,0,0,.7);
+  --dg-ink:#E9F0ED; --dg-mut:#93A5A1; --dg-rul:#2E3F3A; --dg-sur:#182422; --dg-bg:#141F1D;
+  --dg-tea:#63C4B7; --dg-teas:#11302D; --dg-amb:#E0A162; --dg-ambs:#33240F;
+  --dg-sla:#93A9B3; --dg-slas:#1B2A2E; --dg-crt:#E58E8E; --dg-crts:#331C1C;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:'IBM Plex Sans',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--teal-soft); color:var(--ink)}
+a{color:var(--teal); text-decoration:none; border-bottom:1px solid color-mix(in srgb,var(--teal) 35%,transparent)}
+a:hover{border-bottom-color:var(--teal)}
+:focus-visible{outline:2px solid var(--teal); outline-offset:3px; border-radius:3px}
+
+/* ------------------------------------------------ shell */
+.shell{display:grid; grid-template-columns:250px minmax(0,1fr); align-items:start}
+.rail{position:sticky; top:0; height:100vh; overflow-y:auto; padding:34px 18px 34px 30px;
+      border-right:1px solid var(--rule); background:var(--ground)}
+.railmark{font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.14em;
+      text-transform:uppercase; color:var(--faint); margin-bottom:6px}
+.railtitle{font-family:Spectral,Georgia,serif; font-size:18px; font-weight:600; line-height:1.25;
+      color:var(--ink); margin-bottom:22px; text-wrap:balance}
+.rail ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:1px}
+.rail a{display:flex; gap:10px; padding:6px 9px; border-radius:6px; border:0;
+      font-size:13.5px; color:var(--muted); line-height:1.35}
+.rail a:hover{background:var(--surface-2); color:var(--ink)}
+.rail a.on{background:var(--teal-soft); color:var(--teal); font-weight:600}
+.rail a .n{font-family:'IBM Plex Mono',monospace; font-size:11.5px; padding-top:1px; opacity:.75}
+.rail .sub a{padding-left:31px; font-size:12.5px}
+.railfoot{margin-top:26px; padding-top:16px; border-top:1px solid var(--rule);
+      font-size:11.5px; color:var(--faint); line-height:1.5}
+
+main{padding:0 0 120px}
+.col{max-width:1240px; margin:0 auto; padding:0 56px}
+.prose{max-width:72ch}
+.prose p{margin:0 0 17px}
+.prose ul,.prose ol{max-width:70ch; margin:0 0 17px; padding-left:20px}
+.prose li{margin-bottom:7px}
+.prose li::marker{color:var(--faint)}
+
+/* ------------------------------------------------ cover */
+.cover{padding:76px 0 44px; border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.18em;
+      text-transform:uppercase; color:var(--teal); font-weight:600}
+h1{font-family:Spectral,Georgia,serif; font-weight:600; font-size:clamp(34px,4.4vw,54px);
+      line-height:1.08; letter-spacing:-.015em; margin:16px 0 0; max-width:19ch; text-wrap:balance}
+.deck{font-size:19px; line-height:1.55; color:var(--ink-2); max-width:60ch; margin:20px 0 0}
+.meta{display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:1px;
+      margin-top:38px; background:var(--rule); border:1px solid var(--rule); border-radius:10px; overflow:hidden}
+.meta div{background:var(--surface); padding:13px 16px}
+.meta dt{font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.12em;
+      text-transform:uppercase; color:var(--faint); margin-bottom:4px}
+.meta dd{margin:0; font-size:13.5px; font-weight:500; color:var(--ink)}
+
+/* ------------------------------------------------ sections */
+section{scroll-margin-top:22px; padding-top:66px}
+.h2wrap{display:flex; align-items:baseline; gap:16px; padding-bottom:14px;
+      border-bottom:2px solid var(--ink); margin-bottom:30px}
+h2{font-family:Spectral,Georgia,serif; font-weight:600; font-size:31px; line-height:1.15;
+      margin:0; letter-spacing:-.01em}
+.h2n{font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; color:var(--teal)}
+h3{font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:19px; line-height:1.3;
+      margin:44px 0 12px; color:var(--ink); scroll-margin-top:22px}
+h3 .hn{font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--faint); margin-right:9px; font-weight:500}
+h4{font-size:14.5px; font-weight:600; margin:26px 0 9px; color:var(--ink)}
+.lede{font-size:17.5px; line-height:1.6; color:var(--ink-2); max-width:64ch; margin:0 0 26px}
+
+/* ------------------------------------------------ figures */
+figure{margin:30px 0 34px}
+.plate{background:var(--surface); border:1px solid var(--rule); border-radius:12px;
+      padding:22px 24px; overflow-x:auto; box-shadow:var(--shadow)}
+.plate svg{display:block; width:100%; height:auto; min-width:620px}
+figcaption{display:flex; gap:12px; margin-top:12px; font-size:13px; color:var(--muted); line-height:1.5}
+figcaption b{font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--teal); white-space:nowrap; padding-top:2px; font-weight:600}
+
+/* ------------------------------------------------ tables */
+.tw{overflow-x:auto; margin:22px 0 28px; border:1px solid var(--rule); border-radius:10px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:13.5px; min-width:560px}
+th{text-align:left; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--muted); font-weight:600;
+      padding:11px 15px; border-bottom:1px solid var(--rule-2); background:var(--surface-2); white-space:nowrap}
+td{padding:11px 15px; border-bottom:1px solid var(--rule); vertical-align:top; line-height:1.5}
+tr:last-child td{border-bottom:0}
+td code{font-size:12.5px}
+.num{font-variant-numeric:tabular-nums; white-space:nowrap}
+.idc{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--teal); font-weight:500; white-space:nowrap}
+
+/* ------------------------------------------------ code */
+code{font-family:'IBM Plex Mono',monospace; font-size:.885em; background:var(--surface-2);
+      padding:1.5px 5px; border-radius:4px; color:var(--ink)}
+pre{margin:20px 0 26px; background:var(--sunk); border:1px solid var(--rule); border-radius:10px;
+      padding:17px 20px; overflow-x:auto; line-height:1.62}
+pre code{background:none; padding:0; font-size:12.8px; color:var(--ink-2); display:block}
+.cap{font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+      color:var(--faint); margin:24px 0 -12px; font-weight:600}
+
+/* ------------------------------------------------ callouts */
+.note{border-left:3px solid var(--teal); background:var(--teal-soft); padding:15px 20px;
+      border-radius:0 8px 8px 0; margin:24px 0; font-size:14.5px; line-height:1.58; max-width:74ch}
+.note.warn{border-left-color:var(--amber); background:var(--amber-soft)}
+.note.stop{border-left-color:var(--crit); background:var(--crit-soft)}
+.note b{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.11em;
+      text-transform:uppercase; margin-bottom:6px}
+.note.warn b{color:var(--amber)} .note b{color:var(--teal)} .note.stop b{color:var(--crit)}
+
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(272px,1fr)); gap:14px; margin:24px 0 28px}
+.card{background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:17px 19px}
+.card h5{margin:0 0 7px; font-size:14px; font-weight:600}
+.card p{margin:0; font-size:13.5px; color:var(--muted); line-height:1.55}
+.card .k{font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.1em;
+      text-transform:uppercase; color:var(--teal); display:block; margin-bottom:8px; font-weight:600}
+
+/* ------------------------------------------------ roadmap */
+.gantt{margin:26px 0 10px; border:1px solid var(--rule); border-radius:10px;
+      background:var(--surface); overflow-x:auto}
+.ginner{min-width:720px; padding:18px 22px 22px}
+.gh{display:grid; grid-template-columns:180px repeat(8,1fr); gap:0; margin-bottom:10px}
+.gh span{font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.06em;
+      color:var(--faint); text-align:center; font-weight:600}
+.gh span:first-child{text-align:left}
+.grow{display:grid; grid-template-columns:180px repeat(8,1fr); align-items:center;
+      gap:0; padding:4px 0; border-top:1px solid var(--rule)}
+.glabel{font-size:12.5px; font-weight:500; padding-right:12px; line-height:1.35}
+.glabel small{display:block; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--faint); font-weight:400}
+.gbar{grid-row:1; height:19px; border-radius:5px; background:var(--teal-soft);
+      border:1px solid var(--teal); display:flex; align-items:center; justify-content:center}
+.gbar.key{background:var(--teal); border-color:var(--teal)}
+.gbar.key i{font-style:normal; font-family:'IBM Plex Mono',monospace; font-size:9.5px;
+      color:var(--surface); font-weight:600; letter-spacing:.06em}
+.gbar.soft{background:var(--surface-2); border-color:var(--rule-2)}
+
+/* ------------------------------------------------ misc */
+.pill{display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600;
+      letter-spacing:.07em; padding:2.5px 8px; border-radius:20px; border:1px solid; white-space:nowrap}
+.pill.t{color:var(--teal); border-color:var(--teal); background:var(--teal-soft)}
+.pill.a{color:var(--amber); border-color:var(--amber); background:var(--amber-soft)}
+.pill.c{color:var(--crit); border-color:var(--crit); background:var(--crit-soft)}
+.pill.m{color:var(--muted); border-color:var(--rule-2); background:var(--surface-2)}
+.rule{border:0; border-top:1px solid var(--rule); margin:52px 0 0}
+.endcap{margin-top:60px; padding:30px 34px; border:1px solid var(--teal); border-radius:12px;
+      background:var(--teal-soft)}
+.endcap h3{margin-top:0}
+
+@media (max-width:1020px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static; height:auto; border-right:0; border-bottom:1px solid var(--rule); padding:26px 30px}
+  .rail ol{flex-direction:row; flex-wrap:wrap; gap:5px}
+  .rail .sub{display:none}
+  .col{padding:0 30px}
+  h1{font-size:34px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="rail" aria-label="Contents">
+  <div class="railmark">Design Document</div>
+  <div class="railtitle">Sharded Durable Execution Engine</div>
+  <ol id="toc">
+    <li><a href="#s1"><span class="n">1</span><span>Summary &amp; Scope</span></a></li>
+    <li class="sub"><a href="#s1-2"><span>Requirements</span></a></li>
+    <li><a href="#s2"><span class="n">2</span><span>Architecture (HLD)</span></a></li>
+    <li class="sub"><a href="#s2-2"><span>Topology</span></a></li>
+    <li class="sub"><a href="#s2-3"><span>Sharding</span></a></li>
+    <li class="sub"><a href="#s2-4"><span>Failure model</span></a></li>
+    <li class="sub"><a href="#s2-5"><span>Technology stack</span></a></li>
+    <li><a href="#s3"><span class="n">3</span><span>Component Design (LLD)</span></a></li>
+    <li class="sub"><a href="#s3-2"><span>The task loop</span></a></li>
+    <li class="sub"><a href="#s3-3"><span>Data model</span></a></li>
+    <li class="sub"><a href="#s3-4"><span>Semantic idempotency</span></a></li>
+    <li class="sub"><a href="#s3-5"><span>API surface</span></a></li>
+    <li><a href="#s4"><span class="n">4</span><span>Infrastructure</span></a></li>
+    <li><a href="#s5"><span class="n">5</span><span>Roadmap</span></a></li>
+    <li><a href="#s6"><span class="n">6</span><span>Implementation Findings</span></a></li>
+    <li class="sub"><a href="#s6-1"><span>Hash ring defect</span></a></li>
+    <li class="sub"><a href="#s6-2"><span>Task queue starvation</span></a></li>
+    <li class="sub"><a href="#s6-3"><span>Migration race</span></a></li>
+    <li class="sub"><a href="#s6-4"><span>Connection pool sizing</span></a></li>
+    <li class="sub"><a href="#s6-5"><span>Standby never replicating</span></a></li>
+    <li class="sub"><a href="#s6-6"><span>Failover demonstration</span></a></li>
+    <li class="sub"><a href="#s6-7"><span>Limitation: no rebalance on recovery</span></a></li>
+    <li><a href="#s7"><span class="n">7</span><span>Awaiting Approval</span></a></li>
+  </ol>
+  <div class="railfoot">Revision B · 21 September 2026<br>Status: build in progress — core engine, sharding, leases, gateway forwarding and semantic idempotency all running end to end; a live fault-injection run has met the P3/P8 exit condition (§6.6)<br>Supersedes Revision A (5 September 2026), amended against the running implementation.</div>
+</nav>
+
+<main>
+<div class="col">
+
+<header class="cover">
+  <div class="eyebrow">Architecture &amp; System Design · Revision B</div>
+  <h1>A durable execution engine that fits in one database</h1>
+  <p class="deck">Long-running workflows that survive machine failure, split across shards, with
+  no coordination service — and a duplicate-action check that understands meaning, not just text.
+  <em>Revision B: reconciled against the running implementation — see §6 and §7.</em></p>
+  <dl class="meta">
+    <div><dt>Author</dt><dd>Team BL.EN.U4AID23</dd></div>
+    <div><dt>Guide</dt><dd>Dr. K Dinesh Kumar</dd></div>
+    <div><dt>Phase</dt><dd>Build — in progress</dd></div>
+    <div><dt>Build window</dt><dd class="num">8 weeks</dd></div>
+    <div><dt>Language</dt><dd>Go 1.22 · PostgreSQL 16</dd></div>
+    <div><dt>Status</dt><dd>Core engine running; five defects found and fixed; failover demonstrated live</dd></div>
+  </dl>
+</header>
+
+<!-- ===================================================== 1 -->
+<section id="s1">
+  <div class="h2wrap"><span class="h2n">01</span><h2>Executive Summary &amp; Scope</h2></div>
+
+  <h3 id="s1-1"><span class="hn">1.1</span>What the system does</h3>
+  <p class="lede">A workflow is a business process made of several steps that must all happen —
+  taking a payment, reserving stock, telling a restaurant, dispatching a driver. It can run for
+  seconds or for days. This engine makes sure such a process finishes correctly even when the
+  machine running it dies halfway through.</p>
+
+  <div class="prose">
+  <p>The mechanism is simple to state. Every decision a workflow makes is written to an append-only
+  log in PostgreSQL before anything else happens. If the machine running that workflow disappears,
+  another machine reads the log back, re-runs the workflow code against it, and arrives at exactly
+  the point the old machine had reached. Steps that already finished return their recorded answer
+  instead of running a second time.</p>
+
+  <p>Two properties make this more than a retry loop. First, work is split across a fixed number of
+  <em>shards</em>, so adding a machine adds capacity. Second, ownership of each shard is decided by a
+  renewable lease held in a database row rather than by an external coordination service such as
+  ZooKeeper — which means the whole system has exactly one dependency.</p>
+
+  <p>The research contribution sits at one specific point in that flow. Before any real-world action
+  fires, the engine asks whether it has already done this. Every existing engine answers that by
+  comparing the request letter for letter. We also compare by <em>meaning</em>, which catches the case
+  that matters for AI agents: an agent that crashes and re-plans re-issues the same intention in
+  different words, and word-for-word matching lets it through.</p>
+  </div>
+
+  <h3 id="s1-2"><span class="hn">1.2</span>Scope</h3>
+  <div class="grid2">
+    <div class="card"><span class="k">In scope</span>
+      <p>Event-sourced execution with deterministic replay; consistent-hash sharding; lease-based
+      ownership with fencing; leader–follower replication; saga compensation; exact and semantic
+      idempotency; two demonstration applications on one unmodified binary; a benchmark and
+      fault-injection harness.</p></div>
+    <div class="card"><span class="k">Out of scope</span>
+      <p>Hyperscale throughput; a full Raft implementation; multi-region deployment; cross-workflow
+      transaction isolation; authentication and multi-tenancy beyond a shared secret; a visual
+      workflow builder; garbage collection of old event history.</p></div>
+  </div>
+
+  <h4>Functional requirements</h4>
+  <div class="tw"><table>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Acceptance</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">FR-1</td><td>Persist every workflow state transition as an immutable, ordered event before acting on it.</td><td>History replays byte-identically after a kill.</td></tr>
+      <tr><td class="idc">FR-2</td><td>Resume a crashed workflow from its recorded history without re-running completed steps.</td><td>Kill mid-workflow; no completed activity runs twice.</td></tr>
+      <tr><td class="idc">FR-3</td><td>Retry a failed step with configurable backoff and a non-retryable error class.</td><td>Fail 3×, succeed on 4th; log shows one success.</td></tr>
+      <tr><td class="idc">FR-4</td><td>Sleep durably for arbitrary durations without holding a thread or connection.</td><td>A 2-minute sleep survives a full cluster restart.</td></tr>
+      <tr><td class="idc">FR-5</td><td>Accept external signals, including human approval, into a running workflow.</td><td>Signal delivered before the workflow waits is buffered, not lost.</td></tr>
+      <tr><td class="idc">FR-6</td><td>Partition workflows across a fixed shard count and assign shards to nodes by consistent hashing.</td><td>16 shards over 3 nodes; gateway routes correctly.</td></tr>
+      <tr><td class="idc">FR-7</td><td>Transfer shard ownership automatically when the owning node fails.</td><td><code>docker kill</code> the owner; work resumes unattended.</td></tr>
+      <tr><td class="idc">FR-8</td><td>Prevent a node that has lost ownership from mutating shard state.</td><td>Zero duplicate events across 20 induced failovers.</td></tr>
+      <tr><td class="idc">FR-9</td><td>Replicate each shard's log to a follower and promote it on failure.</td><td>Follower promoted; recovery time recorded p50/p99.</td></tr>
+      <tr><td class="idc">FR-10</td><td>Run registered compensations in reverse order when a workflow fails partway.</td><td>History shows LIFO compensation order.</td></tr>
+      <tr><td class="idc">FR-11</td><td>Surface an explicit terminal state when compensation itself exhausts its retries.</td><td><code>COMPENSATING_FAILED</code> visible in the admin panel.</td></tr>
+      <tr><td class="idc">FR-12</td><td>Forward a stable deduplication key to every external call.</td><td>Key identical across every crash and replay.</td></tr>
+      <tr><td class="idc">FR-13</td><td>Detect a semantically equivalent repeat of an action before it executes, per activity, opt-in.</td><td>A reproducible double-booking is blocked.</td></tr>
+      <tr><td class="idc">FR-14</td><td>Journal every deduplication verdict with its score, threshold and matched call.</td><td>Any skipped action is explainable from the log alone.</td></tr>
+      <tr><td class="idc">FR-15</td><td>Expose workflow status and full history without a separate read model.</td><td>Query API returns rendered history.</td></tr>
+      <tr><td class="idc">FR-16</td><td>Run two unrelated applications on the same engine binary.</td><td>Food delivery and AI agent, no recompilation.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>Non-functional requirements</h4>
+  <p class="prose">These are the numbers the evaluation has to produce. Each one is measurable on the
+  demonstration cluster; none of them require hyperscale infrastructure to verify.</p>
+  <div class="tw"><table>
+    <thead><tr><th>ID</th><th>Attribute</th><th>Target</th><th>How it is measured</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">NFR-1</td><td>Durability of committed work</td><td class="num">Zero loss</td><td>Compare completed-step counts either side of 20 induced kills.</td></tr>
+      <tr><td class="idc">NFR-2</td><td>Recovery time after node loss</td><td class="num">p50 &lt; 6 s · p99 &lt; 15 s</td><td>Lease expiry 10 s plus replay; distribution over 20 kills.</td></tr>
+      <tr><td class="idc">NFR-3</td><td>Duplicate side effects, exact mode</td><td class="num">0 per 1 000 runs</td><td>Count real invocations at a stub external API.</td></tr>
+      <tr><td class="idc">NFR-4</td><td>Shard availability gap during failover</td><td class="num">≤ lease TTL (10 s)</td><td>Affects 1/16 of workflows; stated, not hidden.</td></tr>
+      <tr><td class="idc">NFR-5</td><td>Throughput scaling</td><td class="num">≥ 1.7× from 1→2 shards</td><td>Completed workflows per second at 1, 2, 4 shards.</td></tr>
+      <tr><td class="idc">NFR-6</td><td>Replay latency</td><td class="num">&lt; 50 ms at 200 events</td><td>Instrumented timer around history load and replay.</td></tr>
+      <tr><td class="idc">NFR-7</td><td>Added latency of the semantic check</td><td class="num">p99 &lt; 40 ms</td><td>Local embedding inference, per-check timer.</td></tr>
+      <tr><td class="idc">NFR-8</td><td>Semantic false-positive rate</td><td class="num">&lt; 2% at τ = 0.90</td><td>Hand-labelled retry pairs; the asymmetric risk.</td></tr>
+      <tr><td class="idc">NFR-9</td><td>Operational footprint</td><td class="num">&lt; 3 GB, 1 machine</td><td>Full stack under Docker Compose.</td></tr>
+      <tr><td class="idc">NFR-10</td><td>External dependencies</td><td class="num">One</td><td>PostgreSQL. No broker, no coordinator, no consensus cluster.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<!-- ===================================================== 2 -->
+<section id="s2">
+  <div class="h2wrap"><span class="h2n">02</span><h2>System Architecture</h2></div>
+
+  <h3 id="s2-1"><span class="hn">2.1</span>Pattern, and why not the alternatives</h3>
+  <p class="lede">The system is a <b>replicated, sharded monolith</b>: one Go binary, deployed three
+  times, with all coordination pushed into PostgreSQL. That choice is deliberate and worth defending
+  because the obvious alternatives are worse here.</p>
+  <div class="grid2">
+    <div class="card"><span class="k">Rejected — microservices</span>
+      <p>Splitting the gateway, scheduler, workers and lease manager into separate services would add
+      network hops inside the hot path and a service mesh to operate, while solving no problem this
+      system has. The components share one database and one failure domain by design.</p></div>
+    <div class="card"><span class="k">Rejected — serverless</span>
+      <p>Functions cannot hold a workflow coroutine across a multi-day sleep, and per-invocation
+      billing punishes exactly the long-lived, mostly-idle workloads this engine targets.</p></div>
+    <div class="card"><span class="k">Rejected — external coordinator</span>
+      <p>ZooKeeper or etcd would give correct leader election, and a second distributed system to
+      install, monitor and reason about. PostgreSQL already provides linearizable compare-and-swap,
+      which is all shard ownership needs.</p></div>
+    <div class="card"><span class="k">Chosen — database-centric</span>
+      <p>The log, the queue, the timers, the ownership record and the meaning-vectors live in one
+      transaction domain. That is what lets a workflow's entire decision commit atomically, which is
+      the property the whole design rests on.</p></div>
+  </div>
+
+  <h3 id="s2-2"><span class="hn">2.2</span>Topology</h3>
+  <figure>
+    <div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" role="img" class="dg"><defs><marker id="mk-mut" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0.6 L 9.4 5 L 0 9.4 z" fill="var(--dg-mut)"/></marker><marker id="mk-tea" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0.6 L 9.4 5 L 0 9.4 z" fill="var(--dg-tea)"/></marker></defs><rect x="28" y="96" width="200" height="234" rx="14" fill="none" stroke="var(--dg-rul)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="46" y="87" width="66.30000000000001" height="19" rx="5" fill="var(--dg-bg)"/><text x="79.15" y="100.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-mut)" text-anchor="middle" letter-spacing="1.1">CLIENTS</text><rect x="44" y="130" width="168" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="128.0" y="153.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">Order Web App</text><text x="128.0" y="171.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">a customer places</text><text x="128.0" y="186.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">a food order</text><rect x="44" y="216" width="168" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="128.0" y="239.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">AI Agent Client</text><text x="128.0" y="257.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">plan → tool call</text><text x="128.0" y="272.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">→ human approval</text><rect x="268" y="70" width="560" height="360" rx="14" fill="none" stroke="var(--dg-sla)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="286" y="61" width="259.5" height="19" rx="5" fill="var(--dg-bg)"/><text x="415.75" y="74.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-sla)" text-anchor="middle" letter-spacing="1.1">ENGINE NODE — ONE GO BINARY, RUN ×3</text><rect x="288" y="100" width="520" height="56" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="548.0" y="126.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">HTTP Gateway</text><text x="548.0" y="144.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">stateless · shard_id = fnv32(workflow_id) % 16</text><rect x="288" y="172" width="256" height="60" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="416.0" y="200.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">Lease Manager</text><text x="416.0" y="218.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">renew 3 s · acquire 5 s</text><rect x="552" y="172" width="256" height="60" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="680.0" y="200.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">Timer Scanner</text><text x="680.0" y="218.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">polls timers every 1 s</text><rect x="288" y="248" width="256" height="68" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="416.0" y="272.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">Workflow Workers ×4</text><text x="416.0" y="290.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">replay history, decide</text><text x="416.0" y="305.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">never touches the network</text><rect x="552" y="248" width="256" height="68" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="680.0" y="272.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">Activity Workers ×8</text><text x="680.0" y="290.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">perform the real action</text><text x="680.0" y="305.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">retry with backoff</text><rect x="288" y="332" width="520" height="72" rx="12" fill="var(--dg-ambs)" stroke="var(--dg-amb)" stroke-width="1.8"/><text x="548.0" y="358.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">Idempotency Gate</text><text x="548.0" y="376.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">Exact  ·  Semantic  —  runs on the workflow path,</text><text x="548.0" y="391.5" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">verdict journaled once and replayed, never recomputed</text><rect x="702.8" y="323" width="95.19999999999999" height="18" rx="9" fill="var(--dg-amb)"/><text x="750.4" y="336" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.8">CONTRIBUTION</text><rect x="868" y="96" width="344" height="234" rx="14" fill="none" stroke="var(--dg-rul)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="886" y="87" width="211.20000000000002" height="19" rx="5" fill="var(--dg-bg)"/><text x="991.6" y="100.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-mut)" text-anchor="middle" letter-spacing="1.1">OUTSIDE WORLD — IRREVERSIBLE</text><rect x="884" y="130" width="312" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="1040.0" y="161.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">Payment / Booking APIs</text><text x="1040.0" y="179.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">real money, real seats</text><rect x="884" y="216" width="312" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="1040.0" y="247.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">LLM + Embedding</text><text x="1040.0" y="265.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">never called during replay</text><line x1="232" y1="213" x2="262" y2="213" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/><text x="247" y="194" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">start</text><text x="247" y="236" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">signal</text><line x1="834" y1="213" x2="862" y2="213" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/><text x="848" y="196" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">execute</text><rect x="28" y="470" width="1184" height="212" rx="14" fill="none" stroke="var(--dg-tea)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="46" y="461" width="501.0" height="19" rx="5" fill="var(--dg-bg)"/><text x="296.5" y="474.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-tea)" text-anchor="middle" letter-spacing="1.1">DURABLE FOUNDATION — POSTGRESQL 16 + PGVECTOR · ONE DATABASE, PARTITIONED BY SHARD_ID</text><rect x="48" y="506" width="179" height="74" rx="12" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.8"/><text x="137.5" y="541.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">events</text><text x="137.5" y="559.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">append-only · truth</text><rect x="241" y="506" width="179" height="74" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="330.5" y="541.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">executions</text><text x="330.5" y="559.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">status pointer</text><rect x="434" y="506" width="179" height="74" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="523.5" y="541.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">tasks</text><text x="523.5" y="559.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">lease queue</text><rect x="627" y="506" width="179" height="74" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="716.5" y="541.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">timers</text><text x="716.5" y="559.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">durable sleep</text><rect x="820" y="506" width="179" height="74" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="909.5" y="541.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">shard_leases</text><text x="909.5" y="559.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">fencing token</text><rect x="1013" y="506" width="179" height="74" rx="12" fill="var(--dg-ambs)" stroke="var(--dg-amb)" stroke-width="1.8"/><text x="1102.5" y="541.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">activity_intents</text><text x="1102.5" y="559.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">vector(384)</text><rect x="48" y="604" width="1144" height="50" rx="10" fill="none" stroke="var(--dg-tea)" stroke-width="1.5" stroke-dasharray="7,6"/><text x="620" y="634" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="500" fill="var(--dg-tea)" text-anchor="middle">Follower replica  —  streaming WAL, promoted on failover</text><line x1="420" y1="434" x2="420" y2="500" stroke="var(--dg-tea)" stroke-width="2.4" marker-end="url(#mk-tea)" stroke-linecap="round"/><text x="432" y="456" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11.5" font-weight="600" fill="var(--dg-tea)" text-anchor="start">commit — ONE transaction</text><line x1="700" y1="500" x2="700" y2="434" stroke="var(--dg-tea)" stroke-width="2.0" marker-end="url(#mk-tea)" stroke-linecap="round" stroke-dasharray="7,5"/><text x="688" y="456" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11.5" font-weight="600" fill="var(--dg-tea)" text-anchor="end">poll · replay history</text></svg></div>
+    <figcaption><b>Fig 1</b><span>Three identical engine nodes sit on a durable foundation. Everything
+    above the line is stateless and disposable; everything below it is the truth. The idempotency
+    gate — the contribution — sits on the workflow path, not in the activity worker, for reasons
+    given in §3.4.</span></figcaption>
+  </figure>
+  <div class="prose">
+  <p>A node is one operating-system process containing a handful of goroutines: an HTTP server, one
+  lease manager, and per owned shard a timer scanner, four workflow workers and eight activity
+  workers. Each worker is a plain loop — poll, work, commit, repeat — that backs off from 10 ms to
+  1 s when the queue is empty, so an idle cluster does not hammer the database.</p>
+  <p>There is no leader among the nodes and no membership protocol between them. A node discovers
+  what it owns by reading <code>shard_leases</code>, and discovers it has lost something when a
+  transaction refuses to commit.</p>
+  </div>
+
+  <h3 id="s2-3"><span class="hn">2.3</span>Sharding and ownership</h3>
+  <figure>
+    <div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 560" role="img" class="dg"><defs></defs><text x="60" y="62" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="700" fill="var(--dg-mut)" text-anchor="start" letter-spacing="1.2">TWO MAPPINGS, DELIBERATELY SEPARATE</text><rect x="106.5" y="119" width="87.0" height="22" rx="11" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.3"/><text x="150" y="134" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-sla)" text-anchor="middle">order-8f3a</text><rect x="106.5" y="181" width="87.0" height="22" rx="11" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.3"/><text x="150" y="196" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-sla)" text-anchor="middle">order-b21c</text><rect x="106.5" y="243" width="87.0" height="22" rx="11" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.3"/><text x="150" y="258" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-sla)" text-anchor="middle">agent-77e1</text><rect x="48" y="92" width="204" height="190" rx="14" fill="none" stroke="var(--dg-rul)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="300" y="152" width="190" height="76" rx="12" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.8"/><text x="395.0" y="188.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">fnv32 % 16</text><text x="395.0" y="206.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">N fixed at deploy</text><line x1="226" y1="130" x2="296" y2="170" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/><line x1="226" y1="192" x2="296" y2="176" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/><line x1="226" y1="254" x2="296" y2="182" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/><rect x="563.4" y="119" width="73.2" height="22" rx="11" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.3"/><text x="600" y="134" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-tea)" text-anchor="middle">shard 02</text><line x1="494" y1="170" x2="552" y2="130" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/><rect x="563.4" y="181" width="73.2" height="22" rx="11" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.3"/><text x="600" y="196" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-tea)" text-anchor="middle">shard 11</text><line x1="494" y1="176" x2="552" y2="192" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/><rect x="563.4" y="243" width="73.2" height="22" rx="11" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.3"/><text x="600" y="258" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-tea)" text-anchor="middle">shard 02</text><line x1="494" y1="182" x2="552" y2="254" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/><text x="60" y="330" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="400" fill="var(--dg-mut)" text-anchor="start">workflow_id → shard_id is fixed for life, so each shard is a stable,</text><text x="60" y="350" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="400" fill="var(--dg-mut)" text-anchor="start">single-writer append stream. Only shard → node ever moves.</text><circle cx="900" cy="250" r="132" fill="none" stroke="var(--dg-rul)" stroke-width="2.2"/><circle cx="900.0" cy="118.0" r="8.5" fill="var(--dg-tea)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="900.0" y="96.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">00</text><circle cx="950.5142130721919" cy="128.04790170851015" r="8.5" fill="var(--dg-tea)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="960.4639823136841" y="108.0270338632167" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">01</text><circle cx="993.3380951166242" cy="156.66190488337574" r="8.5" fill="var(--dg-tea)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="1011.7228714274745" y="142.2771285725255" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">02</text><circle cx="1021.9520982914898" cy="199.48578692780814" r="8.5" fill="var(--dg-tea)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="1045.9729661367833" y="193.5360176863158" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">03</text><circle cx="1032.0" cy="250.0" r="8.5" fill="var(--dg-tea)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="1058.0" y="254.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">04</text><circle cx="1021.9520982914898" cy="300.51421307219186" r="8.5" fill="var(--dg-tea)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="1045.9729661367833" y="314.4639823136842" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">05</text><circle cx="993.3380951166242" cy="343.33809511662423" r="8.5" fill="var(--dg-sla)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="1011.7228714274745" y="365.7228714274745" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">06</text><circle cx="950.5142130721919" cy="371.95209829148985" r="8.5" fill="var(--dg-sla)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="960.4639823136841" y="399.97296613678327" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">07</text><circle cx="900.0" cy="382.0" r="8.5" fill="var(--dg-sla)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="900.0" y="412.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">08</text><circle cx="849.4857869278081" cy="371.95209829148985" r="8.5" fill="var(--dg-sla)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="839.5360176863159" y="399.97296613678327" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">09</text><circle cx="806.6619048833758" cy="343.3380951166243" r="8.5" fill="var(--dg-sla)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="788.2771285725255" y="365.7228714274745" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">10</text><circle cx="778.0479017085102" cy="300.5142130721919" r="8.5" fill="var(--dg-amb)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="754.0270338632167" y="314.46398231368426" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">11</text><circle cx="768.0" cy="250.00000000000003" r="8.5" fill="var(--dg-amb)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="742.0" y="254.00000000000003" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">12</text><circle cx="778.0479017085102" cy="199.4857869278081" r="8.5" fill="var(--dg-amb)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="754.0270338632167" y="193.53601768631577" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">13</text><circle cx="806.6619048833757" cy="156.66190488337574" r="8.5" fill="var(--dg-amb)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="788.2771285725255" y="142.2771285725255" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">14</text><circle cx="849.485786927808" cy="128.04790170851018" r="8.5" fill="var(--dg-amb)" stroke="var(--dg-bg)" stroke-width="2.4"/><text x="839.5360176863157" y="108.02703386321673" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">15</text><text x="900" y="242" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">consistent</text><text x="900" y="260" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">hash ring</text><text x="900" y="280" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">~150 vnodes</text><rect x="760.3" y="441" width="59.400000000000006" height="22" rx="11" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.3"/><text x="790" y="456" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-tea)" text-anchor="middle">node-a</text><rect x="872.3" y="441" width="59.400000000000006" height="22" rx="11" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.3"/><text x="902" y="456" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-sla)" text-anchor="middle">node-b</text><rect x="984.3" y="441" width="59.400000000000006" height="22" rx="11" fill="var(--dg-ambs)" stroke="var(--dg-amb)" stroke-width="1.3"/><text x="1014" y="456" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-amb)" text-anchor="middle">node-c</text><text x="900" y="500" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">adding a node moves a minority of shards — an ownership handoff, not a data migration</text><line x1="650" y1="192" x2="744" y2="236" stroke="var(--dg-mut)" stroke-width="1.8" marker-end="url(#mk-mut)" stroke-linecap="round"/></svg></div>
+    <figcaption><b>Fig 2</b><span>Two mappings kept deliberately separate. Hashing straight from
+    workflow to node would move individual workflows between logs whenever the cluster changed size;
+    the fixed indirection through <code>shard_id</code> turns rebalancing into an ownership handoff
+    instead of a data migration.</span></figcaption>
+  </figure>
+  <div class="prose">
+  <p>The gateway is stateless and is <em>allowed to be wrong</em>. If a request lands on a node
+  that no longer owns the shard, that node answers <code>409 NotOwner</code> with the current owner.
+  Correctness is enforced at the write, never at the route — which is precisely why routing needs no
+  consensus.</p>
+  </div>
+  <div class="note"><b>As built — the retry half now lands, server-side</b>
+    The paragraph above used to be only half true: every node correctly <em>refused</em> work for a
+    shard it did not own, but nothing performed the retry on the client's behalf, so a client that was
+    not shard-aware hit the wrong door on roughly two requests in three. That gap is now closed. A node
+    that receives a request for a shard it does not own now forwards it to the node that does, and
+    relays the answer back, so the caller never sees the miss. Two independent bounds stop the obvious
+    failure mode of a forwarding layer — a routing loop between two nodes that disagree about who owns
+    what: an <code>X-Durexec-Forwarded-By</code> header means a request that has already been forwarded
+    once is served or refused locally, never forwarded again, and a hard cap of two outbound attempts
+    per inbound request (<code>internal/api/forward.go</code>) means a confused cluster gives up quickly
+    rather than being walked node to node. If the named owner cannot be reached at all, the node answers
+    <code>503</code> naming that owner rather than hanging or guessing — a response that is safe to
+    retry because nothing was attempted against it. Verified live: a <code>POST</code> to
+    <code>node-a</code> for a shard owned by another node returned <code>201 Created</code>, the caller
+    never seeing the miss. Correctness is unaffected either way — the owner still re-verifies its
+    fencing token inside the commit transaction, exactly as before forwarding existed.</div>
+
+  <div class="note warn"><b>As built — the ring existed but decided nothing</b>
+    A consistent hash ring that nobody consults is decoration. <code>lease.ManagerConfig</code> always
+    had a <code>Wants</code> hook built for exactly this purpose — the ring narrows which shards a node
+    reaches for — but <code>cmd/engined</code> never set it. Every node therefore wanted every shard,
+    and whichever node finished booting first won all sixteen leases before its peers got a chance to
+    try. Verified live before the fix: node-b owned all 16 shards, node-a and node-c owned 0.<br><br>
+    <code>Wants</code> is now wired to <code>ring.Lookup</code>: a node only reaches for a shard the
+    ring assigns it, which is what actually produces an even split. That alone is not sufficient for
+    failover, though — a preference with nothing backing it up means that if a preferred owner dies,
+    the ring still says its shards belong to a node that is not coming back, and nobody else will try
+    for them. So a node also adopts an <em>orphan</em>: a shard whose lease has sat expired for more
+    than twice the lease TTL. The wait is deliberate — it stops a brief GC pause or a rolling restart
+    from causing needless shard churn between nodes that are all still alive. Verified live after the
+    fix, three nodes: 4 / 9 / 3 shards.<br><br>
+    The ring's membership list is a new required setting, <code>CLUSTER_NODES</code> — a comma-separated
+    list of every node id in the cluster, added to the configuration surface in §4.3. Every node needs
+    the identical list, because the ring is a pure function of it and two nodes computing it from
+    different membership would silently disagree about who owns what.</div>
+
+  <div class="note"><b>As built — one database, not sixteen</b>
+    The figures on this page (Fig 1, Fig 5, Fig 7) show a database per shard, and that was the
+    original intent: an independent PostgreSQL instance per shard would give each shard's log its own
+    failure domain, so one shard's database trouble cannot touch another's. What was actually built,
+    and what <code>deploy/docker-compose.yml</code> actually starts, is <em>one</em> PostgreSQL leader
+    and one streaming-replication standby, shared by all sixteen shards and all three nodes. Every
+    table added <code>shard_id</code> as the leading column of its primary key from the first migration
+    (<code>migrations/0001_init.up.sql</code>) specifically so this would still be safe: two shards
+    never collide on a row, because no primary key is complete without naming which shard it belongs
+    to.<br><br>
+    This is honestly a weaker version of the independent-log argument in §2.1. Sixteen shards sharing
+    one Postgres share its connection limit, its buffer cache, its WAL, and — most importantly — its
+    availability: a leader that is down for maintenance or recovering from a crash takes every shard
+    down with it, not just one, which is a materially worse failure blast radius than the design
+    originally claimed. The single-writer-per-shard argument in Fig 2 above still holds — nothing about
+    sharing a database lets two workers write the same <code>(shard_id, workflow_id, run_id, seq)</code>
+    — but the <em>fault isolation</em> argument does not, and the report should say so plainly rather
+    than let it be discovered.<br><br>
+    What it would take to change: because every key already carries <code>shard_id</code>, moving to
+    one database per shard (or one per a group of shards) is a deployment change, not a schema change.
+    It would mean routing each shard's connection pool at a different <code>DATABASE_URL</code>,
+    running <code>migrations/</code> against each target, and teaching the lease manager and the ring
+    which database backs which shard — none of which requires touching a single table definition. That
+    is deliberate: the schema was built to make this move possible later without a rewrite, even though
+    the demonstration cluster does not exercise it. It remains a stated extension, not a current
+    property.</div>
+
+  <h3 id="s2-4"><span class="hn">2.4</span>Failure model and the fencing argument</h3>
+  <p class="prose">We assume nodes crash without warning, pause arbitrarily long, and come back
+  believing no time has passed. We assume the network drops and reorders messages. We assume
+  PostgreSQL is a single linearizable source of truth and that its own failover is handled by
+  streaming replication. We do <em>not</em> assume clocks are synchronised.</p>
+  <figure>
+    <div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 470" role="img" class="dg"><defs><marker id="mk-crt" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0.6 L 9.4 5 L 0 9.4 z" fill="var(--dg-crt)"/></marker></defs><text x="48" y="54" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="700" fill="var(--dg-mut)" text-anchor="start" letter-spacing="1.2">SPLIT BRAIN, PREVENTED AT THE WRITE</text><line x1="90" y1="390" x2="1110" y2="390" stroke="var(--dg-rul)" stroke-width="1.6" stroke-linecap="round"/><line x1="150" y1="385" x2="150" y2="395" stroke="var(--dg-rul)" stroke-width="1.6" stroke-linecap="round"/><text x="150" y="414" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">t0</text><line x1="420" y1="385" x2="420" y2="395" stroke="var(--dg-rul)" stroke-width="1.6" stroke-linecap="round"/><text x="420" y="414" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">t+4s</text><line x1="690" y1="385" x2="690" y2="395" stroke="var(--dg-rul)" stroke-width="1.6" stroke-linecap="round"/><text x="690" y="414" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">t+10s</text><line x1="900" y1="385" x2="900" y2="395" stroke="var(--dg-rul)" stroke-width="1.6" stroke-linecap="round"/><text x="900" y="414" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">t+13s</text><line x1="1050" y1="385" x2="1050" y2="395" stroke="var(--dg-rul)" stroke-width="1.6" stroke-linecap="round"/><text x="1050" y="414" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">t+15s</text><text x="48" y="132" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="13" font-weight="600" fill="var(--dg-ink)" text-anchor="start">node-a</text><text x="48" y="262" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="13" font-weight="600" fill="var(--dg-ink)" text-anchor="start">node-b</text><line x1="90" y1="160" x2="1110" y2="160" stroke="var(--dg-rul)" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="3,5"/><line x1="90" y1="290" x2="1110" y2="290" stroke="var(--dg-rul)" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="3,5"/><rect x="150" y="100" width="270" height="56" rx="9" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.8"/><text x="285" y="124" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-tea)" text-anchor="middle">owns shard 02</text><text x="285" y="142" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="var(--dg-tea)" text-anchor="middle">token = 7</text><rect x="420" y="100" width="270" height="56" rx="9" fill="var(--dg-crts)" stroke="var(--dg-crt)" stroke-width="1.8" stroke-dasharray="6,5"/><text x="555" y="124" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-crt)" text-anchor="middle">process frozen</text><text x="555" y="142" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="var(--dg-crt)" text-anchor="middle">GC pause / VM stall</text><rect x="880" y="100" width="230" height="56" rx="9" fill="none" stroke="var(--dg-crt)" stroke-width="1.8"/><text x="995" y="122" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="var(--dg-crt)" text-anchor="middle">wakes, tries to commit</text><text x="995" y="141" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-crt)" text-anchor="middle">reads token 8 ≠ 7  →  ROLLBACK</text><rect x="690" y="230" width="420" height="56" rx="9" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.8"/><text x="900" y="254" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-tea)" text-anchor="middle">acquires lease, replays, resumes</text><text x="900" y="272" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="var(--dg-tea)" text-anchor="middle">token = 8</text><text x="400" y="262" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">idle</text><line x1="690" y1="84" x2="690" y2="400" stroke="var(--dg-amb)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="6,5"/><rect x="620.0" y="65" width="140.0" height="16" rx="3" fill="var(--dg-bg)"/><text x="690" y="76" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="var(--dg-amb)" text-anchor="middle">lease expires (10 s)</text><line x1="995" y1="160" x2="900" y2="226" stroke="var(--dg-crt)" stroke-width="1.8" marker-end="url(#mk-crt)" stroke-linecap="round" stroke-dasharray="5,4"/><rect x="150" y="300" width="960" height="62" rx="10" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.4"/><text x="170" y="324" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="var(--dg-ink)" text-anchor="start">SELECT fencing_token FROM shard_leases WHERE shard_id=$1 AND owner_node=$2 FOR UPDATE;</text><text x="170" y="346" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-mut)" text-anchor="start">-- runs inside the SAME transaction as every event append. Token moved → the write cannot land.</text></svg></div>
+    <figcaption><b>Fig 3</b><span>The failure that breaks naive lease systems, and why it cannot break
+    this one. The lease alone is not the safety property — re-reading the token
+    <code>FOR UPDATE</code> inside the same transaction as the writes is.</span></figcaption>
+  </figure>
+  <div class="note"><b>The invariant</b>
+    A node that has lost ownership of a shard cannot mutate that shard's state, regardless of what it
+    believes about the world. This is Kleppmann's fencing-token argument implemented in a table
+    rather than in ZooKeeper, and it is the same technique Temporal uses under the name
+    <code>RangeID</code>.</div>
+  <div class="note warn"><b>Stated honestly</b>
+    This is not consensus. The coordination problem has been moved into PostgreSQL, not eliminated.
+    The system inherits the database's availability, and a shard is unavailable for up to the lease
+    TTL between an owner dying and a successor acquiring. Both are measured and reported rather than
+    glossed over.</div>
+
+  <h3 id="s2-5"><span class="hn">2.5</span>Technology stack</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Layer</th><th>Choice</th><th>Why this, specifically</th></tr></thead>
+    <tbody>
+      <tr><td>Language</td><td class="idc">Go 1.22</td><td>Goroutines and channels map directly onto the cooperative coroutine scheduler the workflow dispatcher needs. It is also the language Temporal and Cadence are written in, so the prior art is readable.</td></tr>
+      <tr><td>Persistence</td><td class="idc">PostgreSQL 16</td><td>Supplies the four things the design depends on: linearizable compare-and-swap for leases, <code>FOR UPDATE SKIP LOCKED</code> for the queue, <code>JSONB</code> for event payloads, and streaming replication.</td></tr>
+      <tr><td>Vectors</td><td class="idc">pgvector 0.7</td><td>Keeps embeddings in the same database and the same transaction as the event log, so a verdict and the event recording it commit together.</td></tr>
+      <tr><td>Driver</td><td class="idc">pgx v5</td><td>Native protocol, real connection pooling, first-class <code>JSONB</code> and array handling.</td></tr>
+      <tr><td>Migrations</td><td class="idc">a hand-rolled runner</td><td>Applies every <code>*.up.sql</code> file in lexical order under a PostgreSQL session advisory lock, so three nodes booting together apply schema once rather than racing (see §6.3). No separate migrations table; every statement is <code>IF NOT EXISTS</code>.</td></tr>
+      <tr><td>Embeddings</td><td class="idc">all-MiniLM-L6-v2</td><td>384 dimensions, runs locally in milliseconds, and is the standard baseline in the semantic-caching literature — which keeps our comparison against prior work fair.</td></tr>
+      <tr><td>Containers</td><td class="idc">Docker Compose</td><td>Whole cluster on one laptop: 3 engine nodes sharing one PostgreSQL leader and one streaming-replication standby, plus monitoring, under 3 GB. <em>As built, this is one database for all shards, not one per shard — see §2.3.</em></td></tr>
+      <tr><td>Metrics</td><td class="idc">Prometheus + Grafana</td><td>Pull-based scraping suits short-lived worker loops; Grafana gives the live failover view used in the demonstration.</td></tr>
+      <tr><td>Testing</td><td class="idc">testcontainers-go</td><td>Integration tests run against a real PostgreSQL, not a mock — essential when the correctness argument is a SQL transaction.</td></tr>
+      <tr><td>Load</td><td class="idc">k6 + Go benchmarks</td><td>k6 drives the HTTP surface; Go benchmarks measure the internals without network noise.</td></tr>
+      <tr><td>Frontend</td><td class="idc">React + TypeScript</td><td>Order form, live status page, and the admin panel with the deliberate "fail this step" control.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<!-- ===================================================== 3 -->
+<section id="s3">
+  <div class="h2wrap"><span class="h2n">03</span><h2>Component Design</h2></div>
+
+  <h3 id="s3-1"><span class="hn">3.1</span>Module breakdown</h3>
+  <p class="prose">One Go module, internal packages with a strict dependency direction: nothing in
+  <code>engine/</code> may import <code>app/</code>. That rule is what makes the claim "two
+  applications, one unmodified binary" structurally true rather than a coincidence.</p>
+  <pre><code>cmd/engined/            entry point — flags, config, wiring, graceful shutdown
+internal/
+  eventlog/             append, read, seq allocation, non-determinism detection
+  workflow/             WorkflowContext, Future, dispatcher coroutine, replay cursor
+  activity/             registry, retry policy, dedup-key derivation
+  taskq/                SKIP LOCKED poll, lease renewal, visibility timeouts
+  timers/               timer table scanner, fire → task conversion
+  shard/                fnv32 mapping, consistent-hash ring, NotOwner redirect
+  lease/                acquire, renew, fencing-token verification helper
+  saga/                 compensation stack, LIFO executor, terminal states
+  idem/
+    exact/              stable key derivation
+    semantic/           canonicaliser, embedder client, cosine, threshold bands
+  api/                  HTTP handlers, request/response types, error mapping
+  obs/                  Prometheus collectors, structured logging
+  faultinj/             kill hooks, step-failure switches, crash-point injection
+app/
+  delivery/             food-delivery workflow + activities
+  agent/                plan → tool → approve → finalize workflow</code></pre>
+
+  <h4>Core types</h4>
+  <div class="tw"><table>
+    <thead><tr><th>Type</th><th>Responsibility</th><th>Key invariant</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">WorkflowContext</td><td>The only surface workflow code may touch. Issues <code>ExecuteActivity</code>, <code>Sleep</code>, <code>WaitForSignal</code>, <code>SideEffect</code>.</td><td>Allocates <code>k</code> from a counter in program order; never performs I/O.</td></tr>
+      <tr><td class="idc">Future[T]</td><td>An unresolved result. Resolved from history on replay, or by a later task in new mode.</td><td><code>Get()</code> suspends the coroutine, never the OS thread.</td></tr>
+      <tr><td class="idc">Dispatcher</td><td>Drives one workflow task: builds context, runs code to the first block, collects commands.</td><td>Discards all in-memory state after commit.</td></tr>
+      <tr><td class="idc">Command</td><td>An intention produced by the workflow — schedule activity, start timer, complete.</td><td>Never executed directly; only ever turned into events inside the commit.</td></tr>
+      <tr><td class="idc">Ring</td><td>Consistent hash over nodes with ~150 virtual nodes each.</td><td>Pure function of the membership snapshot; safe to be stale. Its point hash carries a finalising avalanche step — see §6.1 for why that is load-bearing, not cosmetic.</td></tr>
+      <tr><td class="idc">LeaseManager</td><td>Acquires and renews shard leases; hands out the current fencing token. Its <code>Wants</code> hook lets the ring express a preference for which shards this node should try to acquire, and also adopts a shard whose lease has sat expired for more than twice the TTL, so a dead preferred owner cannot strand its shards forever.</td><td>Token increases monotonically and never reverses. <code>Wants</code> only ever narrows which shards we <em>reach for</em> — it can never make us drop one we already hold; that decision belongs to the lease alone.</td></tr>
+      <tr><td class="idc">Saga</td><td>In-memory stack of compensations, rebuilt identically on every replay.</td><td>Registration happens only after the forward step succeeds.</td></tr>
+      <tr><td class="idc">DedupVerdict</td><td>DUPLICATE, ESCALATE or DISTINCT, with score, threshold, matched index and model id.</td><td>Computed once, journaled, and thereafter read — never recomputed.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s3-2"><span class="hn">3.2</span>The workflow task loop</h3>
+  <p class="lede">This is the mechanism the entire system is built around. A workflow task means:
+  <em>this workflow has new history — run its code forward until it blocks again.</em></p>
+  <figure>
+    <div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" class="dg"><defs><marker id="mk-rul" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0.6 L 9.4 5 L 0 9.4 z" fill="var(--dg-rul)"/></marker></defs><rect x="96" y="84" width="470" height="62" rx="11" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><circle cx="96" cy="115" r="15" fill="var(--dg-bg)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="96" y="119" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="700" fill="var(--dg-mut)" text-anchor="middle">1</text><text x="122" y="111" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="13.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">Poll one WORKFLOW task</text><text x="122" y="130" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-mut)" text-anchor="start">FOR UPDATE SKIP LOCKED — a lease, not a delete</text><line x1="331" y1="146" x2="331" y2="162" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="96" y="162" width="470" height="62" rx="11" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><circle cx="96" cy="193" r="15" fill="var(--dg-bg)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="96" y="197" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="700" fill="var(--dg-mut)" text-anchor="middle">2</text><text x="122" y="189" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="13.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">Load the full history</text><text x="122" y="208" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-mut)" text-anchor="start">SELECT * FROM events … ORDER BY seq</text><line x1="331" y1="224" x2="331" y2="240" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="96" y="240" width="470" height="62" rx="11" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><circle cx="96" cy="271" r="15" fill="var(--dg-bg)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="96" y="275" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="700" fill="var(--dg-mut)" text-anchor="middle">3</text><text x="122" y="267" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="13.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">Run the workflow function</text><text x="122" y="286" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-mut)" text-anchor="start">fresh coroutine, seqCounter k = 0, 1, 2 …</text><line x1="331" y1="302" x2="331" y2="318" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="96" y="318" width="470" height="62" rx="11" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><circle cx="96" cy="349" r="15" fill="var(--dg-bg)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="96" y="353" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="700" fill="var(--dg-mut)" text-anchor="middle">4</text><text x="122" y="345" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="13.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">At each call, match on k</text><text x="122" y="364" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-mut)" text-anchor="start">in history → resolve from the record  ·  not in history → emit a command</text><line x1="331" y1="380" x2="331" y2="396" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="96" y="396" width="470" height="62" rx="11" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><circle cx="96" cy="427" r="15" fill="var(--dg-bg)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="96" y="431" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="700" fill="var(--dg-mut)" text-anchor="middle">5</text><text x="122" y="423" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="13.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">Run until it blocks</text><text x="122" y="442" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-mut)" text-anchor="start">collect the commands it produced, then stop</text><rect x="96" y="474" width="470" height="62" rx="11" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="2.2"/><circle cx="96" cy="505" r="15" fill="var(--dg-tea)" stroke="var(--dg-bg)" stroke-width="2"/><text x="96" y="509" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text><text x="122" y="501" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="13.5" font-weight="700" fill="var(--dg-tea)" text-anchor="start">Commit everything, once</text><text x="122" y="520" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="500" fill="var(--dg-tea)" text-anchor="start">one Postgres transaction — all of it lands, or none of it does</text><line x1="331" y1="536" x2="331" y2="552" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="96" y="552" width="470" height="52" rx="11" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5" stroke-dasharray="6,5"/><text x="331" y="574" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="13" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">Throw the in-memory workflow away</text><text x="331" y="592" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">correctness never depends on keeping it — caching is pure latency</text><path d="M 96 578 H 52 V 115 Q 52 84 74 84 H 96" fill="none" stroke="var(--dg-mut)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6,5" marker-end="url(#mk-mut)"/><text x="44" y="330" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">next task</text><rect x="636" y="150" width="520" height="322" rx="14" fill="none" stroke="var(--dg-tea)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="654" y="141" width="204.3" height="19" rx="5" fill="var(--dg-bg)"/><text x="756.15" y="154.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-tea)" text-anchor="middle" letter-spacing="1.1">INSIDE THAT ONE TRANSACTION</text><circle cx="672" cy="202" r="6.5" fill="var(--dg-tea)"/><text x="692" y="199" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">verify the fencing token</text><text x="692" y="217" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="400" fill="var(--dg-mut)" text-anchor="start">FOR UPDATE — abort if we no longer own the shard</text><circle cx="672" cy="254" r="6.5" fill="var(--dg-tea)"/><text x="692" y="251" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">INSERT the new events</text><text x="692" y="269" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="400" fill="var(--dg-mut)" text-anchor="start">seq n+1 … n+k, append only</text><circle cx="672" cy="306" r="6.5" fill="var(--dg-tea)"/><text x="692" y="303" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">INSERT rows into tasks / timers</text><text x="692" y="321" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="400" fill="var(--dg-mut)" text-anchor="start">whatever the commands scheduled</text><circle cx="672" cy="358" r="6.5" fill="var(--dg-tea)"/><text x="692" y="355" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">UPDATE executions.last_seq</text><text x="692" y="373" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="400" fill="var(--dg-mut)" text-anchor="start">the mutable status pointer</text><circle cx="672" cy="410" r="6.5" fill="var(--dg-tea)"/><text x="692" y="407" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="start">DELETE this task row</text><text x="692" y="425" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="400" fill="var(--dg-mut)" text-anchor="start">the work is provably finished</text><line x1="668" y1="442" x2="1124" y2="442" stroke="var(--dg-tea)" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="5,5"/><text x="896" y="462" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="700" fill="var(--dg-tea)" text-anchor="middle">No partial state can exist on disk. Ever.</text><line x1="578" y1="505" x2="630" y2="300" stroke="var(--dg-tea)" stroke-width="2.2" marker-end="url(#mk-tea)" stroke-linecap="round"/></svg></div>
+    <figcaption><b>Fig 4</b><span>Step 6 is the correctness argument. Step 7 is the one people find
+    surprising: throwing the workflow away costs nothing, because correctness never depended on
+    keeping it. Caching it between tasks is a latency optimisation that can be added and removed
+    without changing behaviour.</span></figcaption>
+  </figure>
+  <div class="prose">
+  <p>The join between "the call the code is making right now" and "the event that recorded that call
+  last time" is <code>k</code>, a counter incremented once per blocking call in program order. It is
+  never stored in the source. It is recomputed identically on every replay because the code takes the
+  same branches, because the code only ever reads from history.</p>
+  <p>If the code takes a different branch on replay, <code>k</code> shifts and the match fails. The
+  engine cannot repair this — it has no way to know which version of the code told the truth — so it
+  refuses to continue and raises a non-determinism error naming the sequence number, the recorded
+  activity type and the requested one.</p>
+  </div>
+
+  <h3 id="s3-3"><span class="hn">3.3</span>Data model</h3>
+  <figure>
+    <div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 700" role="img" class="dg"><defs></defs><rect x="60" y="96" width="280" height="158" rx="10" fill="var(--dg-sur)" stroke="var(--dg-sla)" stroke-width="1.8"/><path d="M 60 130 h 280" fill="none" stroke="var(--dg-sla)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="60" y="96" width="280" height="34" rx="10" fill="var(--dg-slas)"/><rect x="60" y="118" width="280" height="12" rx="0" fill="var(--dg-slas)"/><text x="74" y="118" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="13" font-weight="700" fill="var(--dg-sla)" text-anchor="start">executions</text><circle cx="78" cy="141" r="3.4" fill="var(--dg-sla)"/><text x="90" y="145" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">shard_id</text><text x="326" y="145" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">INT</text><circle cx="78" cy="160" r="3.4" fill="var(--dg-sla)"/><text x="90" y="164" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">workflow_id</text><text x="326" y="164" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="90" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">run_id</text><text x="326" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">UUID</text><text x="90" y="202" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">workflow_type</text><text x="326" y="202" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="90" y="221" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">status</text><text x="326" y="221" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="90" y="240" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">last_seq</text><text x="326" y="240" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">BIGINT</text><rect x="480" y="96" width="280" height="177" rx="10" fill="var(--dg-sur)" stroke="var(--dg-tea)" stroke-width="1.8"/><path d="M 480 130 h 280" fill="none" stroke="var(--dg-tea)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="480" y="96" width="280" height="34" rx="10" fill="var(--dg-teas)"/><rect x="480" y="118" width="280" height="12" rx="0" fill="var(--dg-teas)"/><text x="494" y="118" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="13" font-weight="700" fill="var(--dg-tea)" text-anchor="start">events</text><circle cx="498" cy="141" r="3.4" fill="var(--dg-tea)"/><text x="510" y="145" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">shard_id</text><text x="746" y="145" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">INT</text><circle cx="498" cy="160" r="3.4" fill="var(--dg-tea)"/><text x="510" y="164" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">workflow_id</text><text x="746" y="164" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><circle cx="498" cy="179" r="3.4" fill="var(--dg-tea)"/><text x="510" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">run_id</text><text x="746" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">UUID</text><circle cx="498" cy="198" r="3.4" fill="var(--dg-tea)"/><text x="510" y="202" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">seq</text><text x="746" y="202" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">BIGINT</text><text x="510" y="221" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">event_type</text><text x="746" y="221" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="510" y="240" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">payload</text><text x="746" y="240" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">JSONB</text><text x="510" y="259" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">created_at</text><text x="746" y="259" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TIMESTAMPTZ</text><rect x="900" y="96" width="280" height="234" rx="10" fill="var(--dg-sur)" stroke="var(--dg-sla)" stroke-width="1.8"/><path d="M 900 130 h 280" fill="none" stroke="var(--dg-sla)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="900" y="96" width="280" height="34" rx="10" fill="var(--dg-slas)"/><rect x="900" y="118" width="280" height="12" rx="0" fill="var(--dg-slas)"/><text x="914" y="118" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="13" font-weight="700" fill="var(--dg-sla)" text-anchor="start">tasks</text><circle cx="918" cy="141" r="3.4" fill="var(--dg-sla)"/><text x="930" y="145" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">shard_id</text><text x="1166" y="145" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">INT</text><circle cx="918" cy="160" r="3.4" fill="var(--dg-sla)"/><text x="930" y="164" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">task_id</text><text x="1166" y="164" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">BIGSERIAL</text><text x="930" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">task_type</text><text x="1166" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="930" y="202" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">workflow_id</text><text x="1166" y="202" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="930" y="221" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">run_id</text><text x="1166" y="221" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">UUID</text><text x="930" y="240" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">scheduled_event_seq</text><text x="1166" y="240" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">BIGINT</text><text x="930" y="259" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">visible_at</text><text x="1166" y="259" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TIMESTAMPTZ</text><text x="930" y="278" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">locked_until</text><text x="1166" y="278" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TIMESTAMPTZ</text><text x="930" y="297" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">lock_token</text><text x="1166" y="297" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">UUID</text><text x="930" y="316" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">attempt</text><text x="1166" y="316" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">INT</text><rect x="60" y="430" width="280" height="139" rx="10" fill="var(--dg-sur)" stroke="var(--dg-sla)" stroke-width="1.8"/><path d="M 60 464 h 280" fill="none" stroke="var(--dg-sla)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="60" y="430" width="280" height="34" rx="10" fill="var(--dg-slas)"/><rect x="60" y="452" width="280" height="12" rx="0" fill="var(--dg-slas)"/><text x="74" y="452" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="13" font-weight="700" fill="var(--dg-sla)" text-anchor="start">timers</text><circle cx="78" cy="475" r="3.4" fill="var(--dg-sla)"/><text x="90" y="479" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">shard_id</text><text x="326" y="479" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">INT</text><circle cx="78" cy="494" r="3.4" fill="var(--dg-sla)"/><text x="90" y="498" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">workflow_id</text><text x="326" y="498" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><circle cx="78" cy="513" r="3.4" fill="var(--dg-sla)"/><text x="90" y="517" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">run_id</text><text x="326" y="517" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">UUID</text><circle cx="78" cy="532" r="3.4" fill="var(--dg-sla)"/><text x="90" y="536" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">timer_seq</text><text x="326" y="536" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">BIGINT</text><text x="90" y="555" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">fire_at</text><text x="326" y="555" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TIMESTAMPTZ</text><rect x="480" y="470" width="280" height="120" rx="10" fill="var(--dg-sur)" stroke="var(--dg-sla)" stroke-width="1.8"/><path d="M 480 504 h 280" fill="none" stroke="var(--dg-sla)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="480" y="470" width="280" height="34" rx="10" fill="var(--dg-slas)"/><rect x="480" y="492" width="280" height="12" rx="0" fill="var(--dg-slas)"/><text x="494" y="492" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="13" font-weight="700" fill="var(--dg-sla)" text-anchor="start">shard_leases</text><circle cx="498" cy="515" r="3.4" fill="var(--dg-sla)"/><text x="510" y="519" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">shard_id</text><text x="746" y="519" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">INT</text><text x="510" y="538" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">owner_node</text><text x="746" y="538" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="510" y="557" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">fencing_token</text><text x="746" y="557" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">BIGINT</text><text x="510" y="576" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">expires_at</text><text x="746" y="576" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TIMESTAMPTZ</text><rect x="900" y="430" width="280" height="177" rx="10" fill="var(--dg-sur)" stroke="var(--dg-amb)" stroke-width="1.8"/><path d="M 900 464 h 280" fill="none" stroke="var(--dg-amb)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="900" y="430" width="280" height="34" rx="10" fill="var(--dg-ambs)"/><rect x="900" y="452" width="280" height="12" rx="0" fill="var(--dg-ambs)"/><text x="914" y="452" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="13" font-weight="700" fill="var(--dg-amb)" text-anchor="start">activity_intents</text><circle cx="918" cy="475" r="3.4" fill="var(--dg-amb)"/><text x="930" y="479" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">shard_id</text><text x="1166" y="479" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">INT</text><circle cx="918" cy="494" r="3.4" fill="var(--dg-amb)"/><text x="930" y="498" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">workflow_id</text><text x="1166" y="498" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><circle cx="918" cy="513" r="3.4" fill="var(--dg-amb)"/><text x="930" y="517" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">run_id</text><text x="1166" y="517" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">UUID</text><circle cx="918" cy="532" r="3.4" fill="var(--dg-amb)"/><text x="930" y="536" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="600" fill="var(--dg-ink)" text-anchor="start">scheduled_seq</text><text x="1166" y="536" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">BIGINT</text><text x="930" y="555" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">activity_type</text><text x="1166" y="555" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="930" y="574" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">intent_text</text><text x="1166" y="574" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">TEXT</text><text x="930" y="593" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="var(--dg-ink)" text-anchor="start">embedding</text><text x="1166" y="593" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="400" fill="var(--dg-mut)" text-anchor="end">VECTOR(384)</text><line x1="476" y1="170" x2="344" y2="170" stroke="var(--dg-mut)" stroke-width="1.6" marker-end="url(#mk-mut)" stroke-linecap="round"/><rect x="388.0" y="149" width="44.0" height="16" rx="3" fill="var(--dg-bg)"/><text x="410" y="160" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">1 : N</text><line x1="764" y1="170" x2="896" y2="170" stroke="var(--dg-mut)" stroke-width="1.6" marker-end="url(#mk-mut)" stroke-linecap="round"/><rect x="808.0" y="149" width="44.0" height="16" rx="3" fill="var(--dg-bg)"/><text x="830" y="160" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">1 : N</text><path d="M 560 296 V 414 Q 560 426 548 426 H 200" fill="none" stroke="var(--dg-mut)" stroke-width="1.6" stroke-linecap="round" marker-end="url(#mk-mut)"/><path d="M 690 296 V 414 Q 690 426 702 426 H 1040" fill="none" stroke="var(--dg-mut)" stroke-width="1.6" stroke-linecap="round" marker-end="url(#mk-mut)"/><line x1="620" y1="296" x2="620" y2="466" stroke="var(--dg-tea)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="6,5"/><rect x="514.8" y="381" width="210.4" height="16" rx="3" fill="var(--dg-bg)"/><text x="620" y="392" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="10.5" font-weight="600" fill="var(--dg-tea)" text-anchor="middle">checked in the same transaction</text><text x="620" y="596" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">shard_leases has no foreign key to anything — it is read FOR UPDATE inside every mutating</text><text x="620" y="616" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">transaction, which is what makes a fenced-out node unable to write.</text></svg></div>
+    <figcaption><b>Fig 5</b><span>Six tables, and — as built — one shared database rather than one per
+    shard: every row carries <code>shard_id</code> as a leading key column, so all sixteen shards are
+    multiplexed inside a single PostgreSQL instance. See §2.3 for what that trades away and what it
+    would take to change. Every mechanism in the engine is still just these tables plus the code that
+    manipulates them.</span></figcaption>
+  </figure>
+
+  <div class="tw"><table>
+    <thead><tr><th>Table</th><th>Purpose</th><th>The design decision inside it</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">events</td><td>Append-only history; the single source of truth.</td><td>The primary key <em>is</em> the concurrency control. Two workers appending <code>seq = 47</code> — one takes a unique violation and rolls back. No lock needed.</td></tr>
+      <tr><td class="idc">executions</td><td>One mutable row per workflow, derived from the log.</td><td>Keyed on <code>(shard_id, workflow_id)</code> without <code>run_id</code>, so a duplicate start request collides and returns the existing run. Free deduplication at the front door.</td></tr>
+      <tr><td class="idc">tasks</td><td>Durable work queue.</td><td>A lease queue, not delete-on-read. A dead worker's lock simply expires and the task becomes visible again — that is the entire crash-recovery story for in-flight work.</td></tr>
+      <tr><td class="idc">timers</td><td>Durable sleep.</td><td>A row, not a goroutine. A two-week sleep costs one row and no memory.</td></tr>
+      <tr><td class="idc">shard_leases</td><td>Ownership and fencing.</td><td>Four columns that replace ZooKeeper. Read <code>FOR UPDATE</code> inside every mutating transaction.</td></tr>
+      <tr><td class="idc">activity_intents</td><td>Meaning-vectors for the semantic check.</td><td>Candidate sets are bounded by <em>workflow history length</em>, not corpus size — tens of rows — so brute-force cosine is microseconds and no ANN index is warranted.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="cap">Schema — abridged, with the indexes that matter</p>
+  <pre><code>CREATE TABLE events (
+    shard_id    INT         NOT NULL,
+    workflow_id TEXT        NOT NULL,
+    run_id      UUID        NOT NULL,
+    seq         BIGINT      NOT NULL,
+    event_type  TEXT        NOT NULL,
+    payload     JSONB       NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (shard_id, workflow_id, run_id, seq)
+);  -- never UPDATEd, never DELETEd
+
+CREATE TABLE tasks (
+    shard_id            INT         NOT NULL,
+    task_id             BIGSERIAL   NOT NULL,
+    task_type           TEXT        NOT NULL,        -- WORKFLOW | ACTIVITY
+    workflow_id         TEXT        NOT NULL,
+    run_id              UUID        NOT NULL,
+    scheduled_event_seq BIGINT,
+    visible_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    locked_until        TIMESTAMPTZ,
+    lock_token          UUID,
+    attempt             INT         NOT NULL DEFAULT 0,
+    PRIMARY KEY (shard_id, task_id)
+);
+CREATE INDEX tasks_pollable ON tasks (shard_id, task_type, visible_at)
+    WHERE locked_until IS NULL OR locked_until &lt; now();
+
+CREATE TABLE shard_leases (
+    shard_id      INT         PRIMARY KEY,
+    owner_node    TEXT,
+    fencing_token BIGINT      NOT NULL DEFAULT 0,
+    expires_at    TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE activity_intents (
+    shard_id      INT         NOT NULL,
+    workflow_id   TEXT        NOT NULL,
+    run_id        UUID        NOT NULL,
+    scheduled_seq BIGINT      NOT NULL,
+    activity_type TEXT        NOT NULL,
+    intent_text   TEXT        NOT NULL,
+    embedding     VECTOR(384) NOT NULL,
+    PRIMARY KEY (shard_id, workflow_id, run_id, scheduled_seq)
+);
+CREATE INDEX intents_by_type ON activity_intents (shard_id, workflow_id, run_id, activity_type);
+
+CREATE INDEX timers_due ON timers (shard_id, fire_at);
+CREATE INDEX exec_status ON executions (shard_id, status) WHERE status = 'RUNNING';</code></pre>
+
+  <p class="cap">The queue poll — SKIP LOCKED is not optional</p>
+  <pre><code>UPDATE tasks
+SET locked_until = now() + interval '30 seconds',
+    lock_token   = gen_random_uuid(),
+    attempt      = attempt + 1
+WHERE (shard_id, task_id) IN (
+    SELECT shard_id, task_id FROM tasks
+    WHERE shard_id = $1 AND task_type = $2
+      AND visible_at &lt;= now()
+      AND (locked_until IS NULL OR locked_until &lt; now())
+    ORDER BY task_id
+    FOR UPDATE SKIP LOCKED
+    LIMIT 1
+)
+RETURNING *;</code></pre>
+  <p class="prose">Without <code>SKIP LOCKED</code> every worker serialises behind a single row lock,
+  and the queue stops scaling at one consumer. It is the difference between a design that uses N
+  workers and one that merely deploys them.</p>
+
+  <h3 id="s3-4"><span class="hn">3.4</span>Semantic idempotency</h3>
+  <p class="lede">The contribution, and the part of the design most likely to be challenged. The
+  interesting decision is not the similarity metric — it is <em>where the check runs</em>.</p>
+  <div class="note stop"><b>Why it cannot live in the activity worker</b>
+    A similarity check is non-deterministic: it depends on a model, a float threshold and a candidate
+    set. Placed inside the activity worker it would either be recomputed on replay — possibly
+    differently, diverging the history — or skipped entirely, making the workflow's decision
+    irreproducible. Either outcome destroys the replay invariant the whole engine rests on.</div>
+  <p class="prose">So the verdict is computed <em>once</em>, on the workflow path, and journaled as a
+  <code>SemanticDedupEvaluated</code> event. It is the existing <code>SideEffect</code> mechanism
+  applied to a deduplication decision. Replay reads the recorded verdict and performs no network call
+  at all.</p>
+  <figure>
+    <div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" role="img" class="dg"><defs></defs><text x="60" y="58" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11" font-weight="700" fill="var(--dg-mut)" text-anchor="start" letter-spacing="1.2">COSINE SIMILARITY AGAINST EARLIER ACTIONS IN THIS RUN</text><rect x="130.0" y="150" width="480.0" height="78" rx="8" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="370.0" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="14" font-weight="700" fill="var(--dg-sla)" text-anchor="middle" letter-spacing="1">DISTINCT</text><text x="370.0" y="205" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="500" fill="var(--dg-sla)" text-anchor="middle">schedule the activity</text><rect x="610.0" y="150" width="160.0000000000001" height="78" rx="8" fill="var(--dg-ambs)" stroke="var(--dg-amb)" stroke-width="1.8"/><text x="690.0" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="14" font-weight="700" fill="var(--dg-amb)" text-anchor="middle" letter-spacing="1">ESCALATE</text><text x="690.0" y="205" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="500" fill="var(--dg-amb)" text-anchor="middle">runs by default · can be made to block</text><rect x="770.0000000000001" y="150" width="319.9999999999999" height="78" rx="8" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.8"/><text x="930.0" y="183" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="14" font-weight="700" fill="var(--dg-tea)" text-anchor="middle" letter-spacing="1">DUPLICATE</text><text x="930.0" y="205" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="500" fill="var(--dg-tea)" text-anchor="middle">skip — reuse the recorded result</text><line x1="130.0" y1="228" x2="130.0" y2="238" stroke="var(--dg-rul)" stroke-width="1.5" stroke-linecap="round"/><text x="130.0" y="256" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">0.70</text><line x1="290.0000000000001" y1="228" x2="290.0000000000001" y2="238" stroke="var(--dg-rul)" stroke-width="1.5" stroke-linecap="round"/><text x="290.0000000000001" y="256" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">0.75</text><line x1="450.0000000000002" y1="228" x2="450.0000000000002" y2="238" stroke="var(--dg-rul)" stroke-width="1.5" stroke-linecap="round"/><text x="450.0000000000002" y="256" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">0.80</text><line x1="610.0" y1="228" x2="610.0" y2="238" stroke="var(--dg-rul)" stroke-width="1.5" stroke-linecap="round"/><text x="610.0" y="256" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">0.85</text><line x1="770.0000000000001" y1="228" x2="770.0000000000001" y2="238" stroke="var(--dg-rul)" stroke-width="1.5" stroke-linecap="round"/><text x="770.0000000000001" y="256" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">0.90</text><line x1="929.9999999999999" y1="228" x2="929.9999999999999" y2="238" stroke="var(--dg-rul)" stroke-width="1.5" stroke-linecap="round"/><text x="929.9999999999999" y="256" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">0.95</text><line x1="1090.0" y1="228" x2="1090.0" y2="238" stroke="var(--dg-rul)" stroke-width="1.5" stroke-linecap="round"/><text x="1090.0" y="256" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="500" fill="var(--dg-mut)" text-anchor="middle">1.00</text><line x1="610.0" y1="116" x2="610.0" y2="150" stroke="var(--dg-amb)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="5,4"/><rect x="588.0" y="97" width="44.0" height="16" rx="3" fill="var(--dg-bg)"/><text x="610.0" y="108" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11.5" font-weight="600" fill="var(--dg-amb)" text-anchor="middle">τ_low</text><line x1="770.0000000000001" y1="116" x2="770.0000000000001" y2="150" stroke="var(--dg-amb)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="5,4"/><rect x="744.8000000000001" y="97" width="50.400000000000006" height="16" rx="3" fill="var(--dg-bg)"/><text x="770.0000000000001" y="108" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="11.5" font-weight="600" fill="var(--dg-amb)" text-anchor="middle">τ_high</text><line x1="897.9999999999998" y1="80" x2="897.9999999999998" y2="150" stroke="var(--dg-crt)" stroke-width="2" stroke-linecap="round"/><circle cx="897.9999999999998" cy="80" r="6" fill="var(--dg-crt)" stroke="var(--dg-bg)" stroke-width="2"/><rect x="729.9999999999998" y="32" width="336" height="40" rx="8" fill="var(--dg-crts)" stroke="var(--dg-crt)" stroke-width="1.5"/><text x="897.9999999999998" y="58" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="600" fill="var(--dg-crt)" text-anchor="middle">worked example: 0.94 → DUPLICATE, matched k=3</text><rect x="60" y="322" width="520" height="190" rx="14" fill="none" stroke="var(--dg-amb)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="78" y="313" width="156.0" height="19" rx="5" fill="var(--dg-bg)"/><text x="156.0" y="326.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-amb)" text-anchor="middle" letter-spacing="1.1">NEW MODE — RUNS ONCE</text><circle cx="88" cy="360" r="5" fill="var(--dg-amb)"/><text x="106" y="364" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="400" fill="var(--dg-ink)" text-anchor="start">canonicalise activity_type + sorted args → intent text</text><circle cx="88" cy="398" r="5" fill="var(--dg-amb)"/><text x="106" y="402" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="400" fill="var(--dg-ink)" text-anchor="start">embed → vector(384), all-MiniLM-L6-v2</text><circle cx="88" cy="436" r="5" fill="var(--dg-amb)"/><text x="106" y="440" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="400" fill="var(--dg-ink)" text-anchor="start">cosine against prior COMPLETED calls of the same type</text><circle cx="88" cy="474" r="5" fill="var(--dg-amb)"/><text x="106" y="478" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="400" fill="var(--dg-ink)" text-anchor="start">APPEND SemanticDedupEvaluated{verdict, sim, τ, matched_k}</text><rect x="620" y="322" width="520" height="190" rx="14" fill="none" stroke="var(--dg-tea)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="638" y="313" width="238.8" height="19" rx="5" fill="var(--dg-bg)"/><text x="757.4" y="326.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-tea)" text-anchor="middle" letter-spacing="1.1">REPLAY MODE — RUNS FOREVER AFTER</text><circle cx="648" cy="360" r="5" fill="var(--dg-tea)"/><text x="666" y="364" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="400" fill="var(--dg-ink)" text-anchor="start">read SemanticDedupEvaluated from history</text><circle cx="648" cy="398" r="5" fill="var(--dg-tea)"/><text x="666" y="402" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="400" fill="var(--dg-ink)" text-anchor="start">no embedding call · no similarity · no network</text><circle cx="648" cy="436" r="5" fill="var(--dg-tea)"/><text x="666" y="440" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="400" fill="var(--dg-ink)" text-anchor="start">apply the recorded verdict, identically, every time</text><circle cx="648" cy="474" r="5" fill="var(--dg-tea)"/><text x="666" y="478" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="11.5" font-weight="400" fill="var(--dg-ink)" text-anchor="start">→ recovery never depends on the model being up</text></svg></div>
+    <figcaption><b>Fig 6</b><span>Three bands rather than one threshold. The middle band is the region
+    where the model is least confident, and forcing a binary decision exactly there is what the
+    calibration literature warns against — so the engine defers it. By default that means running the
+    activity anyway while journaling the uncertainty; a stricter, opt-in policy holds the run for a
+    human instead. The reasoning is decided, not proposed — see the note below and design decision D5
+    in §7.</span></figcaption>
+  </figure>
+  <div class="note"><b>Decided — D5, the ESCALATE band executes by default</b>
+    This was left open at design time (§7, D5) and has since been resolved, in the direction opposite
+    the original proposal. <strong>By default, the ESCALATE band runs the activity</strong>, exactly as
+    DISTINCT does, and journals the verdict alongside it so the uncertainty is fully visible in the
+    audit trail. Setting <code>ESCALATION_BLOCKS=true</code> switches to the originally-proposed
+    stricter policy: the activity is not scheduled, and the run parks on an unresolved future until a
+    person answers the durable <code>__adjudicate</code> signal.<br><br>
+    The reasoning follows directly from the project's own risk table (§3.4, below): the two ways of
+    being wrong in this band are not equally bad. A false positive — calling something a duplicate when
+    it was not — makes the engine silently drop a real action, with nothing erroring anywhere to notice
+    it by. That is the severe, asymmetric failure this whole mechanism exists to be honest about. A
+    false negative — running something that actually was a repeat — is no worse than the engine's
+    behaviour with no semantic check at all, because the exact-match dedup key still travels with the
+    call and the downstream service still gets its chance to catch the repeat. Running the activity by
+    default in the uncertain band therefore guarantees the mechanism can never be worse than the
+    exact-match baseline on the dangerous axis; it can only ever be better, on the other. Nothing about
+    this hides the uncertainty — the verdict, its similarity score and both thresholds are journaled in
+    the same transaction either way, so the width of the band and what fell into it remain fully
+    measurable. Both policies exist behind one flag specifically so the evaluation can run the identical
+    workload both ways and report the comparison, rather than asserting one is right.</div>
+
+  <div class="prose">
+  <p>Two consequences are worth stating explicitly. Recovery never depends on the embedding service
+  being reachable, because replay never calls it — a design that re-embedded on every replay would
+  have coupled crash recovery to a third-party API. And every skipped action is explainable from a
+  row: score, threshold, matched call index, model identifier. For a mechanism whose job is to
+  <em>not</em> perform real-world actions, that audit trail is what makes it deployable at all.</p>
+  </div>
+  <div class="tw"><table>
+    <thead><tr><th>Failure</th><th>Meaning</th><th>Cost</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill c">False positive</span></td><td>Two genuinely different calls judged duplicate; a real action is silently skipped.</td><td>Severe and asymmetric — a flight the user wanted is never booked, and nothing errors.</td><td>Opt-in per activity; conservative τ; escalation band; every verdict journaled and surfaced.</td></tr>
+      <tr><td><span class="pill m">False negative</span></td><td>A true duplicate is missed and executes twice.</td><td>Equal to the exact-match baseline. No regression.</td><td>None required — this is the floor we are already standing on.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose">That asymmetry is the honest core of the contribution and is presented as a
+  designed-for constraint rather than left to be discovered: the mechanism is strictly better than
+  baseline on false negatives and strictly worse on false positives, which is exactly why it is
+  opt-in, thresholded conservatively, and fully audited.</p>
+
+  <h3 id="s3-5"><span class="hn">3.5</span>API surface</h3>
+  <p class="prose">A small REST surface over JSON. Every mutating call carries an
+  <code>Idempotency-Key</code> header; every response carries <code>X-Shard-Id</code> and
+  <code>X-Owner-Node</code> so the routing behaviour is observable in the demonstration.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Method &amp; path</th><th>Purpose</th><th>Returns</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">POST /v1/workflows</td><td>Start a workflow. Body carries <code>workflow_type</code>, <code>workflow_id</code>, <code>input</code>.</td><td><code>201</code> with run id · <code>200</code> if already running · <code>409 NotOwner</code></td></tr>
+      <tr><td class="idc">GET /v1/workflows/{id}</td><td>Current status, last sequence number and terminal result.</td><td><code>200</code> · <code>404</code></td></tr>
+      <tr><td class="idc">GET /v1/workflows/{id}/history</td><td>Full rendered event history, paginated by <code>seq</code>.</td><td><code>200</code></td></tr>
+      <tr><td class="idc">POST /v1/workflows/{id}/signals</td><td>Deliver an external signal, including a human approval decision.</td><td><code>202</code> · <code>409 NotOwner</code></td></tr>
+      <tr><td class="idc">POST /v1/workflows/{id}/cancel</td><td>Request cancellation; triggers saga compensation.</td><td><code>202</code></td></tr>
+      <tr><td class="idc">GET /v1/workflows</td><td>List executions filtered by status and workflow type.</td><td><code>200</code></td></tr>
+      <tr><td class="idc">GET /v1/dedup/verdicts</td><td>Every semantic verdict with score, threshold and matched call — the audit view.</td><td><code>200</code></td></tr>
+      <tr><td class="idc">POST /v1/admin/fail-step</td><td>Demonstration control: force the next occurrence of an activity to fail.</td><td><code>202</code></td></tr>
+      <tr><td class="idc">GET /v1/shards</td><td>Ownership map, fencing tokens and lease expiry per shard.</td><td><code>200</code></td></tr>
+      <tr><td class="idc">GET /healthz · /metrics</td><td>Liveness and Prometheus exposition.</td><td><code>200</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="cap">Start a workflow — request and response</p>
+  <pre><code>POST /v1/workflows
+Idempotency-Key: order-8f3a
+
+{ "workflow_type": "food_delivery",
+  "workflow_id":   "order-8f3a",
+  "input": { "customer_id": "c-119", "amount_inr": 450, "restaurant_id": "r-22" } }
+
+201 Created
+X-Shard-Id: 2
+X-Owner-Node: node-a
+
+{ "workflow_id": "order-8f3a",
+  "run_id":      "6f1c9e2a-1d4b-4f0a-9c77-2b6e5a0d31ff",
+  "status":      "RUNNING",
+  "last_seq":    1 }</code></pre>
+
+  <p class="cap">Routing miss — now absorbed by the node, not the client</p>
+  <pre><code>POST /v1/workflows          (sent to node-a; shard 2 is owned by node-c)
+
+201 Created
+X-Shard-Id: 2
+X-Owner-Node: node-c
+X-Durexec-Forwarded-By: node-a
+
+{ "workflow_id": "order-8f3a", "run_id": "…", "status": "RUNNING", "last_seq": 1 }</code></pre>
+  <p class="prose">The <code>409</code> below is still the wire format — it is what one node sends
+  another internally, and what a client sees only if both forwarding attempts are exhausted without a
+  peer ever answering with a usable result (a node that cannot be reached at all instead answers
+  <code>503</code>, naming the owner — §2.3).</p>
+  <pre><code>409 Conflict
+{ "error": "NotOwner", "shard_id": 2, "current_owner": "node-c", "retry": true }</code></pre>
+
+  <h4>Error taxonomy</h4>
+  <div class="tw"><table>
+    <thead><tr><th>Code</th><th>Condition</th><th>Client action</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">NotOwner</td><td>Shard moved between routing and handling, or the request simply hit a node that never owned it.</td><td>As built, the receiving node now forwards to the named owner and relays the result itself — see §2.3. A client only needs to retry by hand if it receives a <code>503</code> (owner unreachable) or a <code>409</code> that made it all the way through two exhausted forwarding attempts.</td></tr>
+      <tr><td class="idc">LostOwnership</td><td>Fencing token changed mid-transaction.</td><td>Internal only. The worker abandons the transaction and exits.</td></tr>
+      <tr><td class="idc">NonDeterminism</td><td>Replay diverged from recorded history.</td><td>Fail loudly with seq, recorded type and requested type. Never auto-repair.</td></tr>
+      <tr><td class="idc">WorkflowAlreadyOpen</td><td>Duplicate start for a running business key.</td><td>Return the existing run. This is success, not an error.</td></tr>
+      <tr><td class="idc">CompensationFailed</td><td>A compensating action exhausted its retries.</td><td>Terminal. Requires human intervention; surfaced in the admin panel.</td></tr>
+      <tr><td class="idc">EmbeddingUnavailable</td><td>Model unreachable during a new-mode semantic check.</td><td>Fall back to exact matching for that call and journal the fallback.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<!-- ===================================================== 4 -->
+<section id="s4">
+  <div class="h2wrap"><span class="h2n">04</span><h2>Infrastructure &amp; Deployment</h2></div>
+
+  <h3 id="s4-1"><span class="hn">4.1</span>Runtime topology</h3>
+  <figure>
+    <div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" class="dg"><defs></defs><rect x="50" y="80" width="1100" height="300" rx="14" fill="none" stroke="var(--dg-sla)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="68" y="71" width="363.0" height="19" rx="5" fill="var(--dg-bg)"/><text x="249.5" y="84.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-sla)" text-anchor="middle" letter-spacing="1.1">DOCKER COMPOSE — ONE DEVELOPER MACHINE, UNDER 3 GB</text><rect x="80" y="116" width="176" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="168.0" y="147.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">node-a</text><text x="168.0" y="165.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">engine binary</text><rect x="280" y="116" width="176" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="368.0" y="147.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">node-b</text><text x="368.0" y="165.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">engine binary</text><rect x="480" y="116" width="176" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="568.0" y="147.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">node-c</text><text x="568.0" y="165.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">engine binary</text><rect x="700" y="116" width="200" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="800.0" y="147.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">frontend</text><text x="800.0" y="165.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">React + TypeScript</text><rect x="924" y="116" width="200" height="66" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="1024.0" y="147.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">prometheus</text><text x="1024.0" y="165.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">scrape /metrics</text><rect x="80" y="236" width="176" height="60" rx="12" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.8"/><text x="168.0" y="264.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">postgres-leader</text><text x="168.0" y="282.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">PostgreSQL 16 · shared by all 3</text><rect x="80" y="306" width="176" height="46" rx="12" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.8" stroke-dasharray="6,5"/><text x="168.0" y="334.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">postgres-standby</text><line x1="168" y1="296" x2="168" y2="302" stroke="var(--dg-tea)" stroke-width="1.6" marker-end="url(#mk-tea)" stroke-linecap="round"/><line x1="168" y1="182" x2="168" y2="232" stroke="var(--dg-mut)" stroke-width="1.6" marker-end="url(#mk-mut)" stroke-linecap="round"/><path d="M 368 182 V 240 Q 368 250 356 250 H 256" fill="none" stroke="var(--dg-mut)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mk-mut)"/><path d="M 568 182 V 262 Q 568 272 356 272 H 256" fill="none" stroke="var(--dg-mut)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#mk-mut)"/><text x="460" y="316" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">no databases of their own</text><text x="460" y="356" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">node-b and node-c connect to the same postgres-leader.</text><text x="460" y="372" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">Every table carries shard_id, so one instance serves all 16 shards — see &#167;2.3.</text><rect x="700" y="236" width="200" height="60" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="800.0" y="264.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">loadgen</text><text x="800.0" y="282.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">k6 + fault injector</text><rect x="924" y="236" width="200" height="60" rx="12" fill="var(--dg-slas)" stroke="var(--dg-sla)" stroke-width="1.8"/><text x="1024.0" y="264.0" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="15" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">grafana</text><text x="1024.0" y="282.0" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">dashboards</text><line x1="1024" y1="182" x2="1024" y2="232" stroke="var(--dg-mut)" stroke-width="1.6" marker-end="url(#mk-mut)" stroke-linecap="round"/><rect x="50" y="416" width="1100" height="76" rx="14" fill="none" stroke="var(--dg-tea)" stroke-width="1.4" stroke-dasharray="7,6"/><rect x="68" y="407" width="356.1" height="19" rx="5" fill="var(--dg-bg)"/><text x="246.05" y="420.5" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10.5" font-weight="700" fill="var(--dg-tea)" text-anchor="middle" letter-spacing="1.1">CLOUD VALIDATION — CONFIRMATORY, NOT LOAD-BEARING</text><text x="600" y="452" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">3 × e2-small VMs (2 vCPU / 2 GB), one engine node each, sharing one managed Postgres leader + replica,</text><text x="600" y="472" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">private network between nodes. Proves the design across real machines and a real network.</text></svg></div>
+    <figcaption><b>Fig 7</b><span>The demonstration cluster is the primary artefact and runs on one
+    machine. As built, the three engine nodes share a single PostgreSQL leader and standby rather than
+    one database per shard — the divergence from the original design is explained in §2.3, including
+    what it would take to change. Cloud deployment confirms the design across real network boundaries
+    but is deliberately not load-bearing for the evaluation.</span></figcaption>
+  </figure>
+
+  <h3 id="s4-2"><span class="hn">4.2</span>Continuous integration</h3>
+  <figure>
+    <div class="plate"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 250" role="img" class="dg"><defs></defs><rect x="50" y="90" width="142" height="74" rx="10" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="121.0" y="122" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">push / PR</text><text x="121.0" y="142" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">any branch</text><text x="121.0" y="76" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">01</text><line x1="192" y1="127" x2="206" y2="127" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="208" y="90" width="142" height="74" rx="10" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="279.0" y="122" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">lint + vet</text><text x="279.0" y="142" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">golangci-lint</text><text x="279.0" y="76" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">02</text><line x1="350" y1="127" x2="364" y2="127" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="366" y="90" width="142" height="74" rx="10" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="437.0" y="122" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">unit tests</text><text x="437.0" y="142" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">go test ./…</text><text x="437.0" y="76" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">03</text><line x1="508" y1="127" x2="522" y2="127" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="524" y="90" width="142" height="74" rx="10" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="595.0" y="122" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">integration</text><text x="595.0" y="142" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">testcontainers + PG</text><text x="595.0" y="76" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">04</text><line x1="666" y1="127" x2="680" y2="127" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="682" y="90" width="142" height="74" rx="10" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="753.0" y="122" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">build image</text><text x="753.0" y="142" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">multi-stage distroless</text><text x="753.0" y="76" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">05</text><line x1="824" y1="127" x2="838" y2="127" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="840" y="90" width="142" height="74" rx="10" fill="var(--dg-sur)" stroke="var(--dg-rul)" stroke-width="1.5"/><text x="911.0" y="122" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="600" fill="var(--dg-ink)" text-anchor="middle">compose up</text><text x="911.0" y="142" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">3 nodes + 1 leader + 1 standby</text><text x="911.0" y="76" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">06</text><line x1="982" y1="127" x2="996" y2="127" stroke="var(--dg-rul)" stroke-width="1.8" marker-end="url(#mk-rul)" stroke-linecap="round"/><rect x="998" y="90" width="142" height="74" rx="10" fill="var(--dg-teas)" stroke="var(--dg-tea)" stroke-width="1.8"/><text x="1069.0" y="122" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12.5" font-weight="700" fill="var(--dg-tea)" text-anchor="middle">fault smoke</text><text x="1069.0" y="142" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="var(--dg-tea)" text-anchor="middle">kill · assert no dup</text><text x="1069.0" y="76" font-family="'IBM Plex Mono',ui-monospace,monospace" font-size="10" font-weight="600" fill="var(--dg-mut)" text-anchor="middle">07</text><text x="600" y="196" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">The last stage is the one that matters: every merge proves the engine survives a node kill</text><text x="600" y="216" font-family="'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="400" fill="var(--dg-mut)" text-anchor="middle">without writing a duplicate event. A green build is evidence, not a formality.</text></svg></div>
+    <figcaption><b>Fig 8</b><span>GitHub Actions on every push. The final stage is the one that
+    matters — it kills a node under load and asserts that not one duplicate event was written.</span></figcaption>
+  </figure>
+  <div class="note"><b>Why the fault stage is in CI, not in a notebook</b>
+    The central claim of this project is a safety property. A property that is only checked by hand
+    before a demonstration is a hope; a property checked on every merge is a guarantee. The stage
+    runs the cluster, kills the owner of shard 2 mid-load, and fails the build if the event log
+    contains a single duplicated sequence number.</div>
+
+  <h3 id="s4-3"><span class="hn">4.3</span>Configuration surface</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Setting</th><th>Default</th><th>Effect of changing it</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">CLUSTER_NODES</td><td class="num">this node only</td><td>Comma-separated list of every node id in the cluster, including this one — <code>node-a,node-b,node-c</code>. The hash ring is a pure function of this list, so every node must be given the identical list or two nodes can disagree about who owns what. Defaults to a single-node cluster if unset.</td></tr>
+      <tr><td class="idc">SHARD_COUNT</td><td class="num">16</td><td>Fixed at deploy. Changing it after data exists invalidates every workflow-to-shard mapping.</td></tr>
+      <tr><td class="idc">LEASE_TTL</td><td class="num">10 s</td><td>Shorter means faster failover and more risk of spurious fencing under load. Directly sets NFR-4. Also sets the orphan-adoption wait (2× TTL) described in §2.3.</td></tr>
+      <tr><td class="idc">LEASE_RENEW</td><td class="num">3 s</td><td>Must stay well under one third of the TTL to tolerate a missed renewal.</td></tr>
+      <tr><td class="idc">TASK_LOCK</td><td class="num">30 s</td><td>Visibility timeout. Too short and slow activities are redelivered while still running.</td></tr>
+      <tr><td class="idc">WORKFLOW_WORKERS</td><td class="num">4</td><td>Per owned shard. Decision-making is CPU-bound and short.</td></tr>
+      <tr><td class="idc">ACTIVITY_WORKERS</td><td class="num">8</td><td>Per owned shard. Side effects are I/O-bound and slow.</td></tr>
+      <tr><td class="idc">SYNC_COMMIT</td><td class="num">on</td><td><code>on</code> removes the replication loss window at the cost of a round trip; <code>off</code> is faster with a measurable window. Both are benchmarked.</td></tr>
+      <tr><td class="idc">TAU_HIGH / TAU_LOW</td><td class="num">0.90 / 0.85</td><td>The escalation band. Widening it trades throughput for safety on the asymmetric failure.</td></tr>
+      <tr><td class="idc">ESCALATION_BLOCKS</td><td class="num">off</td><td>Decides what an ESCALATE verdict does — see design decision D5, §7. Off (the default) runs the activity and journals the verdict anyway; on holds the run for human adjudication via the <code>__adjudicate</code> signal. A flag rather than a fixed choice because the evaluation runs the same workload under both policies and compares them.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s4-4"><span class="hn">4.4</span>Observability</h3>
+  <p class="prose">Metrics exist to produce the evaluation numbers, not to decorate a dashboard. Each
+  one below maps to a specific non-functional requirement.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Signal</th><th>Type</th><th>Answers</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">workflow_completed_total</td><td>counter</td><td>Throughput scaling — NFR-5.</td></tr>
+      <tr><td class="idc">replay_duration_seconds</td><td>histogram</td><td>Replay latency against history length — NFR-6.</td></tr>
+      <tr><td class="idc">shard_recovery_seconds</td><td>histogram</td><td>Time from kill to resumed work — NFR-2.</td></tr>
+      <tr><td class="idc">lease_transitions_total</td><td>counter</td><td>Failover frequency and any lease flapping under load.</td></tr>
+      <tr><td class="idc">fencing_rejections_total</td><td>counter</td><td>Proof the safety mechanism actually fires. Should be non-zero during fault injection.</td></tr>
+      <tr><td class="idc">dedup_verdict_total</td><td>counter by class</td><td>DUPLICATE / ESCALATE / DISTINCT distribution — NFR-8.</td></tr>
+      <tr><td class="idc">dedup_latency_seconds</td><td>histogram</td><td>Added cost of the semantic check — NFR-7.</td></tr>
+      <tr><td class="idc">task_queue_depth</td><td>gauge</td><td>Backpressure and whether workers are the bottleneck.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s4-5"><span class="hn">4.5</span>Memory budget</h3>
+  <p class="prose">NFR-9 sets the operational footprint at under 3 GB on one machine. The base stack —
+  three engine nodes, the PostgreSQL leader and standby, Prometheus and Grafana — measures at
+  <strong>2300 MB</strong>, comfortably inside the <strong>3072 MB</strong> (3 GB) target.</p>
+  <div class="note"><b>The real embedding service is an opt-in overlay, on purpose</b>
+    A real sentence-embedding model needs headroom the base stack does not budget for — CPU
+    <code>sentence-transformers</code> plus a CPU build of torch want roughly <strong>900 MB</strong> on
+    their own, which would put the whole stack at 3200 MB and break the NFR-9 claim outright. Rather than
+    quietly exceed the target, that service lives in a separate overlay file,
+    <code>deploy/docker-compose.embedder.yml</code>, started only with <code>make up-semantic</code>. The
+    default path, <code>make up</code>, never pulls it in.<br><br>
+    Without the overlay, the engine falls back to a built-in deterministic stand-in encoder: it hashes
+    the intent text into a vector, so an <em>exact</em> repeat still scores a perfect match and is still
+    caught, but it has no notion of meaning — a reworded repeat hashes to an unrelated vector and is not
+    recognised as one. That is enough to exercise every piece of plumbing (the journal, the replay path,
+    the audit trail) end to end on a laptop with nothing else running, but only the real encoder — under
+    <code>make up-semantic</code>, at 3200 MB, deliberately over budget for the duration of that
+    measurement only — demonstrates the actual contribution.</div>
+  <p class="cap">Memory, by configuration</p>
+  <div class="tw"><table>
+    <thead><tr><th>Configuration</th><th>Total</th><th>Against the 3072 MB (3 GB) target</th></tr></thead>
+    <tbody>
+      <tr><td><code>make up</code> — base stack, stand-in encoder</td><td class="num">2300 MB</td><td class="num">inside target</td></tr>
+      <tr><td><code>make up-semantic</code> — base stack + real embedder</td><td class="num">3200 MB</td><td class="num">over target by ~128 MB (~4%), while measuring the semantic contribution only</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<!-- ===================================================== 5 -->
+<section id="s5">
+  <div class="h2wrap"><span class="h2n">05</span><h2>Implementation Roadmap</h2></div>
+  <p class="lede">Eight weeks, from 8 September to the document deadline on 29 October. Each phase
+  carries an objective exit condition, because "done" is the part that slips.</p>
+
+  <div class="gantt"><div class="ginner">
+    <div class="gh"><span>Phase</span><span>Sep 8</span><span>Sep 15</span><span>Sep 22</span><span>Sep 29</span><span>Oct 6</span><span>Oct 13</span><span>Oct 20</span><span>Oct 27</span></div>
+    <div class="grow"><div class="glabel">Foundations<small>P0</small></div><div class="gbar soft" style="grid-column:2/3"></div></div>
+    <div class="grow"><div class="glabel">Event log &amp; replay<small>P1 · critical</small></div><div class="gbar key" style="grid-column:2/4"><i>MILESTONE 1</i></div></div>
+    <div class="grow"><div class="glabel">Queue, retries, timers<small>P2</small></div><div class="gbar" style="grid-column:4/5"></div></div>
+    <div class="grow"><div class="glabel">Sharding, leases, fencing<small>P3 · critical</small></div><div class="gbar key" style="grid-column:5/7"><i>MILESTONE 2</i></div></div>
+    <div class="grow"><div class="glabel">Replication &amp; saga<small>P4</small></div><div class="gbar" style="grid-column:6/8"></div></div>
+    <div class="grow"><div class="glabel">Frontend &amp; agent app<small>P5</small></div><div class="gbar" style="grid-column:7/8"></div></div>
+    <div class="grow"><div class="glabel">Semantic idempotency<small>P6 · critical</small></div><div class="gbar key" style="grid-column:7/9"><i>MILESTONE 3</i></div></div>
+    <div class="grow"><div class="glabel">Experiment &amp; report<small>P7</small></div><div class="gbar" style="grid-column:8/9"></div></div>
+  </div></div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Phase</th><th>Deliverable</th><th>Exit condition — how "done" is verified</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">P0</td><td>Repo, migrations, Compose skeleton, CI</td><td><code>make up</code> brings up PostgreSQL; migrations apply cleanly; CI green.</td></tr>
+      <tr><td class="idc">P1 <span class="pill t">critical</span></td><td>Event log, WorkflowContext, deterministic replay</td><td><b>Kill the process mid-workflow, restart, and it resumes without re-running completed activities.</b> This is the moment the project becomes real.</td></tr>
+      <tr><td class="idc">P2</td><td>Task queue, retry policy, durable timers</td><td>Workers run as separate processes; an activity fails 3× then succeeds with one logged success; a 2-minute sleep survives a full restart.</td></tr>
+      <tr><td class="idc">P3 <span class="pill t">critical</span></td><td>Hash ring, gateway routing, leases, fencing</td><td><code>docker kill</code> the shard owner; another node takes over; <b>no duplicate event is ever written</b>, asserted in CI.</td></tr>
+      <tr><td class="idc">P4</td><td>Streaming replication, saga compensation</td><td>Follower promoted; recovery time over 20 kills reported p50/p99; restaurant rejection triggers refund in LIFO order.</td></tr>
+      <tr><td class="idc">P5</td><td>Demo frontend, AI agent workflow</td><td>Compensation demonstrable live via the "fail this step" control; both apps run on the same binary.</td></tr>
+      <tr><td class="idc">P6 <span class="pill t">critical</span></td><td>Idempotency modes, embedding path, journaled verdicts</td><td>A reproducible double-booking is blocked before it executes, and the verdict is explainable from the log.</td></tr>
+      <tr><td class="idc">P7</td><td>Experiment runner, dashboards, report</td><td>Precision–recall curve over ≥100 hand-labelled retry pairs, with the exact-match baseline as a single point.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s5-2"><span class="hn">5.2</span>Risk register</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Risk</th><th>Impact</th><th>Response</th></tr></thead>
+    <tbody>
+      <tr><td>Replay (P1) takes longer than planned.</td><td><span class="pill c">Critical</span> Everything downstream depends on it.</td><td>Start P1 in week one, before the task queue. Build it in-process with no database first, so the mechanism is isolated from persistence concerns.</td></tr>
+      <tr><td>Lease failover proves subtle under load.</td><td><span class="pill a">High</span></td><td>Reserve two full weeks. Test with induced GC pauses and <code>SIGSTOP</code>, not only clean kills — a clean kill never exercises the fencing path.</td></tr>
+      <tr><td>Eight weeks is shorter than the original sixteen.</td><td><span class="pill a">High</span></td><td>Scope is ordered so partial completion still demonstrates the core claim. If anything slips it is replication and dashboards, never the three critical milestones.</td></tr>
+      <tr><td>Hand-labelling 100–200 retry pairs is slow.</td><td><span class="pill m">Medium</span></td><td>Generate pairs continuously from P5 onward so labelling overlaps development rather than following it.</td></tr>
+      <tr><td>Semantic false positives silently skip real actions.</td><td><span class="pill c">Critical</span> to the contribution's credibility.</td><td>Opt-in per activity, conservative thresholds, escalation band, and a full audit view. Reported as a measured rate, not claimed to be zero.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<hr class="rule">
+
+<!-- ===================================================== 6 -->
+<section id="s6">
+  <div class="h2wrap"><span class="h2n">06</span><h2>Implementation Findings</h2></div>
+  <p class="lede">A document that only records what was intended is a proposal. A document that also
+  records what went wrong, how it was found, and what it cost, is evidence the system was actually
+  built and actually tested. The five defects below (§6.1–§6.5) surfaced through measurement, not code
+  review, and each one changed a real number in the evaluation before it changed a line of prose here.
+  §6.6 presents the evidence that the assembled system meets its central claim, and §6.7 records a
+  limitation that survives into this revision honestly rather than being fixed under deadline pressure.</p>
+
+  <h3 id="s6-1"><span class="hn">6.1</span>The hash ring's clustering defect</h3>
+  <p class="prose">§2.3's central sharding claim is that adding a node moves a minority of shards — an
+  ownership handoff, not a data migration. The ring that was supposed to provide that property did not,
+  and the reason is a specific, checkable mixing defect rather than a vague "the hashing was off."</p>
+  <div class="note stop"><b>What was wrong</b>
+    The ring placed nodes and looked up keys with raw FNV-1a. FNV-1a mixes <em>upward only</em>: each
+    byte is folded into the low bits and the accumulator is then multiplied, so by the time hashing
+    reaches the end of a short string, the high bits — the ones that decide ring position — have been
+    shaped almost entirely by the string's length and its first few characters. The sixteen shard keys
+    <code>"shard-0"</code>…<code>"shard-15"</code> are exactly such a set: the ten seven-character names
+    collapsed onto one point around <code>0x8ae4…</code>, and the six eight-character names onto another
+    around <code>0x6749…</code>, each cluster spanning about <code>1e10</code> inside a 64-bit space of
+    <code>1.8e19</code>. For a clockwise-walk ring, a cluster that tight is indistinguishable from a
+    single point. At most two nodes could ever own a shard, at any cluster size, and adding a fourth
+    node to a three-node cluster moved <strong>zero</strong> of sixteen shards — the exact opposite of
+    the property a consistent hash ring exists to provide.</div>
+  <p class="prose"><b>The fix.</b> <code>hashRing</code> now runs its FNV-1a output through splitmix64's
+  finalising avalanche step — three xor-shift/multiply rounds that spread a one-bit input difference
+  across all 64 output bits — before the value is used for ring placement. The cost is a handful of
+  nanoseconds per ring point, paid once when the ring is built.</p>
+  <p class="cap">Measured, before and after (internal/shard/ring_test.go)</p>
+  <div class="tw"><table>
+    <thead><tr><th>Measurement</th><th>Before the fix</th><th>After the fix</th></tr></thead>
+    <tbody>
+      <tr><td>Adding a 4th node to a 3-node cluster</td><td class="num">0 of 16 shards moved</td><td class="num">5 of 16 shards moved (31.2%), 11 untouched</td></tr>
+      <tr><td>Nodes that own any shard, any cluster size</td><td class="num">at most 2, always</td><td class="num">every node owns at least one, for 2/3/4/8-node clusters tested</td></tr>
+      <tr><td>1 → 2 nodes, 10,000 spread keys</td><td class="num">—</td><td class="num">50.38% moved (ideal 50.0%)</td></tr>
+      <tr><td>2 → 3 nodes, 10,000 spread keys</td><td class="num">—</td><td class="num">33.69% moved (ideal 33.3%)</td></tr>
+      <tr><td>3 → 4 nodes, 10,000 spread keys</td><td class="num">—</td><td class="num">25.76% moved (ideal 25.0%)</td></tr>
+      <tr><td>7 → 8 nodes, 10,000 spread keys</td><td class="num">—</td><td class="num">12.82% moved (ideal 12.5%)</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose">These are the numbers that belong wherever this document previously asserted the
+  rebalancing property without evidence — Fig 2's caption and the sharding discussion in §2.3 among
+  them. Each transition lands within a tight band of its ideal fair share (1/<i>n</i>), which is the
+  actual, checkable version of "adding a node moves about one node's worth of keys."</p>
+
+  <h3 id="s6-2"><span class="hn">6.2</span>The task queue's silent starvation under concurrency</h3>
+  <p class="prose">The <code>SKIP LOCKED</code> poll in §3.3 is correct in isolation and wrong under
+  load, in a way that a single-worker test cannot see and a lightly-loaded demo will not trigger.</p>
+  <div class="note stop"><b>What was wrong</b>
+    The original poll was the textbook spelling: <code>UPDATE tasks SET … WHERE (shard_id, task_id) IN
+    (SELECT … FOR UPDATE SKIP LOCKED LIMIT 1)</code>. Under PostgreSQL's default <code>READ COMMITTED</code>
+    isolation, when that outer <code>UPDATE</code> reaches a row that a concurrent transaction has just
+    modified, PostgreSQL re-evaluates the uncorrelated subquery during <em>EvalPlanQual</em> to decide
+    whether the update should still apply. The re-run of the subquery now sees the winning transactions'
+    locks already held, <code>SKIP LOCKED</code> steps over every one of them, the recheck finds nothing
+    to update, and the poll reports "no task available" — while the tasks are sitting there, unclaimed,
+    the entire time. It hid during development because cold database connections stagger pollers by
+    roughly 17ms, long enough for each to finish before the next begins; it only appears once several
+    warm connections poll at genuinely the same instant.</div>
+  <p class="cap">Measured, before and after (internal/taskq/concurrency_test.go)</p>
+  <div class="tw"><table>
+    <thead><tr><th>Setup</th><th>Before the fix</th><th>After the fix</th></tr></thead>
+    <tbody>
+      <tr><td>4 warm pollers against 4 available tasks, 12 rounds</td><td class="num">1 poller got work, 3 got nothing — in 12 of 12 rounds</td><td class="num">48 of 48 polls succeeded across 12 rounds</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose"><b>The fix.</b> The same lock-and-pick logic is rewritten as a single-pass CTE —
+  <code>WITH pick AS (SELECT … FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE tasks … FROM pick …</code> — so
+  the row selection, the lock and the skip all happen once, inside the same plan, instead of being
+  re-derived after the fact.</p>
+  <div class="note"><b>Correctness was never at risk</b>
+    No task was ever double-claimed and no event was ever lost — a poller that lost the race simply
+    tried again on its next tick, and the queue's lease-with-expiry design (§3.3) absorbed the retry
+    for free. What the defect cost was <em>throughput</em>: with three of four workers idling every
+    round under load, the queue could not come close to using the worker pool it was configured with.
+    That is precisely the axis NFR-5 (throughput scaling) measures, so this defect would have understated
+    the engine's own headline number without ever showing up as an incorrect result. It is exactly the
+    kind of finding that is more convincing in a viva than a feature would have been, because it shows
+    the difference between code that passed its tests and a system that was measured under the
+    conditions it claims to handle.</div>
+
+  <h3 id="s6-3"><span class="hn">6.3</span>A migration race on first boot</h3>
+  <p class="prose">Three engine nodes booting together all run the same schema migrations on startup
+  (§2.5, §4.2), and that concurrency was never actually exercised until the demonstration cluster came
+  up with all three nodes cold at once.</p>
+  <div class="note stop"><b>What was wrong</b>
+    <code>CREATE EXTENSION IF NOT EXISTS vector</code> — the first statement in
+    <code>migrations/0001_init.up.sql</code> — is not atomic against a concurrent creator. Its existence
+    check and its insert into <code>pg_extension</code> are two separate steps, so when two nodes reach
+    it in the same instant, both see "not there," both attempt the insert, and the loser dies with a
+    unique violation on <code>pg_extension_name_index</code>. <code>CREATE TABLE IF NOT EXISTS</code>
+    can fail the identical way. Neither is a bug in PostgreSQL; it is what "IF NOT EXISTS" always meant
+    — not present <em>at the moment I checked</em> — applied somewhere that check-then-act is not safe
+    without help.</div>
+  <p class="prose"><b>The fix.</b> <code>eventlog.Migrate</code> now takes a PostgreSQL session advisory
+  lock (<code>pg_advisory_lock</code>) on a fixed key before applying any migration file, and releases
+  it when done. The first node to arrive migrates while its peers block on the same lock; each of them
+  then finds the schema already in place and its own <code>IF NOT EXISTS</code> statements become
+  genuine no-ops rather than a race. This is not defensive programming added out of caution — without
+  it, a three-node cluster reliably fails to start on a cold volume, because all three nodes migrate on
+  every boot by design (§2.5: there is deliberately no migrations-applied bookkeeping table to keep in
+  sync across nodes).</p>
+
+  <h3 id="s6-4"><span class="hn">6.4</span>Connection pool sizing</h3>
+  <p class="prose">This one was found by the database refusing to talk to the cluster at all, not by a
+  subtle timing window — the loudest possible failure, from the quietest possible cause: a sum that was
+  wrong by 3×.</p>
+  <div class="note stop"><b>What was wrong</b>
+    Each node's connection pool was sized <code>ShardCount × (WorkflowWorkers + ActivityWorkers) + 8</code>
+    — one connection reserved per worker goroutine, per shard the node could ever own, plus a small
+    margin. At the running defaults that is <code>16 × (4 + 8) + 8 = 200</code> connections per node, or
+    <strong>600</strong> across the three-node demonstration cluster, against PostgreSQL's default
+    <code>max_connections</code> of 100. The server did exactly what a correctly configured server should
+    do under that load: once the limit was reached it started refusing new connections outright, with
+    <code>"sorry, too many clients already"</code>.</div>
+  <p class="prose"><b>The fix.</b> The sum was wrong at the premise, not the arithmetic: a worker holds a
+  database connection only for the duration of one query, not for its whole lifetime, so the pool never
+  needed a permanent slot per worker in the first place. Between polls a worker holds nothing. The pool
+  is now capped at a flat <code>25</code> connections per node — comfortably inside a default server
+  across three nodes, with room left for <code>psql</code> and the monitoring stack — and a burst of
+  workers that briefly exceeds it simply queues for a free connection rather than deadlocking, which is
+  exactly the back-pressure wanted when the database, not the worker pool, is the bottleneck.</p>
+  <p class="cap">Measured, before and after</p>
+  <div class="tw"><table>
+    <thead><tr><th>Measurement</th><th>Before the fix</th><th>After the fix</th></tr></thead>
+    <tbody>
+      <tr><td>Pool size, per node</td><td class="num">200</td><td class="num">25 (capped)</td></tr>
+      <tr><td>Pool size, three-node cluster</td><td class="num">600</td><td class="num">75</td></tr>
+      <tr><td>Against <code>max_connections=100</code></td><td class="num">exceeded by 6×</td><td class="num">comfortably inside</td></tr>
+      <tr><td>Cluster boot, all three nodes</td><td class="num">fails — connections refused</td><td class="num">succeeds</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s6-5"><span class="hn">6.5</span>The standby that was never replicating</h3>
+  <p class="prose">FR-9 claims a real, verified follower. For a stretch of development the standby
+  container reported <code>unhealthy</code> and never recovered, and the reason was a single missing
+  word in a shell script — the kind of defect that is invisible until something forces the question
+  "is it actually replicating, or just running?"</p>
+  <div class="note stop"><b>What was wrong</b>
+    <code>deploy/postgres/standby-entrypoint.sh</code> cloned the leader with
+    <code>PGPASSWORD="$REPL_PASSWORD" pg_isready …</code> to wait for the leader to be ready, then later
+    ran <code>pg_basebackup</code> to perform the actual clone. A prefix assignment like
+    <code>VAR=val cmd</code> sets that variable only for the one command it prefixes — it does not
+    persist in the shell's environment afterwards. So <code>pg_basebackup</code>, running moments later
+    with no <code>PGPASSWORD</code> in scope at all, was rejected by the leader's <code>scram-sha-256</code>
+    authentication with <code>"fe_sendauth: no password supplied"</code>. The script had
+    <code>set -e</code>, so that failure killed it immediately, and the container's restart policy
+    brought it straight back into the same failure — postgres itself never finished starting, which is
+    why the healthcheck never turned green: there was nothing behind it to check.</div>
+  <p class="prose"><b>The fix.</b> Changing the one line to <code>export PGPASSWORD="$REPL_PASSWORD"</code>
+  before the clone keeps the password in the environment for every command that follows, including
+  <code>pg_basebackup</code>. <code>deploy/check_replication.sh</code> makes the fix demonstrable rather
+  than asserted: it writes a one-off sentinel row on the leader and polls the standby until that exact
+  row shows up there, which is the only way to actually prove WAL is being applied rather than merely
+  that the container reports itself healthy.</p>
+  <p class="cap">Measured, before and after</p>
+  <div class="tw"><table>
+    <thead><tr><th>Measurement</th><th>Before the fix</th><th>After the fix</th></tr></thead>
+    <tbody>
+      <tr><td>Standby container health</td><td class="num">unhealthy, permanently</td><td class="num">healthy</td></tr>
+      <tr><td><code>pg_basebackup</code> auth</td><td class="num">rejected — no password supplied</td><td class="num">succeeds</td></tr>
+      <tr><td>Sentinel row written on leader, read from standby</td><td class="num">never arrives</td><td class="num">arrives on the first poll attempt</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="s6-6"><span class="hn">6.6</span>The failover demonstration: results</h3>
+  <p class="prose">§2.4 argues that the fencing mechanism makes a stale node unable to corrupt a shard
+  it has lost, and P3/P8 in §5 set an exit condition for that argument: kill the owner mid-workflow and
+  show that nothing is lost and nothing is duplicated. The other findings in this section were defects
+  in the machinery underneath that claim. This one is the claim itself, run for real, with the numbers
+  it produced.</p>
+  <div class="note"><b>What was run, on the live three-node cluster</b>
+    A workflow was started on the shard owned by <code>node-b</code>, with a 25-second durable sleep in
+    its history. <code>node-b</code> was killed mid-flight with <code>docker kill</code>. Shard 3 — the
+    shard that workflow lived on — moved to <code>node-c</code>, and its fencing token incremented from
+    1 to 2, exactly as §2.4's argument requires. The workflow nonetheless reached
+    <code>COMPLETED</code>, at <code>last_seq=12</code>, with exactly four
+    <code>ActivityTaskCompleted</code> events and none of them duplicated. The durable timer survived the
+    failover intact: <code>TimerStarted</code> at seq 8 and <code>TimerFired</code> at seq 9, on either
+    side of the kill, with no re-firing and no lost wakeup.</div>
+  <p class="cap">Database-wide assertions after the run (<code>deploy/assert_no_duplicates.sql</code>, <code>cmd/acceptance/analyze.go</code>)</p>
+  <div class="tw"><table>
+    <thead><tr><th>Assertion</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Duplicated <code>(shard_id, workflow_id, run_id, seq)</code> tuples in <code>events</code></td><td class="num">0</td></tr>
+      <tr><td>Duplicated activity results at the same program-order index <i>k</i> across the whole run</td><td class="num">0</td></tr>
+      <tr><td>Shard 3's fencing token across the kill</td><td class="num">1 → 2</td></tr>
+      <tr><td>Workflow terminal state</td><td class="num">COMPLETED, last_seq=12</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose">This is the P3/P8 exit condition from §5, met on the running system rather than
+  asserted about it: a workflow's owner dies mid-execution, ownership and the fencing token both move,
+  and the workflow still finishes exactly once — no event replayed twice, no activity re-run, no timer
+  either lost or re-fired. Combined with the CI fault-injection stage in §4.2, this is checked on every
+  merge, not only when someone remembers to run it by hand.</p>
+
+  <h3 id="s6-7"><span class="hn">6.7</span>Known limitation: the cluster does not rebalance on recovery</h3>
+  <p class="prose">The demonstration above shows the failure side of fault tolerance working. The
+  recovery side has a real gap, and it is worth stating plainly rather than leaving it to be noticed.</p>
+  <div class="note warn"><b>What happens today</b>
+    When a node that died is brought back up, it does not get its shards back. In the run above,
+    restarting <code>node-b</code> left it owning <strong>zero</strong> shards: <code>node-a</code> and
+    <code>node-c</code> had already adopted everything it used to hold, and both keep renewing those
+    leases on schedule, so nothing about them ever looks expired. §2.3's orphan rule only lets a node
+    take over a lease that has sat expired for more than twice the TTL — deliberately, so a brief GC
+    pause does not cause needless churn — but a live, renewing lease never qualifies as an orphan no
+    matter how long ago the ring's preference changed. Repeat this enough times across enough failovers
+    and ownership keeps concentrating onto whichever nodes happen to survive, until one node is carrying
+    shards the ring says several other nodes should hold.</div>
+  <p class="prose">Fixing this needs a mechanism the engine does not yet have: a <em>handback</em>. A
+  node that is currently holding a shard the ring assigns to a live peer would need to notice the
+  mismatch and voluntarily release the lease, rather than simply continuing to renew whatever it already
+  holds. Nothing in the current design triggers that check — <code>Wants</code> (§2.3) only ever governs
+  which shards a node reaches <em>for</em>, never which ones it gives back. This is recorded as accepted,
+  known future work rather than as a defect fixed in this revision, because it does not threaten
+  correctness — a lopsided cluster still answers every request correctly, just from fewer nodes than it
+  should be using.</p>
+
+</section>
+
+<hr class="rule">
+
+<!-- ===================================================== 7 -->
+<section id="s7">
+  <div class="h2wrap"><span class="h2n">07</span><h2>Awaiting Your Approval</h2></div>
+  <p class="lede">Revision A framed these as decisions to confirm before the first commit. Since then the
+  system has been built, and every one of the six has actually been exercised — most as proposed, two
+  resolved the other way once building the thing surfaced a reason to. Nothing below is hypothetical.</p>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Decision</th><th>Proposed</th><th>Status</th><th>Outcome</th></tr></thead>
+    <tbody>
+      <tr><td class="idc">D1</td><td>Shard count</td><td class="num">16</td><td><span class="pill t">Decided</span></td><td>Built as proposed. <code>SHARD_COUNT=16</code> is the running default.</td></tr>
+      <tr><td class="idc">D2</td><td>Lease TTL</td><td class="num">10 s</td><td><span class="pill t">Decided</span></td><td>Built as proposed. <code>LEASE_TTL=10s</code> is the running default, and now also sets the two-TTL orphan-adoption wait in §2.3.</td></tr>
+      <tr><td class="idc">D3</td><td>Database per shard, or schema per shard</td><td>One database per shard</td><td><span class="pill a">Decided — differently</span></td><td>What was built is one shared database with every table partitioned by <code>shard_id</code>, not one database per shard. See the full argument and the extension path in §2.3. The schema was deliberately built so this remains changeable later without a rewrite.</td></tr>
+      <tr><td class="idc">D4</td><td>Default replication mode for the headline numbers</td><td>Synchronous</td><td><span class="pill t">Decided</span></td><td>Built as proposed. <code>SYNC_COMMIT=on</code> is the running default; async remains available for the contrasting benchmark.</td></tr>
+      <tr><td class="idc">D5</td><td>Escalation behaviour when uncertain</td><td>Wait for a human signal</td><td><span class="pill a">Decided — differently</span></td><td>Resolved the opposite way: the ESCALATE band <strong>executes by default</strong>, on the false-positive/false-negative asymmetry argued in §3.4, and journals the verdict regardless. <code>ESCALATION_BLOCKS=true</code> restores the originally-proposed behaviour — the run parks and waits for the <code>__adjudicate</code> signal — as an explicit opt-in so the evaluation can compare both policies on the same workload.</td></tr>
+      <tr><td class="idc">D6</td><td>Event history retention</td><td>No garbage collection</td><td><span class="pill t">Decided</span></td><td>Built as proposed and still an accepted limitation. The <code>events</code> table grows without bound; expect the question.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="endcap">
+    <h3 style="margin-bottom:10px">Where this stands</h3>
+    <p style="margin:0 0 12px; max-width:66ch">The build this document now describes is past the P0–P6
+    milestones in §5: event log and replay, the task queue, sharding and lease-based ownership with the
+    ring actually wired to it (§2.3), the gateway's forward-on-<code>NotOwner</code> path (§2.3, §3.5),
+    replication, saga compensation, and semantic idempotency with the escalation policy resolved (§3.4,
+    §7 D5). Five defects found along the way are written up in §6, and §6.6 records a live
+    fault-injection run meeting the P3/P8 exit condition end to end. What remains is the experiment and
+    evaluation phase — the precision/recall curve over hand-labelled retry pairs — and the write-up.</p>
+    <p style="margin:0; font-size:14px; color:var(--muted)">This section stays as a record of what was
+    decided and why, now marked against what actually shipped, rather than as a live approval gate.</p>
+  </div>
+</section>
+
+</div>
+</main>
+</div>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var targets = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function sync(){
+    var best = 0, y = window.scrollY + 130;
+    for (var i = 0; i < targets.length; i++){
+      if (targets[i] && targets[i].offsetTop <= y) best = i;
+    }
+    links.forEach(function(a, i){ a.classList.toggle('on', i === best); });
+  }
+  var tick = false;
+  window.addEventListener('scroll', function(){
+    if (tick) return; tick = true;
+    window.requestAnimationFrame(function(){ sync(); tick = false; });
+  }, {passive:true});
+  sync();
+})();
+</script>
+</body>
+</html>

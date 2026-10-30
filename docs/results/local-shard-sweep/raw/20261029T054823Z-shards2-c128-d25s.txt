@@ -1,0 +1,32 @@
+cluster: node-a=http://localhost:8081 node-b=http://localhost:8082 node-c=http://localhost:8083
+
+--- throughput: 2 shard(s) [0,2] owned by [node-b node-c] ---
+    window 20s (after 5s warm-up), concurrency 128, poll 100ms, prep 50ms
+    completed 97 in 20.000s = 4.85 wf/s (started 225, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+NFR    METRIC                       VALUE           TARGET                                VERDICT      KIND
+---    ------                       -----           ------                                -------      ----
+NFR-5  completed_per_sec @2shard    4.850 wf/s      no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @2shard            97 workflows    -                                     -            measured
+NFR-5  latency_p50 @2shard          13.2737 s       -                                     -            measured
+NFR-5  latency_p95 @2shard          15.6646 s       -                                     -            measured
+NFR-5  latency_p99 @2shard          15.7809 s       -                                     -            measured
+NFR-5  workload @2shard             DeliveryOrder   -                                     -            assumed
+-      routing_409_follows @2shard  0 requests      -                                     -            measured
+NFR-5  scaling_1_to_2               (not measured)  >= 1.7x from 1 to 2 shards            NO EVIDENCE  not-measured
+
+notes
+  completed_per_sec @2shard          shards 0,2 owned by 2 node(s): [node-b node-c]
+  completed @2shard                  status COMPLETED observed inside the 20.000s window; 225 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @2shard                end to end, start request to terminal status; 97 samples: p99 here is effectively the worst case observed, not a true 99th percentile; upper bound by up to one 100ms poll interval
+  latency_p99 @2shard                97 samples: p99 here is effectively the worst case observed, not a true 99th percentile
+  workload @2shard                   prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 128; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @2shard        requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 4 failed at the transport
+  scaling_1_to_2                     the 1-shard run produced no completions, so there is no baseline to divide by
+
+how to read the 'kind' column
+  measured      an observation taken from the running cluster in this run
+  derived       arithmetic over this run's measurements (a ratio, a percentile)
+  assumed       a value this tool was told, not something it checked
+  not-measured  this run produced no evidence; the target column still shows
+                what the design document asks for, and the value column is empty

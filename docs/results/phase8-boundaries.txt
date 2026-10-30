@@ -1,0 +1,94 @@
+========================================================================
+durexec Phase 8 — boundaries Phase 7 left open   2026-10-27T21:25:30+05:30
+commit=fde6ae096ccb4f4d1e12650fe3cfc0f3ac49c2ac
+engine image=durexec-engine:phase8
+RESUME: OUT=/home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/docs/results/phase8-boundaries.txt /home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/experiments/scripts/phase8-boundaries.sh <H|I|all>
+========================================================================
+
+---- H. effect confirmed, then SIGKILL before the result journal (wf=p8-H-1793116530) ----
+  armed on 2/2 nodes (expect 2)
+  restart counts before: durexec-0=0 durexec-1=0
+  start http=000
+  simulator Performed after start = 0 (precondition: must be 1)
+  INVALID_effect_never_confirmed: the kill boundary was never reached
+
+---- I. ownership moves while the effect is in flight; stale worker then journals (wf=p8-I-1793116640) ----
+  simulator armed: effect recorded, then the response held for 75s
+  start http=201
+  simulator Performed = 1 (the call is in flight, effect already recorded)
+  shard=12 owner=durexec-1.durexec-hl fencing_token=63 -> pausing durexec-1
+  PAUSED container 74ec161640ee (it cannot renew its lease; it is alive, not dead)
+  after pause: owner=durexec-0.durexec-hl fencing_token=64 (was 63)
+  ledger while paused: {"Requests":1,"Performed":1,"Replayed":0,"Unkeyed":0,"Injected":1}
+  UNPAUSED 74ec161640ee: the stale worker now wakes and tries to journal
+  stale-write refusals observed in logs: 0
+  AFTER RECOVERY:
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=COMPLETED
+    ActivityTaskScheduled=1 Completed=1 Failed=0
+    duplicate (run_id,seq) groups=0
+    LEDGER (separate pod): {"Requests":2,"Performed":1,"Replayed":1,"Unkeyed":0,"Injected":1}
+    distinct_keys       : 1
+    duplicate_effects   : 0
+    effect key=dx1:4bc7fec431597263619f15 amount=2200 payee=i-leaseloss requests=1
+  fencing_token now = 65
+========================================================================
+durexec Phase 8 — boundaries Phase 7 left open   2026-10-27T21:37:37+05:30
+commit=fde6ae096ccb4f4d1e12650fe3cfc0f3ac49c2ac
+engine image=durexec-engine:phase8
+RESUME: OUT=/home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/docs/results/phase8-boundaries.txt /home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/experiments/scripts/phase8-boundaries.sh <H|I|all>
+========================================================================
+
+---- H. effect confirmed, then SIGKILL before the result journal (wf=p8-H-1793117257) ----
+  quiescence before arming: pending_tasks=0 nonterminal=46791 (both must be 0)
+  BLOCKED_cluster_not_quiescent: refusing to arm a process-killing seam while other work is in flight
+========================================================================
+durexec Phase 8 — boundaries Phase 7 left open   2026-10-27T21:49:44+05:30
+commit=fde6ae096ccb4f4d1e12650fe3cfc0f3ac49c2ac
+engine image=durexec-engine:phase8
+RESUME: OUT=/home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/docs/results/phase8-boundaries.txt /home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/experiments/scripts/phase8-boundaries.sh <H|I|all>
+========================================================================
+
+---- H. effect confirmed, then SIGKILL before the result journal (wf=p8-H-1793117984) ----
+  quiescence before arming: pending_tasks=0 nonterminal=0 (both must be 0)
+  armed on 2/2 nodes (expect 2)
+  restart counts before: durexec-0=0 durexec-1=0
+  start http=201
+  simulator Performed after start = 1 (precondition: must be 1)
+  process death confirmed by restart count: NO
+  disarmed and restarted (prevents a crash loop on the redelivered task)
+  seam log line found in a previous container: 0
+  AFTER RECOVERY:
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=COMPLETED
+    ActivityTaskScheduled=1 Completed=1 Failed=0
+    duplicate (run_id,seq) groups=0
+    LEDGER (separate pod): {"Requests":2,"Performed":1,"Replayed":1,"Unkeyed":0,"Injected":0}
+    distinct_keys       : 1
+    duplicate_effects   : 0
+    effect key=dx1:0f3d96da63ce7c49dc35ae amount=2100 payee=h-killbeforejournal requests=1
+========================================================================
+durexec Phase 8 — boundaries Phase 7 left open   2026-10-27T21:59:46+05:30
+commit=fde6ae096ccb4f4d1e12650fe3cfc0f3ac49c2ac
+engine image=durexec-engine:phase8
+RESUME: OUT=/home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/docs/results/phase8-boundaries.txt /home/toji339/Documents/Design_and_Implementation_of_a_Fault_Tolerant_Horizontally_Sharded_Durable_Execution_Engine_for_Long_Running_Distributed_Workflows/experiments/scripts/phase8-boundaries.sh <H|I|all>
+========================================================================
+
+---- H. effect confirmed, then SIGKILL before the result journal (wf=p8-H-1793118586) ----
+  quiescence before arming: pending_tasks=0 nonterminal=0 (both must be 0)
+  armed on 2/2 nodes (expect 2)
+  restart counts before: durexec-0=0 durexec-1=0
+  start http=201
+  simulator Performed after start = 1 (precondition: must be 1)
+  process death confirmed: yes (seam log line seen, restart counts 0/0)
+  seam log lines found while the dead container was still addressable: 1
+  disarmed and restarted (prevents a crash loop on the redelivered task)
+  AFTER RECOVERY:
+  ENGINE durable state:
+    executions=1 events=4 tasks_pending=0 status=COMPLETED
+    ActivityTaskScheduled=1 Completed=1 Failed=0
+    duplicate (run_id,seq) groups=0
+    LEDGER (separate pod): {"Requests":2,"Performed":1,"Replayed":1,"Unkeyed":0,"Injected":0}
+    distinct_keys       : 1
+    duplicate_effects   : 0
+    effect key=dx1:d0388ec904e0d1dbac723a amount=2100 payee=h-killbeforejournal requests=1

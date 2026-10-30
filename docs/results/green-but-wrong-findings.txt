@@ -1,0 +1,138 @@
+Two more "green by every signal, silently wrong" defects, found while re-running
+the liveness fixes. Both are real, both were already in the repository, and
+neither was anybody's test setup.
+
+They belong in the write-up next to the hash ring that collapsed 16 shards onto
+2 and the three nodes running three different builds. The pattern is the point:
+in this system the health signals have been wrong more often than the engine.
+
+resume: nothing to re-run. The evidence below is reproducible with the two
+        commands quoted under each finding.
+
+================================================================================
+FINDING 4  The test suite killed four shards of the live cluster
+================================================================================
+WHAT HAPPENED
+  Four shards (0, 1, 2, 3) had no row at all in shard_leases. Only 12 of 16
+  rows existed. Roughly half of all workflow start requests were being refused
+  with "409 NotOwner, shard currently unowned", and stayed refused.
+
+CAUSE
+  internal/lease/integration_test.go, TestEnsureRowsIsIdempotent:
+
+      clean := func() { _, _ = pool.Exec(ctx, "DELETE FROM shard_leases WHERE shard_id < 4") }
+      clean()
+      t.Cleanup(clean)
+
+  The test has to start from no rows, which is fair. But t.Cleanup ran the same
+  DELETE again on the way out, so it LEFT the table four rows short.
+
+  It only skips itself when DUREXEC_TEST_DSN is unset, and the Makefile's own
+  `test` target says to set it:
+
+      ## test: ... Tests that need a real PostgreSQL skip themselves unless
+      ## DUREXEC_TEST_DSN is set ...; export it to include them.
+
+  The obvious DSN to export is the demonstration cluster's own database. So
+  "run the full test suite properly" and "break the running cluster" were the
+  same action.
+
+WHY IT DID NOT HEAL
+  A shard with no lease row cannot be recovered by a running node.
+  lease.Acquire is an UPDATE (internal/lease/store.go), so with no row it
+  matches nothing and the shard stays unowned forever. Only EnsureRows creates
+  rows, and that runs once at node startup. The cluster needed a node restart
+  to come back, and nothing said so.
+
+  Note the engine itself handles the missing row correctly — eventlog's
+  verifyToken reports it as lost ownership rather than crashing — so every
+  layer behaved as designed while the cluster did no work.
+
+FIX
+  The cleanup now restores the rows instead of removing them: delete, then
+  EnsureRows(4), leaving shards 0-3 present and unowned exactly as a fresh
+  migration does. A running node's lease manager then picks them up on its
+  next tick.
+
+VERIFIED
+      lease rows BEFORE: 16
+      (DUREXEC_TEST_DSN=<live leader> go test -count=1 ./...  — all packages ok)
+      lease rows AFTER:  16
+      0:UNOWNED 1:UNOWNED 2:UNOWNED 3:UNOWNED
+  then, within one lease tick:
+      owned: 16/16
+      accepted: 10/10        (10 DeliveryOrder starts spread over the hash space)
+
+  Before the fix the same sequence left 12 rows and the four shards dead until
+  a node was restarted.
+
+================================================================================
+FINDING 5  /healthz reported owned_shards=16 on every node, always
+================================================================================
+WHAT HAPPENED
+  While four shards were dead and half the start requests were failing, all
+  three nodes answered:
+
+      {"status":"ok","node":"node-a","owned_shards":16}
+      {"status":"ok","node":"node-b","owned_shards":16}
+      {"status":"ok","node":"node-c","owned_shards":16}
+
+  Sixteen is the whole cluster. Three nodes cannot each own all of it.
+
+CAUSE
+  internal/api/handlers.go served the field as len(s.deps.OwnedShards), and
+  cmd/engined/main.go sets
+
+      OwnedShards: shard.All(int32(cfg.ShardCount)),
+
+  — every shard in the cluster, computed once at startup and never updated as
+  leases move. So owned_shards was the cluster's shard COUNT wearing the name
+  of the owned SET.
+
+  It was not reporting "what this node wants from the ring" either: the ring
+  assigns about five shards per node, not sixteen. It reported a constant.
+
+  OwnedShards itself is not the bug. It is used by the collection endpoints
+  that have no workflow id to hash, and there reading every shard is the right
+  call — a listing that omitted shards would make the dashboard's contents
+  depend on which node answered. The bug was serving health from it.
+
+FIX
+  api.Deps gains OwnedNow func() []core.ShardID, wired in engined to the lease
+  manager's live owned set, and /healthz reports that. It also now reports
+  cluster_shards, so "2 of 16" is readable without a second request:
+
+      :8081 {"status":"ok","node":"node-a","owned_shards":4,"cluster_shards":16}
+      :8082 {"status":"ok","node":"node-b","owned_shards":9,"cluster_shards":16}
+      :8083 {"status":"ok","node":"node-c","owned_shards":3,"cluster_shards":16}
+
+  4 + 9 + 3 = 16, which is now a check a reader can do.
+
+  status stays "ok" when a node owns nothing. Owning no shard is not a reason
+  to restart a node — it still serves reads, still forwards writes, and is
+  still the next candidate for a lease — and the container probe only reads the
+  HTTP status code (deploy/healthcheck), so this change cannot cause a restart
+  loop. Both cases are pinned by
+  internal/api TestHealthzReportsWhatIsOwnedNotWhatExists.
+
+WHAT THIS COSTS THE EARLIER RESULTS
+  Nothing is retracted. No published figure was derived from owned_shards:
+  loadgen and the acceptance tool both read ownership from /v1/shards, which
+  was correct all along, and cmd/acceptance records the healthz number without
+  asserting on it. The damage was to a human reading the dashboard or curling
+  /healthz, which is exactly who it was for.
+
+================================================================================
+A NOTE ON THE EMBEDDER
+================================================================================
+Separately: the cluster had been recreated from deploy/docker-compose.yml
+alone, without deploy/docker-compose.embedder.yml, so the nodes came up with
+EMBEDDER_URL unset and logged `embedder=(built-in fake)` even though the
+embedder container was still running beside them. That is a deployment
+mistake made during this work, not a defect in the engine, and it did not
+touch any number recorded here: the DeliveryOrder workload used by the
+duplicate and scaling runs is exact-mode and never consults an embedder, and
+no semantic experiment was re-run. The cluster has since been recreated with
+the overlay and logs `embedder=http://embedder:8000/embed`. The lesson worth
+keeping is that `make up` and `make up-semantic` produce clusters that look
+identical in `docker ps` and differ in what the engine will actually do.
