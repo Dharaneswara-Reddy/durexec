@@ -96,6 +96,11 @@ jobs:
     env:
       DUREXEC_TEST_DSN: postgres://durexec:durexec@localhost:5432/durexec?sslmode=disable
       DUREXEC_REQUIRE_DB: "1"
+      # TestFreshDatabaseMigration needs its OWN empty database (it proves a
+      # first migrate, a rerun, and three concurrent migrators). Without these
+      # it skipped, and -strict failed the job on that skip alone.
+      MIGTEST_DSN: postgres://durexec:durexec@localhost:5432/migtest?sslmode=disable
+      MIGTEST_DIR: ${{ github.workspace }}/engine/migrations
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -106,6 +111,9 @@ jobs:
 
       - name: apply the schema to the empty database
         run: for f in migrations/*.up.sql; do psql "$DUREXEC_TEST_DSN" -v ON_ERROR_STOP=1 -q -f "$f"; done
+
+      - name: create the separate, empty database for the fresh-migration test
+        run: psql "$DUREXEC_TEST_DSN" -v ON_ERROR_STOP=1 -q -c 'CREATE DATABASE migtest'
 
       - name: go test, packages in parallel, with executed/skipped inventory
         run: |
@@ -138,6 +146,11 @@ jobs:
     env:
       DUREXEC_TEST_DSN: postgres://durexec:durexec@localhost:5432/durexec?sslmode=disable
       DUREXEC_REQUIRE_DB: "1"
+      # TestFreshDatabaseMigration needs its OWN empty database (it proves a
+      # first migrate, a rerun, and three concurrent migrators). Without these
+      # it skipped, and -strict failed the job on that skip alone.
+      MIGTEST_DSN: postgres://durexec:durexec@localhost:5432/migtest?sslmode=disable
+      MIGTEST_DIR: ${{ github.workspace }}/engine/migrations
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -148,6 +161,9 @@ jobs:
 
       - name: apply the schema to the empty database
         run: for f in migrations/*.up.sql; do psql "$DUREXEC_TEST_DSN" -v ON_ERROR_STOP=1 -q -f "$f"; done
+
+      - name: create the separate, empty database for the fresh-migration test
+        run: psql "$DUREXEC_TEST_DSN" -v ON_ERROR_STOP=1 -q -c 'CREATE DATABASE migtest'
 
       - name: go test -race, packages in parallel, with inventory
         run: |
