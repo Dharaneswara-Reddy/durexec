@@ -1,0 +1,25 @@
+run_id=20261030T184936Z
+exp=G-S32-ladder
+config_id=r3-S32-drive32-w2x4-scon-scaling-c64-d135s-t31
+kind=perf
+git_sha=4dcdbaac23b1c3d6270cf9f2c6395e8427d3dc0c
+git_tree=dirty
+image_tag=cf986fb
+loadgen_args=["-mode","scaling","-shard-count","32","-sweep","32","-concurrency","64","-duration","135s","-warmup","15s","-id-prefix","lg-20261030t184936z","-base","http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080"]
+ring=durexec-0.durexec-hl,durexec-1.durexec-hl,durexec-2.durexec-hl
+NAME            READY   STATUS    RESTARTS   AGE     IP           NODE                          NOMINATED NODE   READINESS GATES
+durexec-0       1/1     Running   0          2m43s   10.91.0.47   ip-10-91-0-39.ec2.internal    <none>           <none>
+durexec-1       1/1     Running   0          2m43s   10.91.0.73   ip-10-91-0-67.ec2.internal    <none>           <none>
+durexec-2       1/1     Running   0          2m43s   10.91.0.35   ip-10-91-0-43.ec2.internal    <none>           <none>
+durexec-probe   1/1     Running   0          3h12m   10.91.0.41   ip-10-91-0-252.ec2.internal   <none>           <none>
+NAME                          STATUS   ROLES    AGE     VERSION               ROLE      INSTANCE-TYPE    ZONE
+ip-10-91-0-252.ec2.internal   Ready    <none>   3h15m   v1.37.1-eks-577a51e   harness   c7i-flex.large   us-east-1a
+ip-10-91-0-39.ec2.internal    Ready    <none>   3h15m   v1.37.1-eks-577a51e   engine    m7i-flex.large   us-east-1a
+ip-10-91-0-43.ec2.internal    Ready    <none>   3h15m   v1.37.1-eks-577a51e   engine    m7i-flex.large   us-east-1a
+ip-10-91-0-67.ec2.internal    Ready    <none>   3h15m   v1.37.1-eks-577a51e   engine    m7i-flex.large   us-east-1a
+node_inventory: name role EC2_instance_type availability_zone
+NAME	ROLE	INSTANCE_TYPE	ZONE
+ip-10-91-0-252.ec2.internal	harness	c7i-flex.large	us-east-1a
+ip-10-91-0-39.ec2.internal	engine	m7i-flex.large	us-east-1a
+ip-10-91-0-43.ec2.internal	engine	m7i-flex.large	us-east-1a
+ip-10-91-0-67.ec2.internal	engine	m7i-flex.large	us-east-1a
