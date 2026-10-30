@@ -1,0 +1,5 @@
+idle_window_s=121.893
+pg_commits_per_s=303.537
+dbhost_cpu_busy_pct=1.672
+engine_cpu_cores_total=0.0177
+engine_process_cpu_seconds=2.160

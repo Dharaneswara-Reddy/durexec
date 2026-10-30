@@ -1,0 +1,37 @@
+LAST SEEN   TYPE     REASON             OBJECT                        MESSAGE
+74s         Normal   Scheduled          pod/durexec-probe             Successfully assigned durexec-lab/durexec-probe to ip-10-91-0-126.ec2.internal
+74s         Normal   Pulling            pod/durexec-probe             Pulling image "pgvector/pgvector:pg16"
+70s         Normal   Started            pod/durexec-probe             Container started
+70s         Normal   Created            pod/durexec-probe             Container created
+70s         Normal   Pulled             pod/durexec-probe             Successfully pulled image "pgvector/pgvector:pg16" in 3.225s (3.225s including waiting). Image size: 158969750 bytes.
+68s         Normal   Scheduled          pod/durexec-1                 Successfully assigned durexec-lab/durexec-1 to ip-10-91-0-43.ec2.internal
+68s         Normal   Scheduled          pod/durexec-2                 Successfully assigned durexec-lab/durexec-2 to ip-10-91-0-82.ec2.internal
+68s         Normal   SuccessfulCreate   statefulset/durexec           Create Pod durexec-1 in StatefulSet durexec successful
+68s         Normal   SuccessfulCreate   statefulset/durexec           Create Pod durexec-2 in StatefulSet durexec successful
+68s         Normal   Scheduled          pod/durexec-0                 Successfully assigned durexec-lab/durexec-0 to ip-10-91-0-170.ec2.internal
+68s         Normal   SuccessfulCreate   statefulset/durexec           Create Pod durexec-0 in StatefulSet durexec successful
+68s         Normal   NoPods             poddisruptionbudget/durexec   No matching pods found
+67s         Normal   Pulling            pod/durexec-1                 Pulling image "pgvector/pgvector:pg16"
+67s         Normal   Pulling            pod/durexec-0                 Pulling image "pgvector/pgvector:pg16"
+67s         Normal   Pulling            pod/durexec-2                 Pulling image "pgvector/pgvector:pg16"
+64s         Normal   Pulled             pod/durexec-2                 Successfully pulled image "pgvector/pgvector:pg16" in 3.024s (3.024s including waiting). Image size: 158969750 bytes.
+64s         Normal   Started            pod/durexec-1                 Container started
+64s         Normal   Pulled             pod/durexec-1                 Successfully pulled image "pgvector/pgvector:pg16" in 2.996s (2.996s including waiting). Image size: 158969750 bytes.
+64s         Normal   Created            pod/durexec-1                 Container created
+64s         Normal   Pulled             pod/durexec-0                 Successfully pulled image "pgvector/pgvector:pg16" in 3.106s (3.106s including waiting). Image size: 158969750 bytes.
+64s         Normal   Created            pod/durexec-0                 Container created
+64s         Normal   Created            pod/durexec-2                 Container created
+64s         Normal   Started            pod/durexec-2                 Container started
+64s         Normal   Started            pod/durexec-0                 Container started
+61s         Normal   Pulling            pod/durexec-0                 Pulling image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb"
+61s         Normal   Pulling            pod/durexec-2                 Pulling image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb"
+61s         Normal   Pulling            pod/durexec-1                 Pulling image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb"
+60s         Normal   Pulled             pod/durexec-2                 Successfully pulled image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" in 713ms (713ms including waiting). Image size: 8332748 bytes.
+60s         Normal   Created            pod/durexec-2                 Container created
+60s         Normal   Started            pod/durexec-2                 Container started
+60s         Normal   Pulled             pod/durexec-0                 Successfully pulled image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" in 736ms (736ms including waiting). Image size: 8332748 bytes.
+60s         Normal   Created            pod/durexec-1                 Container created
+60s         Normal   Pulled             pod/durexec-1                 Successfully pulled image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" in 735ms (735ms including waiting). Image size: 8332748 bytes.
+60s         Normal   Started            pod/durexec-1                 Container started
+60s         Normal   Started            pod/durexec-0                 Container started
+60s         Normal   Created            pod/durexec-0                 Container created

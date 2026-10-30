@@ -1,0 +1,19 @@
+run_id=20261030T130543Z
+config_id=r3-S64-w1x2-scon
+git_sha=cf986fb43c636de85d2fa87fc9225dc6626e0cc2
+git_tree=clean
+window_seconds=120
+settle_seconds=15
+pre_window_nonterminal=0
+pre_window_pending_tasks=0
+nodes (name, role, EC2 instance type, zone):
+NAME	ROLE	INSTANCE_TYPE	ZONE
+ip-10-91-0-126.ec2.internal	harness	c7i-flex.large	us-east-1a
+ip-10-91-0-170.ec2.internal	engine	m7i-flex.large	us-east-1a
+ip-10-91-0-43.ec2.internal	engine	m7i-flex.large	us-east-1a
+ip-10-91-0-82.ec2.internal	engine	m7i-flex.large	us-east-1a
+pods:
+NAME        READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
+durexec-0   1/1     Running   0          24s   10.91.0.184   ip-10-91-0-170.ec2.internal   <none>           <none>
+durexec-1   1/1     Running   0          24s   10.91.0.142   ip-10-91-0-43.ec2.internal    <none>           <none>
+durexec-2   1/1     Running   0          24s   10.91.0.190   ip-10-91-0-82.ec2.internal    <none>           <none>

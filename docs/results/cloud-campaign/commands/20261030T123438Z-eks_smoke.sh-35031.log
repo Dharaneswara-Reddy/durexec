@@ -1,0 +1,23 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T123438Z-eks_smoke.sh-35031.log
+== S1 engine pods Ready ==
+  PASS  all 3 engine pods Ready
+== S2 pods actually on DISTINCT nodes (the anti-affinity claim) ==
+  PASS  3 pods on 3 distinct nodes
+== S2b replicas, ring and connection budget agree with the cluster ==
+  PASS  replicas=3 ring=3 NODE_COUNT=3 expected=3 (engine nodes: 3)
+== S3 NO in-cluster postgres (it belongs on EC2) ==
+  PASS  no in-cluster postgres StatefulSet
+== S4 every engine reports healthy against the EXTERNAL database ==
+  PASS  /healthz ok on every pod
+== S5 shards owned, none orphaned, spread over every pod ==
+  PASS  0 unowned shards, owned by 3 of 3 pods, SHARD_COUNT=16
+== S6 a workflow durably completes ==
+  PASS  workflow smoke-1793363683 COMPLETED
+== S7 metrics present on every pod, including process and pool series ==
+  PASS  required series exported on every pod
+== S8 the probe reaches the database with the engine's own credentials ==
+  PASS  smoke workflow visible COMPLETED in PostgreSQL
+== S9 database instrumentation that comparison with the local lab depends on ==
+  PASS  pg_stat_statements, track_io_timing, superuser probe (1|on|on)
+
+RESULT: 10 passed, 0 failed

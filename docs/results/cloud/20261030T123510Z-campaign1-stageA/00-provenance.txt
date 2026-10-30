@@ -1,0 +1,7 @@
+campaign    : campaign1-stageA
+collected_at: 20261030T123510Z
+context     : arn:aws:eks:us-east-1:<ACCT>:cluster/durexec-bench
+namespace   : durexec-lab
+git_sha     : cf986fb
+git_tree    : clean
+aws_identity: arn:aws:sts::<ACCT>:assumed-role/durexec-bench-operator/i-0c5a7516d5d77b6e3

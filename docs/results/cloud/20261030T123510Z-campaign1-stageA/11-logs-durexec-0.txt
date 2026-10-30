@@ -1,0 +1,15 @@
+gate: waiting for postgres at 10.91.0.99:5432 (deadline 180s)
+gate: OK -- 10.91.0.99:5432 accepted an authenticated query
+{"time":"2026-10-30T12:34:14.321490051Z","level":"INFO","msg":"starting engine node","config":"node=durexec-0.durexec-hl listen=:8080 shards=16 lease_ttl=10s lease_renew=3s task_lock=30s workers=4/8 sync_commit=true tau=0.85/0.90 db=postgres://durexec:<REDACTED>@10.91.0.99:5432/durexec?sslmode=disable embedder=(built-in fake) dedup=semantic (similarity over the whole intent) escalation_blocks=false fault_injection=false"}
+{"time":"2026-10-30T12:34:14.321713807Z","level":"WARN","msg":"no EMBEDDER_URL configured: using the built-in deterministic stand-in encoder. It matches identical intent text exactly and cannot recognise a reworded repeat, so verdicts from this node exercise the plumbing, not the contribution"}
+{"time":"2026-10-30T12:34:14.32800669Z","level":"INFO","msg":"connection budget fits","nodes":3,"per_node_pool":20,"per_node_renewal":4,"cluster_total":98,"server_max_connections":400}
+{"time":"2026-10-30T12:34:14.335270592Z","level":"INFO","msg":"schema applied","dir":"/migrations"}
+{"time":"2026-10-30T12:34:14.336104845Z","level":"INFO","msg":"hash ring built","nodes":["durexec-0.durexec-hl","durexec-1.durexec-hl","durexec-2.durexec-hl"],"vnodes":150}
+{"time":"2026-10-30T12:34:14.336249213Z","level":"INFO","msg":"engine node ready","shards":16,"workflows":["DeliveryOrder","TravelAgent"],"activities":11,"escalation_blocks":false}
+{"time":"2026-10-30T12:34:14.336267877Z","level":"INFO","msg":"http listening","addr":":8080"}
+{"time":"2026-10-30T12:34:15.336508308Z","level":"INFO","msg":"starting shard workers","shard":8,"workflow_workers":4,"activity_workers":8}
+{"time":"2026-10-30T12:34:15.33658651Z","level":"INFO","msg":"starting shard workers","shard":15,"workflow_workers":4,"activity_workers":8}
+{"time":"2026-10-30T12:34:15.336595184Z","level":"INFO","msg":"starting shard workers","shard":0,"workflow_workers":4,"activity_workers":8}
+{"time":"2026-10-30T12:34:15.336624095Z","level":"INFO","msg":"starting shard workers","shard":4,"workflow_workers":4,"activity_workers":8}
+{"time":"2026-10-30T12:34:15.336650138Z","level":"INFO","msg":"starting shard workers","shard":1,"workflow_workers":4,"activity_workers":8}
+{"time":"2026-10-30T12:34:47.737748913Z","level":"INFO","msg":"workflow finished","shard":8,"workflow_id":"smoke-1793363683","run_id":"5ea59994-6c29-411b-92dd-720c6606fde6","status":"COMPLETED","last_seq":12}

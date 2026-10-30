@@ -1,0 +1,380 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T123137Z-eks_publish.sh-29762.log
+WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.92kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for gcr.io/distroless/static-debian12:nonroot
+#2 ...
+
+#3 [internal] load metadata for docker.io/library/golang:1.25
+#3 DONE 0.3s
+
+#2 [internal] load metadata for gcr.io/distroless/static-debian12:nonroot
+#2 DONE 0.7s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 903B done
+#4 DONE 0.0s
+
+#5 [builder 1/7] FROM docker.io/library/golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80
+#5 resolve docker.io/library/golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80 0.0s done
+#5 sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80 9.70kB / 9.70kB done
+#5 sha256:54b6b88db6fe375c6676625d87d668273f85c6d09153635d0cbba89cba7a207a 2.32kB / 2.32kB done
+#5 sha256:9bae33b05e4e159803d2ad714fecbda886969dce7ca369216dece578cad664c1 3.04kB / 3.04kB done
+#5 sha256:1da3cb2f93f2ca3c5bdaf4c024a7f1ebd717938d20c858e4be4b9aa81fc8608c 6.29MB / 49.31MB 0.1s
+#5 sha256:68b64c51cda3d04397bcf5742a29a9a1ba7adcfd18a376bacb8d114ed64cbd5a 2.10MB / 25.64MB 0.1s
+#5 sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 2.10MB / 67.80MB 0.1s
+#5 sha256:1da3cb2f93f2ca3c5bdaf4c024a7f1ebd717938d20c858e4be4b9aa81fc8608c 15.73MB / 49.31MB 0.2s
+#5 sha256:68b64c51cda3d04397bcf5742a29a9a1ba7adcfd18a376bacb8d114ed64cbd5a 14.68MB / 25.64MB 0.2s
+#5 sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 13.63MB / 67.80MB 0.2s
+#5 sha256:1da3cb2f93f2ca3c5bdaf4c024a7f1ebd717938d20c858e4be4b9aa81fc8608c 26.21MB / 49.31MB 0.3s
+#5 sha256:68b64c51cda3d04397bcf5742a29a9a1ba7adcfd18a376bacb8d114ed64cbd5a 24.12MB / 25.64MB 0.3s
+#5 sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 24.12MB / 67.80MB 0.3s
+#5 sha256:1da3cb2f93f2ca3c5bdaf4c024a7f1ebd717938d20c858e4be4b9aa81fc8608c 35.65MB / 49.31MB 0.4s
+#5 sha256:68b64c51cda3d04397bcf5742a29a9a1ba7adcfd18a376bacb8d114ed64cbd5a 25.64MB / 25.64MB 0.4s done
+#5 sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 32.51MB / 67.80MB 0.4s
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 0B / 102.32MB 0.4s
+#5 sha256:1da3cb2f93f2ca3c5bdaf4c024a7f1ebd717938d20c858e4be4b9aa81fc8608c 49.31MB / 49.31MB 0.6s
+#5 sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 53.48MB / 67.80MB 0.6s
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 18.87MB / 102.32MB 0.6s
+#5 sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 63.96MB / 67.80MB 0.7s
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 28.31MB / 102.32MB 0.7s
+#5 sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 67.80MB / 67.80MB 0.8s
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 48.23MB / 102.32MB 0.9s
+#5 sha256:1da3cb2f93f2ca3c5bdaf4c024a7f1ebd717938d20c858e4be4b9aa81fc8608c 49.31MB / 49.31MB 0.9s done
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 58.72MB / 102.32MB 1.0s
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 66.06MB / 102.32MB 1.1s
+#5 extracting sha256:1da3cb2f93f2ca3c5bdaf4c024a7f1ebd717938d20c858e4be4b9aa81fc8608c 0.1s
+#5 sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 67.80MB / 67.80MB 1.1s done
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 78.64MB / 102.32MB 1.2s
+#5 sha256:547e989301353b555d27ccfb0e4081fa9ee30e43ce5c3e57100b4603676d58cd 0B / 126B 1.2s
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 88.08MB / 102.32MB 1.3s
+#5 sha256:547e989301353b555d27ccfb0e4081fa9ee30e43ce5c3e57100b4603676d58cd 126B / 126B 1.2s done
+#5 sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 1.05MB / 60.29MB 1.3s
+#5 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 0B / 32B 1.3s
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 102.32MB / 102.32MB 1.5s
+#5 sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 27.26MB / 60.29MB 1.5s
+#5 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B 1.4s done
+#5 sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 37.75MB / 60.29MB 1.6s
+#5 sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 47.19MB / 60.29MB 1.7s
+#5 sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 57.67MB / 60.29MB 1.8s
+#5 sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 102.32MB / 102.32MB 2.5s done
+#5 sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 60.29MB / 60.29MB 3.2s done
+#5 extracting sha256:1da3cb2f93f2ca3c5bdaf4c024a7f1ebd717938d20c858e4be4b9aa81fc8608c 3.1s done
+#5 extracting sha256:68b64c51cda3d04397bcf5742a29a9a1ba7adcfd18a376bacb8d114ed64cbd5a
+#5 extracting sha256:68b64c51cda3d04397bcf5742a29a9a1ba7adcfd18a376bacb8d114ed64cbd5a 0.5s done
+#5 ...
+
+#6 [internal] load build context
+#6 transferring context: 728.27MB 4.9s done
+#6 DONE 5.6s
+
+#7 [stage-1 1/5] FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+#7 resolve gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab 0.0s done
+#7 sha256:12aa113e298cbae388b298c0dc163fa1547beba948153b23eb9094e16a07a770 2.73kB / 2.73kB done
+#7 sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab 1.51kB / 1.51kB done
+#7 sha256:52dcfbabb7457ea47c82f6e13af8c8a4a1d9f7b0145142b3ecab20f2b888411d 2.67kB / 2.67kB done
+#7 sha256:a5789fc40e828c4e7467626e3f69ec5dea8e5da22fe660db8ae6d16f777b0bbf 83.90kB / 83.90kB 3.4s done
+#7 sha256:990a9c434e5e0f11549a8d4a41a1991e621b04e30cd63269adbc97b1dc38fd7e 12.48kB / 12.48kB 3.6s done
+#7 extracting sha256:a5789fc40e828c4e7467626e3f69ec5dea8e5da22fe660db8ae6d16f777b0bbf done
+#7 extracting sha256:990a9c434e5e0f11549a8d4a41a1991e621b04e30cd63269adbc97b1dc38fd7e done
+#7 sha256:bf7a4185f01524837d19abde915ffde84e64368b250f5b5e9f6f75aea62a11d4 29.00kB / 29.00kB 4.8s done
+#7 sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a 67B / 67B 5.0s done
+#7 sha256:39dc083afc39bd8dc43d456fe7ff7d39292e593bb2769972c11bb2e5f9119386 445.71kB / 445.71kB 5.6s
+#7 sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212 188B / 188B 5.6s
+#7 sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4 0B / 123B 5.6s
+#7 sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212 188B / 188B 5.6s done
+#7 sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4 123B / 123B 5.8s
+#7 sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 0B / 162B 6.0s
+#7 sha256:39dc083afc39bd8dc43d456fe7ff7d39292e593bb2769972c11bb2e5f9119386 445.71kB / 445.71kB 6.0s done
+#7 sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4 123B / 123B 6.1s done
+#7 sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 162B / 162B 6.2s
+#7 extracting sha256:39dc083afc39bd8dc43d456fe7ff7d39292e593bb2769972c11bb2e5f9119386
+#7 extracting sha256:39dc083afc39bd8dc43d456fe7ff7d39292e593bb2769972c11bb2e5f9119386 0.2s done
+#7 sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 0B / 80B 6.4s
+#7 sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 80B / 80B 6.5s
+#7 sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a 0B / 351B 6.5s
+#7 sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 162B / 162B 6.5s done
+#7 sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 80B / 80B 6.6s done
+#7 extracting sha256:bf7a4185f01524837d19abde915ffde84e64368b250f5b5e9f6f75aea62a11d4 done
+#7 sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a 351B / 351B 6.7s
+#7 sha256:dcaa5a89b0ccda4b283e16d0b4d0891cd93d5fe05c6798f7806781a6a2d84354 0B / 314B 6.7s
+#7 sha256:dcaa5a89b0ccda4b283e16d0b4d0891cd93d5fe05c6798f7806781a6a2d84354 314B / 314B 6.9s
+#7 sha256:96ed2737ae312e0bc637b40783f7c2f23416cb72ca957aa01855f1614278e64b 0B / 143.35kB 6.9s
+#7 sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a 351B / 351B 6.9s done
+#7 extracting sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a done
+#7 sha256:dcaa5a89b0ccda4b283e16d0b4d0891cd93d5fe05c6798f7806781a6a2d84354 314B / 314B 7.0s done
+#7 sha256:96ed2737ae312e0bc637b40783f7c2f23416cb72ca957aa01855f1614278e64b 143.35kB / 143.35kB 7.2s done
+#7 extracting sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212 done
+#7 extracting sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4
+#7 extracting sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4 done
+#7 extracting sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296 done
+#7 extracting sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112 done
+#7 extracting sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a done
+#7 extracting sha256:dcaa5a89b0ccda4b283e16d0b4d0891cd93d5fe05c6798f7806781a6a2d84354 done
+#7 extracting sha256:96ed2737ae312e0bc637b40783f7c2f23416cb72ca957aa01855f1614278e64b done
+#7 DONE 13.0s
+
+#5 [builder 1/7] FROM docker.io/library/golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80
+#5 extracting sha256:ec935196e6a095bdd6ac865248321ea4fd33424071fe14264cd33900f8ae6212 1.6s done
+#5 extracting sha256:cd6b31ea4633e156e104ba957c37e29f4e6d880222f0130b90108570442ad860 1.9s done
+#5 extracting sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 1.7s
+#5 extracting sha256:2129e38f8eb91140cd022167d69ad764919cb78de3d2c70efd48c5e6b1b48f98 2.5s done
+#5 extracting sha256:547e989301353b555d27ccfb0e4081fa9ee30e43ce5c3e57100b4603676d58cd
+#5 extracting sha256:547e989301353b555d27ccfb0e4081fa9ee30e43ce5c3e57100b4603676d58cd done
+#5 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 done
+#5 DONE 14.2s
+
+#8 [builder 2/7] WORKDIR /src
+#8 DONE 2.0s
+
+#9 [builder 3/7] COPY go.mod go.sum ./
+#9 DONE 0.0s
+
+#10 [builder 4/7] RUN go mod download
+#10 DONE 1.0s
+
+#11 [builder 5/7] COPY . .
+#11 DONE 10.8s
+
+#12 [builder 6/7] RUN GOOS=linux GOARCH=amd64 go build         -trimpath         -ldflags="-s -w -X main.version=dev"         -o /out/engined ./cmd/engined
+#12 DONE 29.4s
+
+#13 [builder 7/7] RUN GOOS=linux GOARCH=amd64 go build         -trimpath -ldflags="-s -w"         -o /out/healthcheck ./deploy/healthcheck
+#13 DONE 0.6s
+
+#14 [stage-1 2/5] COPY --from=builder /out/engined /engined
+#14 DONE 0.0s
+
+#15 [stage-1 3/5] COPY --from=builder /out/healthcheck /healthcheck
+#15 DONE 0.0s
+
+#16 [stage-1 4/5] COPY --from=builder /src/migrations /migrations
+#16 DONE 0.0s
+
+#17 exporting to image
+#17 exporting layers 0.1s done
+#17 writing image sha256:79a1c8abf01dead12710030e04c3b317824fab092140ab5f24e0a8a342a29d27 done
+#17 naming to 183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb done
+#17 DONE 0.1s
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.extsimd
+#1 transferring dockerfile: 1.96kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/golang:1.25
+#2 DONE 0.1s
+
+#3 [internal] load metadata for gcr.io/distroless/static-debian12:nonroot
+#3 DONE 0.1s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 903B done
+#4 DONE 0.0s
+
+#5 [builder 1/6] FROM docker.io/library/golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80
+#5 DONE 0.0s
+
+#6 [stage-1 1/3] FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+#6 CACHED
+
+#7 [internal] load build context
+#7 transferring context: 35.24kB 0.0s done
+#7 DONE 0.0s
+
+#8 [builder 2/6] WORKDIR /src
+#8 CACHED
+
+#9 [builder 3/6] COPY go.mod go.sum ./
+#9 CACHED
+
+#10 [builder 4/6] RUN go mod download
+#10 CACHED
+
+#11 [builder 5/6] COPY . .
+#11 CACHED
+
+#12 [builder 6/6] RUN GOOS=linux GOARCH=amd64 go build         -trimpath         -ldflags="-s -w -X main.version=dev"         -o /out/extsimd ./cmd/extsimd
+#12 DONE 16.3s
+
+#13 [stage-1 2/3] COPY --from=builder /out/extsimd /extsimd
+#13 DONE 0.0s
+
+#14 exporting to image
+#14 exporting layers 0.0s done
+#14 writing image sha256:0d9142ef90b71857390533ff0245645477d6f0e7d4678fa6cd0d4ffa16d3c923 done
+#14 naming to 183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/extsimd:cf986fb done
+#14 DONE 0.0s
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.loadgen
+#1 transferring dockerfile: 1.21kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/golang:1.25
+#2 DONE 0.1s
+
+#3 [internal] load metadata for gcr.io/distroless/static-debian12:nonroot
+#3 DONE 0.2s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 903B done
+#4 DONE 0.0s
+
+#5 [builder 1/6] FROM docker.io/library/golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80
+#5 DONE 0.0s
+
+#6 [stage-1 1/2] FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
+#6 CACHED
+
+#7 [internal] load build context
+#7 transferring context: 35.24kB done
+#7 DONE 0.0s
+
+#8 [builder 3/6] COPY go.mod go.sum ./
+#8 CACHED
+
+#9 [builder 2/6] WORKDIR /src
+#9 CACHED
+
+#10 [builder 4/6] RUN go mod download
+#10 CACHED
+
+#11 [builder 5/6] COPY . .
+#11 CACHED
+
+#12 [builder 6/6] RUN GOOS=linux GOARCH=amd64 go build         -trimpath -ldflags="-s -w -X main.version=dev"         -o /out/loadgen ./cmd/loadgen
+#12 DONE 22.6s
+
+#13 [stage-1 2/2] COPY --from=builder /out/loadgen /loadgen
+#13 DONE 0.0s
+
+#14 exporting to image
+#14 exporting layers 0.1s done
+#14 writing image sha256:091ebf2a2152763e9f4487458386e90fdcc82f58afb30813b196de81a432eb8c done
+#14 naming to 183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb done
+#14 DONE 0.1s
+The push refers to repository [183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine]
+849973c91c46: Preparing
+abf090d395ce: Preparing
+2419a2e278fe: Preparing
+5904c32f457c: Preparing
+6e7fbcf090d0: Preparing
+ad51d0769d16: Preparing
+4cde6b0bb6f5: Preparing
+bd3cdfae1d3f: Preparing
+6f1cdceb6a31: Preparing
+af5aa97ebe6c: Preparing
+4d049f83d9cf: Preparing
+114dde0fefeb: Preparing
+35b5ba6e08cd: Preparing
+8fa10c0194df: Preparing
+7223ea1323e8: Preparing
+bd3cdfae1d3f: Waiting
+6f1cdceb6a31: Waiting
+af5aa97ebe6c: Waiting
+4d049f83d9cf: Waiting
+114dde0fefeb: Waiting
+35b5ba6e08cd: Waiting
+8fa10c0194df: Waiting
+7223ea1323e8: Waiting
+ad51d0769d16: Waiting
+4cde6b0bb6f5: Waiting
+5904c32f457c: Pushed
+6e7fbcf090d0: Pushed
+849973c91c46: Pushed
+abf090d395ce: Pushed
+2419a2e278fe: Pushed
+ad51d0769d16: Pushed
+4cde6b0bb6f5: Pushed
+bd3cdfae1d3f: Pushed
+6f1cdceb6a31: Pushed
+af5aa97ebe6c: Pushed
+4d049f83d9cf: Pushed
+114dde0fefeb: Pushed
+8fa10c0194df: Pushed
+7223ea1323e8: Pushed
+35b5ba6e08cd: Pushed
+cf986fb: digest: sha256:652717ed63aade33baea5707e7dae5d6d467a5745b6e56c13b35e4231e6e97af size: 3441
+The push refers to repository [183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/extsimd]
+c646710ac2f9: Preparing
+5904c32f457c: Preparing
+6e7fbcf090d0: Preparing
+ad51d0769d16: Preparing
+4cde6b0bb6f5: Preparing
+bd3cdfae1d3f: Preparing
+6f1cdceb6a31: Preparing
+af5aa97ebe6c: Preparing
+4d049f83d9cf: Preparing
+114dde0fefeb: Preparing
+35b5ba6e08cd: Preparing
+8fa10c0194df: Preparing
+7223ea1323e8: Preparing
+af5aa97ebe6c: Waiting
+4d049f83d9cf: Waiting
+114dde0fefeb: Waiting
+35b5ba6e08cd: Waiting
+8fa10c0194df: Waiting
+7223ea1323e8: Waiting
+bd3cdfae1d3f: Waiting
+6f1cdceb6a31: Waiting
+ad51d0769d16: Pushed
+5904c32f457c: Pushed
+4cde6b0bb6f5: Pushed
+6e7fbcf090d0: Pushed
+bd3cdfae1d3f: Pushed
+af5aa97ebe6c: Pushed
+4d049f83d9cf: Pushed
+6f1cdceb6a31: Pushed
+c646710ac2f9: Pushed
+114dde0fefeb: Pushed
+8fa10c0194df: Pushed
+7223ea1323e8: Pushed
+35b5ba6e08cd: Pushed
+cf986fb: digest: sha256:b3b5a35d9e6f46b15e874f20534d2b63a4ae8c02aedef498805e145c5e479f71 size: 3022
+The push refers to repository [183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen]
+038b0fcd18d0: Preparing
+5904c32f457c: Preparing
+6e7fbcf090d0: Preparing
+ad51d0769d16: Preparing
+4cde6b0bb6f5: Preparing
+bd3cdfae1d3f: Preparing
+6f1cdceb6a31: Preparing
+af5aa97ebe6c: Preparing
+4d049f83d9cf: Preparing
+114dde0fefeb: Preparing
+35b5ba6e08cd: Preparing
+8fa10c0194df: Preparing
+7223ea1323e8: Preparing
+af5aa97ebe6c: Waiting
+4d049f83d9cf: Waiting
+114dde0fefeb: Waiting
+35b5ba6e08cd: Waiting
+8fa10c0194df: Waiting
+7223ea1323e8: Waiting
+bd3cdfae1d3f: Waiting
+6f1cdceb6a31: Waiting
+4cde6b0bb6f5: Pushed
+ad51d0769d16: Pushed
+6e7fbcf090d0: Pushed
+5904c32f457c: Pushed
+038b0fcd18d0: Pushed
+6f1cdceb6a31: Pushed
+bd3cdfae1d3f: Pushed
+af5aa97ebe6c: Pushed
+4d049f83d9cf: Pushed
+114dde0fefeb: Pushed
+8fa10c0194df: Pushed
+7223ea1323e8: Pushed
+35b5ba6e08cd: Pushed
+cf986fb: digest: sha256:8b0b831783873c833071b13b810431624e32dbfea5de2bac84718e6a7469ad75 size: 3022
+published 183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/{engine,extsimd,loadgen}:cf986fb
+digests recorded in /opt/durexec/docs/results/cloud-campaign/images.txt

@@ -1,0 +1,10 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T125051Z-eks_idle_baseline.sh-46538.log
+AWS account=183192605828 region=us-east-1
+settling for 15s before taking idle-baseline snapshots
+idle measurement started=2026-10-30T12:51:12Z duration=120s config=r3-S16-w8x16-scon
+idle_window_s=122.073
+pg_commits_per_s=444.660
+dbhost_cpu_busy_pct=2.129
+engine_cpu_cores_total=0.0210
+engine_process_cpu_seconds=2.560
+idle baseline evidence: ../docs/results/cloud-campaign/idle-baselines/20261030T125052Z-r3-S16-w8x16-scon

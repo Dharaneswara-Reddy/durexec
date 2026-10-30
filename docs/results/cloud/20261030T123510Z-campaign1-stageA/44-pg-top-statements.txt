@@ -1,0 +1,25 @@
+15218|118.6ms|0.008ms|WITH pick AS ( SELECT shard_id, task_id FROM tasks WHERE shard_id=$1 AND task_type=$2 AND GREATEST(visible_at, COALESCE(locked_until, $4::timestam
+1|31.7ms|31.707ms|CREATE DATABASE "durexec"
+2436|18.7ms|0.008ms|SELECT shard_id, COALESCE(owner_node, $2), fencing_token, expires_at FROM shard_leases WHERE shard_id = $1
+3|15.4ms|5.120ms|-- One shared database for the whole cluster. Sharding is a shard_id column on -- every table, not a database per shard: all three nodes connect to the same -- 
+3|9.2ms|3.082ms|-- The append-only log. Never UPDATEd, never DELETEd. The primary key IS the -- concurrency control: two workers appending the same seq, one loses. CREATE TABLE
+3|8.6ms|2.869ms|-- The poll index lives in 0002 (tasks_poll_ready), not here. -- -- This file used to create tasks_pollable (shard_id, task_type, visible_at, -- task_id) and 00
+322|8.3ms|0.026ms|UPDATE shard_leases SET expires_at = now() + $4::interval WHERE shard_id = $1 AND owner_node = $2 AND fencing_token = $3
+3|7.9ms|2.632ms|-- The mutable pointer. Keyed WITHOUT run_id so at most one run is open per -- business key, which makes StartWorkflow idempotent at the front door. CREATE TABL
+1|7.7ms|7.750ms|create extension if not exists pg_stat_statements
+3|7.7ms|2.580ms|-- A lease queue, not delete-on-read. A dead worker's lock expires and the task -- becomes visible again; that is the whole crash-recovery story for in-flight w
+3|7.5ms|2.492ms|-- Meaning-vectors for the semantic check. Candidate sets are bounded by -- workflow history length, not corpus size, so no ANN index is warranted. CREATE TABLE
+3|7.4ms|2.464ms|-- Four columns that replace ZooKeeper. Read FOR UPDATE inside every mutating -- transaction, which is what makes a fenced-out node unable to write. CREATE TABL
+1200|6.7ms|0.006ms|SELECT shard_id, workflow_id, run_id::text, timer_seq, fire_at FROM timers WHERE shard_id = $1 AND fire_at <= now() ORDER BY fire_at LIMIT $2
+3|4.3ms|1.429ms|CREATE INDEX IF NOT EXISTS exec_running ON executions (shard_id, status) WHERE status = 'RUNNING'
+3|4.2ms|1.390ms|-- The poll query's index. -- -- tasks_pollable, from 0001, is (shard_id, task_type, visible_at, task_id). It -- cannot serve the poll: -- -- * locked_until i
+3|3.8ms|1.278ms|CREATE INDEX IF NOT EXISTS timers_due ON timers (shard_id, fire_at)
+4|3.6ms|0.906ms|-- Register a view on the function for ease of use. CREATE VIEW pg_stat_statements AS SELECT * FROM pg_stat_statements(true)
+3|3.5ms|1.181ms|CREATE INDEX IF NOT EXISTS intents_by_type ON activity_intents (shard_id, workflow_id, run_id, activity_type)
+45|1.5ms|0.034ms|SELECT p.shard_id, p.task_type, COALESCE(EXTRACT($3 FROM (now() - ( SELECT GREATEST(k.visible_at, COALESCE(k.locked_until, $4::timestamptz)) 
+1|0.7ms|0.714ms|CREATE FUNCTION vector_in(cstring, oid, integer) RETURNS vector AS '$libdir/vector' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+1|0.7ms|0.653ms|select name || $1 || setting from pg_settings where name in ($2,$3,$4,$5,$6, $7,$8,$9,$10,$11, $12,$13,$14,$15) order by name
+4|0.6ms|0.146ms|GRANT SELECT ON pg_stat_statements TO PUBLIC
+10|0.5ms|0.053ms|INSERT INTO tasks (shard_id, task_type, workflow_id, run_id, scheduled_event_seq, visible_at) VALUES ($1, $2, $3, $4::uuid, $5, COALESCE($6, now()))
+12|0.5ms|0.040ms|INSERT INTO events (shard_id, workflow_id, run_id, seq, event_type, payload, created_at) VALUES ($1, $2, $3::uuid, $4, $5, $6::jsonb, COALESCE($7, now()))
+3|0.5ms|0.158ms|/* Then we can drop them */ DROP VIEW pg_stat_statements

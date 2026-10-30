@@ -1,0 +1,2 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T123452Z-eks_fault.sh-35384.log
+networkpolicy_enforced=yes restored_after_delete=yes

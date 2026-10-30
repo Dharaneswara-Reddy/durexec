@@ -1,0 +1,14 @@
+archive_mode=off
+checkpoint_timeout=300
+effective_io_concurrency=1
+fsync=on
+full_page_writes=on
+max_connections=400
+max_wal_size=1024
+server_version=16.15 (Debian 16.15-1.pgdg12+2)
+shared_buffers=131072
+shared_preload_libraries=pg_stat_statements
+synchronous_commit=on
+track_io_timing=on
+wal_level=replica
+work_mem=4096

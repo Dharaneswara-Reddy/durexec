@@ -1,0 +1,2 @@
+window_start=2026-10-30T12:58:37Z
+window_end=2026-10-30T13:00:37Z
