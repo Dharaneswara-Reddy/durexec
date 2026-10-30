@@ -8,6 +8,16 @@ availability.** It runs ONE external PostgreSQL host with no standby, so it
 cannot demonstrate database failover, HA, or distributed fault tolerance. Any
 throughput number from it is a smoke result (`kind=smoke`), not a measurement.
 
+> **2026-10-30:** before any run, the harness behind this runbook was
+> corrected. Smoke and evidence collection could not work against the
+> distroless engine image, the deploy check rejected every correct render,
+> and the overlay ran 2 engines on 3 nodes. See
+> [`../cloud-campaign/03-HARNESS-READINESS.md`](../cloud-campaign/03-HARNESS-READINESS.md).
+> The commands below still work. `eks_loadgen.sh` now writes
+> `docs/results/cloud-campaign/results.csv` (97 columns) rather than
+> `docs/results/eks-pilot/`. The full campaign beyond this pilot is in
+> [`../cloud-campaign/02-EXPERIMENT-MATRIX.md`](../cloud-campaign/02-EXPERIMENT-MATRIX.md).
+
 ---
 
 ## Stop conditions — abandon the session if any occurs

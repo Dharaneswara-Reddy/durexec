@@ -8,6 +8,10 @@
 plan's own shard-scaling prediction and shows the fixed-concurrency sweep was
 offered-load-limited by 2.74x.
 
+**AWS campaign (2026-10-30): prepared, NOT RUN** — evidence inventory, matrix and
+harness fixes in [`../cloud-campaign/`](../cloud-campaign/README.md). No cloud
+result exists; `cloud-campaign/results.csv` appears on the first run.
+
 **For a one-page roll-up of the best valid run of every metric, read
 [`../RESULTS_SUMMARY.md`](../RESULTS_SUMMARY.md).** This file remains the
 per-run index, including the runs that are invalid and why they are kept.

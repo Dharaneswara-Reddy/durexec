@@ -142,3 +142,42 @@ events already in the log where the published run started cleaner, btrfs at
 86 %, and a different background load. **The two are not comparable, and this
 file does not supersede the published figures.** It is a separate exploratory
 run on a differently-loaded machine.
+
+---
+
+## 9. Errata and later analysis (added 2026-10-30; sections 1–8 unchanged)
+
+Found while building the cloud evidence inventory
+(`docs/cloud-campaign/01-EVIDENCE-INVENTORY.md`). Nothing above is rewritten.
+
+1. **`results.csv` latency columns are corrupt.** `p50_ms`, `p95_ms` and
+   `p99_ms` contain the shard count (1, 2, 4, 8, 16) on every row. The
+   latency figures in §2 came from the raw loadgen output, not from the CSV.
+   The runner's header has since changed to `p50_s,p95_s,p99_s`; this file
+   predates that fix.
+2. **The raw loadgen outputs (`raw/*.txt`) were never committed.** Only
+   `.enginecpu` and `.time` are in the repository, so §2's latency and
+   completion figures can't be re-derived from it. If the files are still on
+   the laptop, they should be added.
+3. **Engine CPU, reduced from `raw/*.enginecpu`** (hypothesis 5 was "not
+   established" because these samples were never reduced). Only 4 samples
+   per node per run, so this is weak evidence:
+
+   | Point | node-a | node-b | node-c | sum |
+   |---|---|---|---|---|
+   | 1 shard c128 | 24 % | 76 % | 32 % | 132 % |
+   | 4 shards c128 | 45 % | 73 % | 42 % | 160 % |
+   | 16 shards c128 | 74 % | 113 % | 64 % | 250 % |
+   | 16 shards c256 | 87 % | 130 % | 73 % | 291 % |
+   | 16 shards c512 | 113 % | 171 % | 108 % | 391 % |
+
+   node-b owned **9 of 16 shards** and ran hottest at every point, so engine
+   CPU tracks shard ownership. At c512 the three engines used 3.9 cores
+   while the generator used a full core, on a 12-thread host at load 21.97.
+4. **Shard count was confounded with worker count, not only with offered
+   load.** `WORKFLOW_WORKERS` and `ACTIVITY_WORKERS` are per shard
+   (`internal/runtime/pool.go:49`), so driving 16 shards instead of 1 also
+   ran 16× the worker goroutines. Phase 6 measured that workers alone
+   (4 → 16, one shard) give 1.95×. Hypothesis 1 ("more shards reduce
+   contention") is therefore **not separated** from "more workers". The
+   cloud matrix E1 holds total workers constant to separate them.
