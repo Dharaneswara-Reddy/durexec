@@ -447,3 +447,23 @@ func lastPathSegment(p string) string {
 	}
 	return p
 }
+
+// A p50 well below the declared floor means the floor was declared for other
+// hardware. The verdict stays NOT_SATURATED (a lower bound), but the message
+// must say the floor needs recalibrating instead of claiming p50 sat "within
+// 5%" of it, which is what it used to print for a p50 25% below.
+func TestVerdictFlagsAFloorDeclaredTooHigh(t *testing.T) {
+	r := arrivalResult{ServiceFloor: 2010 * time.Millisecond, Window: 10 * time.Second}
+	r.Latency.P50 = 1504 * time.Millisecond
+	v, why := r.classify()
+	if v != VerdictNotSaturated {
+		t.Fatalf("verdict = %v, want NOT_SATURATED", v)
+	}
+	if strings.Contains(why, "within") || !strings.Contains(why, "25% BELOW the declared floor") {
+		t.Fatalf("message does not flag the mis-declared floor: %q", why)
+	}
+	r.Latency.P50 = 2050 * time.Millisecond
+	if _, why := r.classify(); strings.Contains(why, "BELOW") {
+		t.Fatalf("p50 just above the floor was flagged as below it: %q", why)
+	}
+}

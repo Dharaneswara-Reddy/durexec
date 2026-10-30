@@ -63,7 +63,22 @@ docker run -d --name durexec-postgres --restart unless-stopped \
   -c synchronous_commit=on \
   -c wal_level=replica \
   -c max_wal_senders=4 \
-  -c max_replication_slots=4
+  -c max_replication_slots=4 \
+  -c shared_preload_libraries=pg_stat_statements \
+  -c pg_stat_statements.track=all \
+  -c track_io_timing=on \
+  -c track_wal_io_timing=on \
+  -c log_lock_waits=on \
+  -c log_checkpoints=on \
+  -c log_min_duration_statement=200
+# The instrumentation above matches the local Kubernetes lab
+# (deploy/kubernetes/base/10-config.yaml) so that cloud and local database
+# figures come from the same sources. Without it the cloud run would have had
+# no per-statement latency, no I/O timing and no lock-wait log, and a
+# local-versus-cloud comparison would have compared different measurements.
+# shared_buffers differs on purpose (1GB here, 256MB in the lab) and is
+# recorded with every evidence bundle; the pilot database stays far smaller
+# than either, so both serve from cache.
 
 # A marker the deploy script waits on. Written last, so its presence means
 # every step above succeeded.

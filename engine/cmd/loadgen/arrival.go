@@ -193,11 +193,11 @@ func (r arrivalResult) classify() (Verdict, string) {
 		need := time.Duration(float64(r.ServiceFloor) * floorMargin)
 		if r.Latency.P50 > 0 && r.Latency.P50 < need {
 			return VerdictNotSaturated, fmt.Sprintf(
-				"p50 was %s, within %.0f%% of the declared %s service floor: the engine "+
+				"p50 was %s, not more than %.0f%% above the declared %s service floor: the engine "+
 					"drained its queue and was waiting for work, so %.2f wf/s is a LOWER "+
-					"BOUND on capacity, not a measurement of it",
+					"BOUND on capacity, not a measurement of it%s",
 				fmtDur(r.Latency.P50), (floorMargin-1)*100, fmtDur(r.ServiceFloor),
-				r.CompletedPerSecond())
+				r.CompletedPerSecond(), belowFloorNote(r))
 		}
 	}
 
@@ -690,4 +690,20 @@ func fmtRate(r float64) string {
 		return fmt.Sprintf("%d", int64(r))
 	}
 	return fmt.Sprintf("%.2f", r)
+}
+
+// belowFloorNote flags a p50 clearly BELOW the declared floor. The floor is
+// declared, not measured, and on different hardware the real one moves (it is
+// dominated by durable-timer lateness, not by the activity sleeps). A p50 well
+// under it means the declaration is too high for this deployment -- and a
+// too-high floor would let an idle engine on slower hardware be classified
+// SATURATED. Recalibrate the floor at a trivially low rate before trusting
+// any verdict on this deployment.
+func belowFloorNote(r arrivalResult) string {
+	if r.ServiceFloor <= 0 || r.Latency.P50 <= 0 || r.Latency.P50 >= r.ServiceFloor*9/10 {
+		return ""
+	}
+	return fmt.Sprintf("; NOTE p50 is %.0f%% BELOW the declared floor, so the declared floor "+
+		"does not describe this deployment: recalibrate it at a low rate before trusting verdicts",
+		100*(1-r.Latency.P50.Seconds()/r.ServiceFloor.Seconds()))
 }

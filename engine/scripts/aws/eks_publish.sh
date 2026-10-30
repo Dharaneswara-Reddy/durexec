@@ -11,7 +11,14 @@ cd "$(dirname "$0")/../.."
 require_confirmation "create an ECR repository and push images"
 
 REGION="${AWS_REGION:-us-east-1}"
-TAG="${TAG:-$(git rev-parse --short HEAD)}"
+# The tag is the commit the image is built from. A dirty tree builds code that
+# commit does not contain, so an image tagged with the bare SHA would carry a
+# false provenance. Refuse unless the operator names the tag explicitly.
+if [ -z "${TAG:-}" ]; then
+  git diff --quiet && git diff --cached --quiet \
+    || { echo "FATAL: working tree is dirty; commit first or set TAG=<sha>-dirty-<desc> explicitly" >&2; exit 1; }
+  TAG="$(git rev-parse --short HEAD)"
+fi
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 REGISTRY="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
 
@@ -39,3 +46,13 @@ for img in engine extsimd loadgen; do
   docker push "$REGISTRY/durexec/$img:$TAG"
 done
 echo "published $REGISTRY/durexec/{engine,extsimd,loadgen}:$TAG"
+# Provenance: the immutable digest of every pushed image, beside the commit.
+PROV="$(git rev-parse --show-toplevel)/docs/results/cloud-campaign/images.txt"
+mkdir -p "$(dirname "$PROV")"
+for img in engine extsimd loadgen; do
+  d="$(aws ecr describe-images --region "$REGION" --repository-name "durexec/$img" \
+        --image-ids imageTag="$TAG" --query 'imageDetails[0].imageDigest' --output text)"
+  printf '%s durexec/%s:%s %s git=%s tree=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$img" "$TAG" "$d" \
+    "$(git rev-parse HEAD)" "$(git diff --quiet && echo clean || echo dirty)" >> "$PROV"
+done
+echo "digests recorded in $PROV"

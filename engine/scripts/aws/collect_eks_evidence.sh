@@ -113,46 +113,79 @@ for s in d.get('items',[]):
 " > "$OUT/21-secret-names-and-keys.txt" 2>/dev/null && note "ok       21-secret-names-and-keys.txt (names/keys only, no values)"
 
 # --- 4. engine metrics and shard state -------------------------------------
-POD="$(kubectl -n "$NS" get pods -l app=durexec -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)"
+# The engine image is distroless: no shell, no wget. HTTP goes through the API
+# server's pod proxy (scripts/aws/_k8s.sh). Metrics are taken from EVERY pod;
+# one pod's /metrics describes one process, not the cluster.
+. engine/scripts/aws/_k8s.sh
+PODS="$(engine_pods 2>/dev/null || true)"
+POD="${PODS%% *}"
 if [ -n "$POD" ]; then
-  get "engine /metrics" 30-metrics.txt required \
-    kubectl -n "$NS" exec "$POD" -- sh -c 'wget -qO- http://localhost:8080/metrics'
-  get "shard ownership" 31-shards.json required \
-    kubectl -n "$NS" exec "$POD" -- sh -c 'wget -qO- http://localhost:8080/v1/shards'
-  get "healthz" 32-healthz.json optional \
-    kubectl -n "$NS" exec "$POD" -- sh -c 'wget -qO- http://localhost:8080/healthz'
+  for p in $PODS; do
+    get "engine /metrics $p" "30-metrics-$p.txt" required engine_get "$p" /metrics
+    get "healthz $p"         "32-healthz-$p.json" required engine_get "$p" /healthz
+  done
+  get "shard ownership" 31-shards.json required engine_get "$POD" /v1/shards
 else
   note "MISSING  no engine pod; metrics and shard state unavailable (required)"
   missing=$((missing+2))
 fi
 
-# --- 5. database invariants, over an authenticated path --------------------
-# Run from inside an engine pod using the SAME secret the engine uses, so no
-# password is ever typed, passed as an argument, or written to this machine.
-if [ -n "$POD" ]; then
-  kubectl -n "$NS" exec "$POD" -- sh -c '
-    # DATABASE_URL is already in this container'\''s environment from the
-    # secret; psql reads it from there, so it never reaches argv.
-    command -v psql >/dev/null 2>&1 || { echo "psql absent in engine image"; exit 3; }
-    psql "$DATABASE_URL" -At -c "
-      select '\''events='\''||(select count(*) from events)
-          ||'\'' executions='\''||(select count(*) from executions)
-          ||'\'' pending_tasks='\''||(select count(*) from tasks)
-          ||'\'' nonterminal='\''||(select count(*) from executions where status not in ('\''COMPLETED'\'','\''FAILED'\'','\''COMPENSATING_FAILED'\''))
-          ||'\'' dup_run_seq='\''||(select count(*) from (select run_id,seq from events group by run_id,seq having count(*)>1) d)"
-  ' > "$OUT/40-db-invariants.txt" 2>&1
-  if grep -q 'events=' "$OUT/40-db-invariants.txt" 2>/dev/null; then
-    note "ok       40-db-invariants.txt"; collected=$((collected+1))
-  else
-    note "absent   40-db-invariants.txt (engine image is distroless: no psql). Run the SQL from the smoke script instead."
-  fi
+# --- 5. database state, invariants and statistics ---------------------------
+# Through the probe pod on the harness node, using the SAME secret the engine
+# uses, so no password is typed, passed as an argument or written here.
+if probe_ensure 2>"$OUT/40-probe.err"; then
+  rm -f "$OUT/40-probe.err"
+  # Drain first: "no lost workflows" is only meaningful once in-flight work
+  # has had time to finish. Wait up to DRAIN_WAIT seconds, and RECORD whether
+  # it drained rather than assuming it.
+  DRAIN_WAIT="${DRAIN_WAIT:-180}"; t0=$(date +%s); drained=no
+  while :; do
+    left=$(echo "select (select count(*) from executions where status not in ('COMPLETED','FAILED','COMPENSATING_FAILED','CANCELLED')) + (select count(*) from tasks);" | probe_sql 2>/dev/null || true)
+    [ "$left" = 0 ] && { drained=yes; break; }
+    [ $(( $(date +%s) - t0 )) -ge "$DRAIN_WAIT" ] && break
+    sleep 5
+  done
+  echo "drained=$drained after $(( $(date +%s) - t0 ))s (limit ${DRAIN_WAIT}s); nonterminal+pending at last check=${left:-unknown}" > "$OUT/40-drain.txt"
+  note "ok       40-drain.txt (drained=$drained)"
+  get "database invariants" 41-db-invariants.txt required probe_sql <<'SQL'
+select 'events='           || (select count(*) from events);
+select 'executions='       || (select count(*) from executions);
+select 'pending_tasks='    || (select count(*) from tasks);
+select 'executions_by_status=' || coalesce((select string_agg(status || ':' || n, ';' order by status)
+                                   from (select status, count(*) n from executions group by status) s), 'none');
+select 'dup_run_seq='      || (select count(*) from (select run_id, seq from events group by run_id, seq having count(*) > 1) d);
+select 'dup_activity_completion=' || (select count(*) from (select run_id, payload->>'k' from events
+                                   where event_type = 'ActivityTaskCompleted' group by 1, 2 having count(*) > 1) d);
+select 'seq_gaps='         || (select count(*) from (select run_id from events group by run_id having max(seq) <> count(*)) d);
+select 'multi_terminal='   || (select count(*) from (select run_id from events where event_type in
+                                   ('WorkflowExecutionCompleted','WorkflowExecutionFailed') group by run_id having count(*) > 1) d);
+select 'stuck_running_gt_5min=' || (select count(*) from executions where status = 'RUNNING' and updated_at < now() - interval '5 minutes');
+select 'lease_rows='       || (select count(*) from shard_leases) where to_regclass('shard_leases') is not null;
+SQL
+  get "pg statistics snapshot" 42-pgstat.txt required probe_sql < engine/scripts/aws/sql/pgstat_snapshot.sql
+  get "pg settings" 43-pg-settings.txt required probe_sql <<'SQL'
+select name || '=' || setting from pg_settings
+ where name in ('max_connections','shared_buffers','synchronous_commit','fsync','full_page_writes',
+                'wal_level','checkpoint_timeout','max_wal_size','track_io_timing','shared_preload_libraries',
+                'archive_mode','effective_io_concurrency','work_mem','server_version') order by name;
+SQL
+  get "top statements" 44-pg-top-statements.txt optional probe_sql <<'SQL'
+select calls || '|' || round(total_exec_time::numeric,1) || 'ms|' || round(mean_exec_time::numeric,3) || 'ms|'
+       || regexp_replace(left(query, 160), '\s+', ' ', 'g')
+  from pg_stat_statements order by total_exec_time desc limit 25;
+SQL
+  get "db round trip ms" 45-db-rtt-ms.txt optional probe_rtt 50
+else
+  note "MISSING  probe pod could not start; database invariants unavailable (required)"
+  missing=$((missing+1))
 fi
 
 # --- 6. benchmark artefacts -------------------------------------------------
-for f in docs/results/eks-pilot/results.csv; do
+for f in docs/results/eks-pilot/results.csv docs/results/cloud-campaign/results.csv; do
   [ -f "$f" ] && { cp "$f" "$OUT/50-$(basename "$f")"; note "ok       50-$(basename "$f")"; collected=$((collected+1)); }
 done
 [ -d docs/results/eks-pilot/raw ] && { cp -r docs/results/eks-pilot/raw "$OUT/51-raw" 2>/dev/null; note "ok       51-raw/"; }
+[ -d docs/results/cloud-campaign/raw ] && { cp -r docs/results/cloud-campaign/raw "$OUT/52-campaign-raw" 2>/dev/null; note "ok       52-campaign-raw/"; }
 
 # --- 7. redaction -----------------------------------------------------------
 # Belt and braces: nothing above should contain a credential, but a connection
