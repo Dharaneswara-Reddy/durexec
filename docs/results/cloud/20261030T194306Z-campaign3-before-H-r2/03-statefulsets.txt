@@ -1,0 +1,2 @@
+NAME      READY   AGE    CONTAINERS   IMAGES
+durexec   1/1     4h5m   engined      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb

@@ -1,0 +1,2 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T193752Z-eks_loadgen.sh-281583.log
+r1-S16-drive16-w4x8-scon-scaling-c512-d135s-t22 -> 145.10 wf/s lg=- p99=6.6270s gen=0.485c eng=1.299c node_max=71.1% db_cpu=88.606% sat=[db_cpu] missing=[] verdict=RECORDED

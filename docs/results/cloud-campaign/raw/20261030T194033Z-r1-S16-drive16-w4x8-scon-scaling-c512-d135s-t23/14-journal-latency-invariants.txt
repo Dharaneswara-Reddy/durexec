@@ -1,0 +1,13 @@
+lat|activity_sched_to_done|n=78944|p50=285.0|p90=753.9|p95=893.4|p99=1158.3|max=1851.9
+lat|decision_turnaround|n=98680|p50=36.0|p90=84.5|p95=155.2|p99=396.8|max=1067.0
+lat|end_to_end|n=19736|p50=3254.8|p90=5019.8|p95=5533.0|p99=6456.5|max=8257.5
+lat|start_to_first_decision|n=19736|p50=40.9|p90=149.1|p95=270.5|p99=483.0|max=1019.5
+lat|timer_lag|n=19736|p50=1397.2|p90=3105.4|p95=3557.1|p99=4583.7|max=6163.5
+inv|runs=19736
+inv|dup_run_seq=0
+inv|dup_activity_completion=0
+inv|orphan_completion=0
+inv|seq_gaps=0
+inv|multi_terminal=0
+inv|executions_by_status=COMPLETED:19736
+inv|pending_tasks=0

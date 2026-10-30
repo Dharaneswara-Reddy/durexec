@@ -1,0 +1,32 @@
+cluster: durexec-0.durexec-hl=http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-1.durexec-hl=http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080
+
+--- throughput: 16 shard(s) [0,3,1,2,4,5,6,7,8,9,10,11,12,13,14,15] owned by [durexec-0.durexec-hl durexec-1.durexec-hl] ---
+    window 2m0s (after 15s warm-up), concurrency 256, poll 100ms, prep 50ms
+    completed 14788 in 120.000s = 123.23 wf/s (started 16902, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+NFR    METRIC                        VALUE            TARGET                                VERDICT      KIND
+---    ------                        -----            ------                                -------      ----
+NFR-5  completed_per_sec @16shard    123.233 wf/s     no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @16shard            14788 workflows  -                                     -            measured
+NFR-5  latency_p50 @16shard          2.0046 s         -                                     -            measured
+NFR-5  latency_p95 @16shard          2.9376 s         -                                     -            measured
+NFR-5  latency_p99 @16shard          3.6826 s         -                                     -            measured
+NFR-5  workload @16shard             DeliveryOrder    -                                     -            assumed
+-      routing_409_follows @16shard  0 requests       -                                     -            measured
+NFR-5  scaling_1_to_2                (not measured)   >= 1.7x from 1 to 2 shards            NO EVIDENCE  not-measured
+
+notes
+  completed_per_sec @16shard         shards 0,3,1,2,4,5,6,7,8,9,10,11,12,13,14,15 owned by 2 node(s): [durexec-0.durexec-hl durexec-1.durexec-hl]; fewer owners than shards, so this point measures one machine more than once and is NOT evidence of horizontal scaling
+  completed @16shard                 status COMPLETED observed inside the 120.000s window; 16902 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @16shard               end to end, start request to terminal status; 14788 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @16shard               14788 samples
+  workload @16shard                  prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 256; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @16shard       requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 57 failed at the transport
+  scaling_1_to_2                     the 1-shard run produced no completions, so there is no baseline to divide by
+
+how to read the 'kind' column
+  measured      an observation taken from the running cluster in this run
+  derived       arithmetic over this run's measurements (a ratio, a percentile)
+  assumed       a value this tool was told, not something it checked
+  not-measured  this run produced no evidence; the target column still shows
+                what the design document asks for, and the value column is empty
