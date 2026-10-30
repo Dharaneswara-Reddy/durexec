@@ -66,6 +66,74 @@ resource "random_password" "replication" {
   special = false
 }
 
+# ---------------------------------------------------------------------------
+# Credential delivery.
+#
+# The passwords used to be interpolated into user_data, which anyone with
+# ec2:DescribeInstanceAttribute can read back, and which cloud-init keeps on
+# the instance. They now live in one Secrets Manager secret. Only the database
+# host's instance role may read it, and only that secret; the EKS node role
+# gets nothing, so a pod cannot fetch it through IMDS. The engine receives the
+# password through the Kubernetes Secret that eks_deploy.sh builds from this
+# same secret with the OPERATOR's credentials.
+#
+# STILL IN TERRAFORM STATE: random_password results and the secret version are
+# stored in plaintext in terraform.tfstate. State is local, gitignored and must
+# be treated as a credential file (see LAPTOP-RUNBOOK.md).
+# ---------------------------------------------------------------------------
+
+resource "aws_secretsmanager_secret" "db" {
+  name_prefix = "durexec-${var.environment}-db-"
+  description = "durexec EKS pilot PostgreSQL credentials"
+  # No recovery window: `terraform destroy` must leave nothing billing, and a
+  # pending-deletion secret would also block a same-named re-create.
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "db" {
+  secret_id = aws_secretsmanager_secret.db.id
+  secret_string = jsonencode({
+    postgres_password    = random_password.postgres.result
+    replication_password = random_password.replication.result
+  })
+}
+
+data "aws_iam_policy_document" "db_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "db" {
+  name               = "durexec-${var.environment}-db-host"
+  assume_role_policy = data.aws_iam_policy_document.db_assume.json
+}
+
+# GetSecretValue on this one secret, nothing else. The secret uses the AWS
+# managed key, whose key policy already admits callers Secrets Manager
+# authorises, so no kms:Decrypt grant is needed.
+data "aws_iam_policy_document" "db_read_secret" {
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.db.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "db_read_secret" {
+  name   = "read-db-secret"
+  role   = aws_iam_role.db.id
+  policy = data.aws_iam_policy_document.db_read_secret.json
+}
+
+resource "aws_iam_instance_profile" "db" {
+  name = "durexec-${var.environment}-db-host"
+  role = aws_iam_role.db.name
+}
+
 # PGDATA on its own volume so the journal survives the instance being
 # terminated, which is what makes an instance-loss test possible later without
 # destroying the evidence it collects.
@@ -111,11 +179,18 @@ resource "aws_instance" "database" {
     http_put_response_hop_limit = 2
   }
 
+  iam_instance_profile = aws_iam_instance_profile.db.name
+
+  # No credential in user_data: only the secret's ARN. The bootstrap fetches
+  # the value with the instance role.
   user_data = templatefile("${path.module}/db_user_data.sh.tftpl", {
-    postgres_password    = random_password.postgres.result
-    replication_password = random_password.replication.result
-    max_connections      = var.db_max_connections
+    db_secret_arn   = aws_secretsmanager_secret.db.arn
+    aws_region      = var.aws_region
+    max_connections = var.db_max_connections
   })
+
+  # The secret value must exist before the instance's first boot reads it.
+  depends_on = [aws_secretsmanager_secret_version.db, aws_iam_role_policy.db_read_secret]
 
   tags = { Name = "durexec-${var.environment}-db" }
 }

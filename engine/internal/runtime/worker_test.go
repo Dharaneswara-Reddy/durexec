@@ -9,6 +9,7 @@ import (
 
 	"github.com/dharaneswar339/durexec/internal/activity"
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/taskq"
 	"github.com/dharaneswar339/durexec/internal/workflow"
 )
 
@@ -235,6 +236,42 @@ func TestWorkflowWorkerParksAndDoesNotJournalOnNonDeterminism(t *testing.T) {
 	// With a backoff, so a divergent run does not spin the fleet.
 	if rel := queue.released[0]; rel.visibleIn <= 0 {
 		t.Errorf("task released with visibleIn=%dms, want a backoff", rel.visibleIn)
+	}
+}
+
+// The park backoff must hold for EVERY jitter draw, not most of them. With
+// full jitter on attempt 1 (ceiling 100ms) a draw below 0.01 truncated to a
+// visibility delay of 0ms, so the test above failed about once per hundred
+// runs and a parked run came straight back. Pinning the draw to its minimum
+// makes that case deterministic, for both reasons a run is parked.
+func TestParkedRunBackoffHasAFloorEvenOnTheMinimumJitterDraw(t *testing.T) {
+	saved := randFraction
+	randFraction = func() float64 { return 0 }
+	t.Cleanup(func() { randFraction = saved })
+
+	floor := taskq.DefaultBackoff().Base.Milliseconds()
+
+	hist := append(startedHistory("Divergent"), event(2, core.EvActivityScheduled, core.ActivityScheduled{
+		K: 0, ActivityType: "Alpha", Mode: core.ModeExact,
+	}), event(3, core.EvActivityCompleted, core.ActivityCompleted{
+		K: 0, Result: json.RawMessage(`"done"`),
+	}))
+	e, _, queue := engineForWorker(t, hist, runningExecution("Divergent", 3))
+	if err := (&WorkflowWorker{Engine: e, Shard: 1}).process(context.Background(), workflowTask()); err != nil {
+		t.Fatalf("process: %v", err)
+	}
+	if queue.releaseCount() != 1 || queue.released[0].visibleIn < floor {
+		t.Fatalf("divergent park released %+v, want one release with visibleIn >= %dms", queue.released, floor)
+	}
+
+	e, _, queue = engineForWorker(t, startedHistory("Divergent"), runningExecution("Divergent", 1))
+	e.Dispatcher.CodeVersion = "v2"
+	e.Dispatcher.AcceptVersion = func(recorded string) bool { return recorded == "v2" }
+	if err := (&WorkflowWorker{Engine: e, Shard: 1}).process(context.Background(), workflowTask()); err != nil {
+		t.Fatalf("process: %v", err)
+	}
+	if queue.releaseCount() != 1 || queue.released[0].visibleIn < floor {
+		t.Fatalf("version park released %+v, want one release with visibleIn >= %dms", queue.released, floor)
 	}
 }
 

@@ -148,6 +148,12 @@ That is recorded per point (H5) and used, not hidden.
 Best E1 configuration, re-deployed with S = 24 (divisible by 1, 2, 3) if
 E1's best was 16 or 32. r1, r2, r3. Knee each, 3 trials.
 
+> **Correction (2026-10-30 verification):** divisibility does not make ownership
+> even. The ring is a consistent hash; r3 with S = 24 gives 8/11/5 (busiest node
+> 1.38× its fair share). Read each point's `shards_per_owner` and `shard_skew`
+> columns and report the ratio against them. See
+> `docs/results/local-shard-sweep/CORRECTED-ANALYSIS.md` §3.
+
 **Question:** the scaling ratio r1→r2→r3, and **where it stops**. If the
 knee stops rising while DB CPU or disk reaches ≥ 85 %, the finding is "the
 engine scales until the shared database saturates at N wf/s on this DB

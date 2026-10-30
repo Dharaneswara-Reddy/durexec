@@ -34,7 +34,24 @@ func (e *Engine) backoff() taskq.Backoff {
 // same reason it does in the queue: every worker in the fleet fails the same
 // task at the same moment when a downstream service is down, and retrying in
 // lockstep would rebuild the herd on every cycle.
-func randFraction() float64 { return rand.Float64() }
+//
+// A variable so a test can pin the draw; production never reassigns it.
+var randFraction = func() float64 { return rand.Float64() }
+
+// parkDelayMs is the visibility delay for a PARKED run (divergent replay or a
+// refused code version). Such a run cannot progress until an operator acts, so
+// it must never come straight back. Full jitter alone does not guarantee that:
+// on attempt 1 the ceiling is 100ms and any draw below 0.01 truncates to 0ms,
+// which made the park "with a backoff" a 1-in-100 immediate retry. The floor is
+// one backoff base; above it the delay is still jittered.
+func (e *Engine) parkDelayMs(attempt int) int64 {
+	b := e.backoff()
+	d := b.Jitter(attempt, randFraction())
+	if d < b.Base {
+		d = b.Base
+	}
+	return d.Milliseconds()
+}
 
 // WorkerPool starts and stops per-shard workers as leases come and go.
 //

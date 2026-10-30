@@ -14,7 +14,7 @@ throughput number from it is a smoke result (`kind=smoke`), not a measurement.
 > and the overlay ran 2 engines on 3 nodes. See
 > [`../cloud-campaign/03-HARNESS-READINESS.md`](../cloud-campaign/03-HARNESS-READINESS.md).
 > The commands below still work. `eks_loadgen.sh` now writes
-> `docs/results/cloud-campaign/results.csv` (97 columns) rather than
+> `docs/results/cloud-campaign/results.csv` (99 columns) rather than
 > `docs/results/eks-pilot/`. The full campaign beyond this pilot is in
 > [`../cloud-campaign/02-EXPERIMENT-MATRIX.md`](../cloud-campaign/02-EXPERIMENT-MATRIX.md).
 

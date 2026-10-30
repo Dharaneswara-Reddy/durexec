@@ -181,8 +181,11 @@ else
 fi
 
 # --- 6. benchmark artefacts -------------------------------------------------
-for f in docs/results/eks-pilot/results.csv docs/results/cloud-campaign/results.csv; do
-  [ -f "$f" ] && { cp "$f" "$OUT/50-$(basename "$f")"; note "ok       50-$(basename "$f")"; collected=$((collected+1)); }
+for f in docs/results/eks-pilot/results.csv docs/results/cloud-campaign/results.csv docs/results/cloud-campaign/faults.csv; do
+  # Named by directory too: eks-pilot/ and cloud-campaign/ both hold a
+  # results.csv, and a bare basename let the second copy overwrite the first.
+  b="50-$(basename "$(dirname "$f")")-$(basename "$f")"
+  [ -f "$f" ] && { cp "$f" "$OUT/$b"; note "ok       $b"; collected=$((collected+1)); }
 done
 [ -d docs/results/eks-pilot/raw ] && { cp -r docs/results/eks-pilot/raw "$OUT/51-raw" 2>/dev/null; note "ok       51-raw/"; }
 [ -d docs/results/cloud-campaign/raw ] && { cp -r docs/results/cloud-campaign/raw "$OUT/52-campaign-raw" 2>/dev/null; note "ok       52-campaign-raw/"; }

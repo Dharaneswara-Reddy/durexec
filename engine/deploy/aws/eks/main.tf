@@ -21,7 +21,9 @@ terraform {
     }
   }
   # Local state on purpose; see deploy/aws/terraform/versions.tf for the
-  # reasoning. This state holds no generated passwords.
+  # reasoning. This state DOES hold generated passwords (random_password and
+  # the Secrets Manager secret version, in plaintext): treat terraform.tfstate
+  # as a credential file. It is gitignored and never leaves the operator laptop.
 }
 
 provider "aws" {

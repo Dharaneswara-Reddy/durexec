@@ -54,7 +54,10 @@ MIN_SAMPLES="${MIN_SAMPLES:-150}"
 # bottleneck in the row (the saturation rule in KUBERNETES-TEST-PLAN.md).
 SAT_PCT="${SAT_PCT:-85}"
 SAMPLE_EVERY="${SAMPLE_EVERY:-3}"
-OUT="${OUT:-docs/results/cloud-campaign}"; mkdir -p "$OUT/raw"
+# Relative to engine/ (the cd above), so ../docs is the REPOSITORY docs/ --
+# the tree collect_eks_evidence.sh bundles and the runbook points at. A plain
+# docs/ here wrote to engine/docs/, where no collector ever looked.
+OUT="${OUT:-../docs/results/cloud-campaign}"; mkdir -p "$OUT/raw"
 CSV="$OUT/results.csv"
 
 # --- deployed configuration, READ from the cluster, never assumed ----------
@@ -76,7 +79,7 @@ RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 JOB="loadgen-${RUN_ID,,}"; JOB="${JOB//[^a-z0-9-]/}"
 RAW="$OUT/raw/${RUN_ID}-${CFG}"; mkdir -p "$RAW"
 
-HEADER="run_id,exp,config_id,kind,mode,offered_rate,service_floor,lg_verdict,dropped,gen_lag_p99_s,inflight_slope,trial,ts_start,ts_end,git_sha,git_tree,image_tag,replicas,deployed_shards,driven_shards,wf_workers,act_workers,sync_commit,concurrency,duration,warmup,started,completed,wf_per_s,p50_s,p95_s,p99_s,failed,non_completed,notowner_follows,owner_nodes,gen_node,gen_role,gen_cpu_cores,gen_cpu_peak,gen_mem_peak_mb,gen_restarts,gen_exit,job_status,eng_cpu_cores_total,eng_cpu_cores_max_pod,eng_node_cpu_pct_max,eng_mem_peak_mb_max,db_rtt_ms_p50,db_rtt_ms_max,pg_commit_per_s,pg_rollback,pg_wal_MBps,pg_hit_ratio,pg_stmt_mean_ms,pg_deadlocks,pg_peak_conns,pg_peak_active,pg_peak_lock_waits,pg_ckpt_req,pg_wait_profile,eng_pool_acquires,eng_pool_empty_frac,eng_pool_wait_s,eng_task_failures,eng_fencing_rejections,eng_lease_changes,eng_replays,eng_gc_pause_mean_ms,eng_goroutines_max,eng_queue_oldest_ready_s,e2e_db_p50_ms,e2e_db_p99_ms,first_decision_p50_ms,act_p50_ms,act_p99_ms,decision_p50_ms,decision_p99_ms,timer_lag_p50_ms,timer_lag_p99_ms,inv_runs,inv_dup_run_seq,inv_dup_activity_completion,inv_orphan_completion,inv_seq_gaps,inv_multi_terminal,inv_pending_tasks,inv_exec_status,dbhost_cpu_pct,dbhost_iowait_pct,dbhost_steal_pct,dbhost_disk_write_iops,dbhost_disk_util_pct,saturated,missing,verdict,raw_dir"
+HEADER="run_id,exp,config_id,kind,mode,offered_rate,service_floor,lg_verdict,dropped,gen_lag_p99_s,inflight_slope,trial,ts_start,ts_end,git_sha,git_tree,image_tag,replicas,deployed_shards,driven_shards,wf_workers,act_workers,sync_commit,concurrency,duration,warmup,started,completed,wf_per_s,p50_s,p95_s,p99_s,failed,non_completed,notowner_follows,owner_nodes,shards_per_owner,shard_skew,gen_node,gen_role,gen_cpu_cores,gen_cpu_peak,gen_mem_peak_mb,gen_restarts,gen_exit,job_status,eng_cpu_cores_total,eng_cpu_cores_max_pod,eng_node_cpu_pct_max,eng_mem_peak_mb_max,db_rtt_ms_p50,db_rtt_ms_max,pg_commit_per_s,pg_rollback,pg_wal_MBps,pg_hit_ratio,pg_stmt_mean_ms,pg_deadlocks,pg_peak_conns,pg_peak_active,pg_peak_lock_waits,pg_ckpt_req,pg_wait_profile,eng_pool_acquires,eng_pool_empty_frac,eng_pool_wait_s,eng_task_failures,eng_fencing_rejections,eng_lease_changes,eng_replays,eng_gc_pause_mean_ms,eng_goroutines_max,eng_queue_oldest_ready_s,e2e_db_p50_ms,e2e_db_p99_ms,first_decision_p50_ms,act_p50_ms,act_p99_ms,decision_p50_ms,decision_p99_ms,timer_lag_p50_ms,timer_lag_p99_ms,inv_runs,inv_dup_run_seq,inv_dup_activity_completion,inv_orphan_completion,inv_seq_gaps,inv_multi_terminal,inv_pending_tasks,inv_exec_status,dbhost_cpu_pct,dbhost_iowait_pct,dbhost_steal_pct,dbhost_disk_write_iops,dbhost_disk_util_pct,saturated,missing,verdict,raw_dir"
 if [ -f "$CSV" ]; then
   # Refuse to append rows of a different shape; a mixed-schema file is not
   # analysable and would be silently misread.
@@ -262,6 +265,20 @@ else
   FOLLOWS=$(sed -n 's/.*409 follows \([0-9]*\)).*/\1/p' <<<"$line")
 fi
 OWNERS=$(sed -n 's/.*owned by \[\([^]]*\)\].*/\1/p' "$RAWFILE" | tail -1 | wc -w | tr -d ' ')
+# Shards PER owner, not just how many owners. The ring is a consistent hash,
+# so ownership is uneven even when the shard count divides by the replica
+# count (r3 with S=24 gives 8/11/5, S=16 gives 5/9/2). The busiest engine
+# bounds a closed-loop run, so the skew is a covariate of every scaling point.
+read -r PER_OWNER SKEW < <(python3 - "$RAW/02-shards-before.json" "$REPLICAS" <<'PY' 2>/dev/null || echo " "
+import json, sys
+s = json.load(open(sys.argv[1]))["shards"]; reps = int(sys.argv[2])
+own = {}
+for x in s:
+    if x.get("owner"):
+        own[x["owner"].split(".")[0]] = own.get(x["owner"].split(".")[0], 0) + 1
+print(";".join(f"{k}:{own[k]}" for k in sorted(own)) or "-", f"{max(own.values()) / (len(s) / reps):.2f}" if own else "-")
+PY
+)
 
 # --- attribution: which resources were at or above SAT_PCT ---------------------
 DBCPU=$(pg dbhost_cpu_busy_pct); DBUTIL=$(pg dbhost_disk_util_pct)
@@ -311,7 +328,7 @@ row=("$RUN_ID" "$EXP" "$CFG" "$KIND" "$MODE" "$RATE" "$FLOOR" "$LG_VERDICT" "$DR
   "$(git diff --quiet && echo clean || echo dirty)" "$TAG" "$REPLICAS" "$DEPLOYED_SHARDS" "$SHARDS"
   "$WF_WORKERS" "$ACT_WORKERS" "$SYNC_COMMIT" "$CONC" "$DUR" "$WARMUP"
   "${STARTED:-}" "${COMPLETED:-}" "${WFPS:-}" "$(lat 50)" "$(lat 95)" "$(lat 99)"
-  "${FAILED:-}" "${NONCOMP:-}" "${FOLLOWS:-}" "${OWNERS:-}"
+  "${FAILED:-}" "${NONCOMP:-}" "${FOLLOWS:-}" "${OWNERS:-}" "${PER_OWNER:-}" "${SKEW:-}"
   "${GEN_NODE:-}" "${GEN_ROLE:-}" "${GEN_CPU:-}" "${GEN_CPU_PEAK:-}" "${GEN_MEM_MB:-}" "${GEN_RESTARTS:-}" "${GEN_EXIT:-}" "${JOB_STATUS:-}"
   "${ENG_TOTAL:-}" "${ENG_MAXPOD:-}" "${NODE_MAX:-}" "${ENG_MEM:-}" "${RTT_P50:-}" "${RTT_MAX:-}"
   "$(pg pg_xact_commit_per_s)" "$(pg pg_d_xact_rollback)"

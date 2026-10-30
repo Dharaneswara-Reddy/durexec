@@ -39,12 +39,33 @@ mkdir -p /var/lib/durexec-pgdata/pgdata
 chown -R 999:999 /var/lib/durexec-pgdata
 
 # --- credentials -----------------------------------------------------------
+# Fetched from Secrets Manager with the instance role; user_data carries only
+# the secret's ARN. Nothing below prints the value: stdout/stderr are tee'd to
+# the bootstrap log, so the value is written straight to a 0600 file and the
+# aws/python output never reaches the terminal. The instance profile can take
+# a few seconds to become usable after launch, hence the retry.
 install -d -m 0700 /opt/durexec
-cat > /opt/durexec/.env <<ENVEOF
-POSTGRES_PASSWORD=${postgres_password}
-REPL_PASSWORD=${replication_password}
-ENVEOF
+umask 077
+SECRET_JSON=""
+for i in $(seq 1 30); do
+  if SECRET_JSON="$(aws secretsmanager get-secret-value --region "${aws_region}" \
+        --secret-id "${db_secret_arn}" --query SecretString --output text 2>/dev/null)" \
+     && [ -n "$${SECRET_JSON}" ]; then
+    break
+  fi
+  echo "secret not readable yet (attempt $${i}/30); retrying"
+  SECRET_JSON=""; sleep 5
+done
+if [ -z "$${SECRET_JSON}" ]; then echo "FATAL: could not read the database secret"; exit 1; fi
+printf '%s' "$${SECRET_JSON}" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+sys.stdout.write("POSTGRES_PASSWORD=%s\nREPL_PASSWORD=%s\n" % (d["postgres_password"], d["replication_password"]))
+' > /opt/durexec/.env
+unset SECRET_JSON
 chmod 0600 /opt/durexec/.env
+umask 022
+echo "credentials: written to /opt/durexec/.env (value not logged)"
 
 # --- PostgreSQL ------------------------------------------------------------
 # max_connections must cover every engine pod's pool plus renewal pools plus
@@ -54,7 +75,7 @@ docker run -d --name durexec-postgres --restart unless-stopped \
   -p 5432:5432 \
   -e POSTGRES_DB=durexec \
   -e POSTGRES_USER=durexec \
-  -e POSTGRES_PASSWORD="${postgres_password}" \
+  --env-file /opt/durexec/.env \
   -e PGDATA=/var/lib/postgresql/data/pgdata \
   -v /var/lib/durexec-pgdata:/var/lib/postgresql/data \
   pgvector/pgvector:pg16 \

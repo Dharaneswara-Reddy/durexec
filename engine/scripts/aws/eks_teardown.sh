@@ -14,8 +14,30 @@ REGION="${AWS_REGION:-us-east-1}"
 # Kubernetes objects first. A Service of type LoadBalancer or a bound PVC
 # creates AWS resources that Terraform does not know about, so destroying the
 # cluster underneath them orphans an ELB or an EBS volume that bills for ever.
-kubectl delete -k deploy/kubernetes/overlays/eks --ignore-not-found --timeout=180s || true
-kubectl -n durexec-lab delete pvc --all --ignore-not-found --timeout=120s || true
+#
+# Those deletes end in `|| true`, so from a machine that cannot reach the API
+# (the endpoint admits only operator_cidr) they used to fail silently and the
+# destroy below ran anyway, orphaning exactly what this step exists to clean.
+# Reachability is now proved first; skipping it must be asked for by name.
+if ! kubectl version --request-timeout=15s >/dev/null 2>&1; then
+  if [ "${TEARDOWN_WITHOUT_K8S:-}" != "i-understand-k8s-objects-may-orphan" ]; then
+    echo "FATAL: the Kubernetes API is unreachable from here, so in-cluster objects cannot be" >&2
+    echo "       deleted before the cluster is. Run from the operator laptop (operator_cidr), or" >&2
+    echo "       set TEARDOWN_WITHOUT_K8S=i-understand-k8s-objects-may-orphan and check the sweep." >&2
+    exit 1
+  fi
+  echo "WARNING: Kubernetes API unreachable; skipping in-cluster cleanup as explicitly requested" >&2
+else
+  kubectl delete -k deploy/kubernetes/overlays/eks --ignore-not-found --timeout=180s || true
+  kubectl -n durexec-lab delete pvc --all --ignore-not-found --timeout=120s || true
+  # A deleted PVC's EBS volume is removed asynchronously by the CSI driver,
+  # which dies with the cluster. Wait for the PVs themselves to go.
+  for _ in $(seq 1 36); do
+    left=$(kubectl get pv -o jsonpath='{range .items[?(@.spec.claimRef.namespace=="durexec-lab")]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -c . || true)
+    [ "${left:-0}" = 0 ] && break
+    echo "waiting for $left PersistentVolume(s) of durexec-lab to be released"; sleep 5
+  done
+fi
 
 terraform -chdir=deploy/aws/eks destroy -auto-approve
 TF_RC=$?
@@ -55,6 +77,9 @@ VPC=$(aws ec2 describe-vpcs --region "$REGION" --filters Name=tag:Project,Values
   --query 'NetworkInterfaces[].[NetworkInterfaceId,Status,Description]' --output text
 echo "-- pilot VPC still present --"
 echo "${VPC}"
+echo "-- Secrets Manager secrets of the pilot (recovery window 0, so none should remain) --"
+aws secretsmanager list-secrets --region "$REGION" --filters Key=name,Values=durexec- \
+  --query 'SecretList[].[Name,DeletedDate]' --output text
 echo "-- CloudWatch log groups for the pilot cluster (bill for storage) --"
 aws logs describe-log-groups --region "$REGION" --log-group-name-prefix /aws/eks/durexec \
   --query 'logGroups[].[logGroupName,storedBytes]' --output text

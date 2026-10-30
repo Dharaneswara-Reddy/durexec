@@ -19,7 +19,7 @@ Terraform provider registry.
 |---|---|---|
 | 1 | Cloud experimental report | NOT RUN — method and matrix ready (`02`) |
 | 2 | Local versus cloud comparison | NOT RUN — local side inventoried (`01`), normalization rules in `02` §7 |
-| 3 | Benchmark dataset | NOT RUN — schema fixed: 97 columns per load point, 33 per fault trial |
+| 3 | Benchmark dataset | NOT RUN — schema fixed: 99 columns per load point, 33 per fault trial |
 | 4 | Infrastructure report | NOT RUN — will be read from the evidence bundle (nodes, instance types, zones, settings), not from Terraform intent |
 | 5 | Bottleneck analysis | NOT RUN — hypotheses H1–H8 and the rule that decides each are in `02` |
 | 6 | Reliability report | NOT RUN — F1–F11 designed; oracle and invariants ready |

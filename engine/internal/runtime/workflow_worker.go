@@ -209,7 +209,7 @@ func (w *WorkflowWorker) process(ctx context.Context, task core.Task) error {
 		log.Error(ctx, "PARKED: non-determinism during replay, history left untouched",
 			"k", nd.K, "seq", int64(nd.Seq), "recorded", nd.Recorded, "requested", nd.Requested,
 			"recovery", "redeploy code compatible with this run, or fail it deliberately so its compensations run")
-		w.release(ctx, task, w.Engine.backoff().Jitter(task.Attempt, randFraction()).Milliseconds())
+		w.release(ctx, task, w.Engine.parkDelayMs(task.Attempt))
 		return nil
 	}
 	var vi *core.VersionIncompatibleError
@@ -222,7 +222,7 @@ func (w *WorkflowWorker) process(ctx context.Context, task core.Task) error {
 		e.Runtime.countFailure(string(core.TaskWorkflow), reasonVersionRefused)
 		log.Warn(ctx, "PARKED: refusing to replay a run started by an unaccepted code version",
 			"recorded", vi.Recorded, "running", vi.Running)
-		w.release(ctx, task, w.Engine.backoff().Jitter(task.Attempt, randFraction()).Milliseconds())
+		w.release(ctx, task, w.Engine.parkDelayMs(task.Attempt))
 		return nil
 	}
 	var notReg *workflow.NotRegisteredError

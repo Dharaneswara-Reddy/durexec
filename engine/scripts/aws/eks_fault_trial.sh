@@ -35,7 +35,10 @@ LOAD_DUR="${LOAD_DUR:-180s}"; PRE_S="${PRE_S:-30}"; MAX_WAIT_S="${MAX_WAIT_S:-15
 FREEZE_S="${FREEZE_S:-35}"; NETEM="${NETEM:-delay 200ms 50ms loss 20%}"; HOLD_S="${HOLD_S:-30}"
 COOL_S="${COOL_S:-120}"
 TAG="${TAG:-$(git rev-parse --short HEAD)}"; REGION="${AWS_REGION:-us-east-1}"
-OUT="${OUT:-docs/results/cloud-campaign}"; mkdir -p "$OUT/raw"
+# Relative to engine/ (the cd above), so ../docs is the REPOSITORY docs/ --
+# the tree collect_eks_evidence.sh bundles and the runbook points at. A plain
+# docs/ here wrote to engine/docs/, where no collector ever looked.
+OUT="${OUT:-../docs/results/cloud-campaign}"; mkdir -p "$OUT/raw"
 CSV="$OUT/faults.csv"
 PODS=$(engine_pods); REPLICAS=$(wc -w <<<"$PODS" | tr -d ' ')
 VICTIM="${VICTIM:-durexec-$(( TRIAL % REPLICAS ))}"

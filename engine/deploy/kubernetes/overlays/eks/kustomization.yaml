@@ -25,3 +25,26 @@ patches:
       apiVersion: v1
       kind: Service
       metadata: { name: postgres, namespace: durexec-lab }
+  # The TEST-ONLY external-effect simulator is not part of this campaign (its
+  # matrix runner is the Compose/minikube script). Inherited from the base it
+  # carried the LOCAL tag durexec-extsimd:phase7, which EKS cannot pull, and no
+  # nodeSelector, so it sat in ImagePullBackOff on an engine node for the whole
+  # campaign. Removed rather than left broken.
+  - target: { kind: Deployment, name: extsim }
+    patch: |
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: { name: extsim, namespace: durexec-lab }
+  - target: { kind: Service, name: extsim }
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata: { name: extsim, namespace: durexec-lab }
+  - target: { kind: Service, name: extsim-np }
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata: { name: extsim-np, namespace: durexec-lab }

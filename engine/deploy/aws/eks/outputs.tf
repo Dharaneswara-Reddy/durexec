@@ -31,12 +31,11 @@ output "database_instance_id" {
   value = aws_instance.database.id
 }
 
-# Sensitive, so `terraform output` hides it unless asked for by name with
-# -raw. The deploy script pipes it straight into `kubectl create secret` and
-# never echoes it.
-output "database_password" {
-  value     = random_password.postgres.result
-  sensitive = true
+# The password is no longer a Terraform output. eks_deploy.sh reads it from
+# Secrets Manager by ARN, so `terraform output` cannot print it.
+output "database_secret_arn" {
+  value       = aws_secretsmanager_secret.db.arn
+  description = "Secrets Manager secret holding postgres_password and replication_password."
 }
 
 output "database_url_template" {

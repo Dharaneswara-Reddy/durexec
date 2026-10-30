@@ -64,8 +64,14 @@ aws ecr describe-images --region "$REGION" --repository-name durexec/engine \
 # --- 2. secret, built in memory --------------------------------------------
 # The engine reads DATABASE_URL from secret durexec-db key 'url'
 # (deploy/kubernetes/base/30-engine.yaml:142-144). Not a ConfigMap.
-DB_PASS="$(terraform -chdir="$TF" output -raw database_password 2>/dev/null || true)"
-[ -n "$DB_PASS" ] || { echo "FATAL: database_password output is empty." >&2; exit 1; }
+# From Secrets Manager with the OPERATOR's credentials; Terraform no longer
+# outputs the password. Parsed in memory and never echoed.
+SECRET_ARN="$(terraform -chdir="$TF" output -raw database_secret_arn 2>/dev/null || true)"
+[ -n "$SECRET_ARN" ] || { echo "FATAL: terraform output database_secret_arn is empty." >&2; exit 1; }
+DB_PASS="$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "$SECRET_ARN" \
+            --query SecretString --output text 2>/dev/null \
+          | python3 -c 'import json,sys; print(json.load(sys.stdin)["postgres_password"])' 2>/dev/null || true)"
+[ -n "$DB_PASS" ] || { echo "FATAL: could not read postgres_password from the database secret." >&2; exit 1; }
 
 kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 # --dry-run | apply keeps this idempotent AND keeps the literal off the
@@ -128,6 +134,15 @@ if imgs != [image]:
     sys.exit(f"FATAL: engine image is {imgs}, expected {image}")
 if any(d["kind"] == "StatefulSet" and d["metadata"]["name"] == "postgres" for d in docs):
     sys.exit("FATAL: in-cluster postgres still present")
+# Every image must be one EKS can pull: the ECR engine image or the public
+# pgvector image the init gate uses. A local tag inherited from the base (as
+# extsim's durexec-extsimd:phase7 was) sits in ImagePullBackOff for ever.
+pullable = {image, "pgvector/pgvector:pg16"}
+for d in docs:
+    pod = d.get("spec", {}).get("template", {}).get("spec", {})
+    for c in pod.get("initContainers", []) + pod.get("containers", []):
+        if c["image"] not in pullable:
+            sys.exit(f"FATAL: {d['kind']}/{d['metadata']['name']} uses image {c['image']!r}, which EKS cannot pull")
 cm = [d for d in docs if d["kind"] == "ConfigMap" and d["metadata"]["name"] == "durexec-config"][0]["data"]
 reps = sts[0]["spec"]["replicas"]
 ring = cm["CLUSTER_NODES"].split(",")

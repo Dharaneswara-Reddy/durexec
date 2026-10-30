@@ -17,10 +17,15 @@ A pod seen in fewer than two samples prints cpu_cores=unavailable.
 """
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def ts(s):
+    # Kubelet times are RFC 3339 UTC ("...Z"). Stripping the Z leaves a NAIVE
+    # datetime, and .timestamp() on a naive datetime means LOCAL time: on an
+    # operator laptop at UTC+05:30 every sample moved 5.5h and fell outside the
+    # window eks_loadgen.sh computes with `date -u`, so engine and node CPU
+    # silently came back "unavailable". The zone is now always explicit.
     if not s:
         return None
     s = s.rstrip("Z")
@@ -28,9 +33,12 @@ def ts(s):
         head, frac = s.split(".", 1)
         s = head + "." + frac[:6]
     try:
-        return datetime.fromisoformat(s).timestamp()
+        d = datetime.fromisoformat(s)
     except ValueError:
         return None
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.timestamp()
 
 
 def net(obj):
