@@ -1,0 +1,98 @@
+LAST SEEN   TYPE     REASON             OBJECT                               MESSAGE
+57m         Normal   Completed          job/loadgen-20261030t132127z         Job completed
+56m         Normal   Scheduled          pod/loadgen-20261030t132903z-nq95w   Successfully assigned durexec-lab/loadgen-20261030t132903z-nq95w to ip-10-91-0-126.ec2.internal
+56m         Normal   Pulled             pod/loadgen-20261030t132903z-nq95w   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+56m         Normal   Created            pod/loadgen-20261030t132903z-nq95w   Container created
+56m         Normal   SuccessfulCreate   job/loadgen-20261030t132903z         Created pod: loadgen-20261030t132903z-nq95w
+56m         Normal   Started            pod/loadgen-20261030t132903z-nq95w   Container started
+49m         Normal   Completed          job/loadgen-20261030t132903z         Job completed
+49m         Normal   Scheduled          pod/loadgen-20261030t133639z-qr86c   Successfully assigned durexec-lab/loadgen-20261030t133639z-qr86c to ip-10-91-0-126.ec2.internal
+49m         Normal   SuccessfulCreate   job/loadgen-20261030t133639z         Created pod: loadgen-20261030t133639z-qr86c
+49m         Normal   Pulled             pod/loadgen-20261030t133639z-qr86c   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+49m         Normal   Created            pod/loadgen-20261030t133639z-qr86c   Container created
+49m         Normal   Started            pod/loadgen-20261030t133639z-qr86c   Container started
+43m         Normal   Completed          job/loadgen-20261030t133639z         Job completed
+43m         Normal   Scheduled          pod/loadgen-20261030t134217z-57xfb   Successfully assigned durexec-lab/loadgen-20261030t134217z-57xfb to ip-10-91-0-126.ec2.internal
+43m         Normal   SuccessfulCreate   job/loadgen-20261030t134217z         Created pod: loadgen-20261030t134217z-57xfb
+43m         Normal   Pulled             pod/loadgen-20261030t134217z-57xfb   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+43m         Normal   Created            pod/loadgen-20261030t134217z-57xfb   Container created
+43m         Normal   Started            pod/loadgen-20261030t134217z-57xfb   Container started
+38m         Normal   Completed          job/loadgen-20261030t134217z         Job completed
+37m         Normal   Scheduled          pod/loadgen-20261030t134755z-xj9kv   Successfully assigned durexec-lab/loadgen-20261030t134755z-xj9kv to ip-10-91-0-126.ec2.internal
+37m         Normal   SuccessfulCreate   job/loadgen-20261030t134755z         Created pod: loadgen-20261030t134755z-xj9kv
+37m         Normal   Pulled             pod/loadgen-20261030t134755z-xj9kv   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+37m         Normal   Created            pod/loadgen-20261030t134755z-xj9kv   Container created
+37m         Normal   Started            pod/loadgen-20261030t134755z-xj9kv   Container started
+32m         Normal   Completed          job/loadgen-20261030t134755z         Job completed
+31m         Normal   Scheduled          pod/loadgen-20261030t135404z-qsrvg   Successfully assigned durexec-lab/loadgen-20261030t135404z-qsrvg to ip-10-91-0-126.ec2.internal
+31m         Normal   SuccessfulCreate   job/loadgen-20261030t135404z         Created pod: loadgen-20261030t135404z-qsrvg
+31m         Normal   Pulled             pod/loadgen-20261030t135404z-qsrvg   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+31m         Normal   Created            pod/loadgen-20261030t135404z-qsrvg   Container created
+31m         Normal   Started            pod/loadgen-20261030t135404z-qsrvg   Container started
+29m         Normal   Completed          job/loadgen-20261030t135404z         Job completed
+29m         Normal   SuccessfulCreate   job/loadgen-20261030t135642z         Created pod: loadgen-20261030t135642z-x2h6f
+29m         Normal   Scheduled          pod/loadgen-20261030t135642z-x2h6f   Successfully assigned durexec-lab/loadgen-20261030t135642z-x2h6f to ip-10-91-0-126.ec2.internal
+29m         Normal   Pulled             pod/loadgen-20261030t135642z-x2h6f   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+29m         Normal   Created            pod/loadgen-20261030t135642z-x2h6f   Container created
+29m         Normal   Started            pod/loadgen-20261030t135642z-x2h6f   Container started
+26m         Normal   Completed          job/loadgen-20261030t135642z         Job completed
+26m         Normal   Scheduled          pod/loadgen-20261030t135918z-9rwpb   Successfully assigned durexec-lab/loadgen-20261030t135918z-9rwpb to ip-10-91-0-126.ec2.internal
+26m         Normal   SuccessfulCreate   job/loadgen-20261030t135918z         Created pod: loadgen-20261030t135918z-9rwpb
+26m         Normal   Started            pod/loadgen-20261030t135918z-9rwpb   Container started
+26m         Normal   Created            pod/loadgen-20261030t135918z-9rwpb   Container created
+26m         Normal   Pulled             pod/loadgen-20261030t135918z-9rwpb   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+24m         Normal   Completed          job/loadgen-20261030t135918z         Job completed
+23m         Normal   Scheduled          pod/loadgen-20261030t140154z-ztbr5   Successfully assigned durexec-lab/loadgen-20261030t140154z-ztbr5 to ip-10-91-0-126.ec2.internal
+23m         Normal   Pulled             pod/loadgen-20261030t140154z-ztbr5   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+23m         Normal   Created            pod/loadgen-20261030t140154z-ztbr5   Container created
+23m         Normal   Started            pod/loadgen-20261030t140154z-ztbr5   Container started
+23m         Normal   SuccessfulCreate   job/loadgen-20261030t140154z         Created pod: loadgen-20261030t140154z-ztbr5
+21m         Normal   Completed          job/loadgen-20261030t140154z         Job completed
+21m         Normal   Scheduled          pod/loadgen-20261030t140430z-lbdwq   Successfully assigned durexec-lab/loadgen-20261030t140430z-lbdwq to ip-10-91-0-126.ec2.internal
+21m         Normal   SuccessfulCreate   job/loadgen-20261030t140430z         Created pod: loadgen-20261030t140430z-lbdwq
+21m         Normal   Pulled             pod/loadgen-20261030t140430z-lbdwq   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+21m         Normal   Created            pod/loadgen-20261030t140430z-lbdwq   Container created
+21m         Normal   Started            pod/loadgen-20261030t140430z-lbdwq   Container started
+19m         Normal   Completed          job/loadgen-20261030t140430z         Job completed
+18m         Normal   Scheduled          pod/loadgen-20261030t140706z-jqsnn   Successfully assigned durexec-lab/loadgen-20261030t140706z-jqsnn to ip-10-91-0-126.ec2.internal
+18m         Normal   SuccessfulCreate   job/loadgen-20261030t140706z         Created pod: loadgen-20261030t140706z-jqsnn
+18m         Normal   Pulled             pod/loadgen-20261030t140706z-jqsnn   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+18m         Normal   Created            pod/loadgen-20261030t140706z-jqsnn   Container created
+18m         Normal   Started            pod/loadgen-20261030t140706z-jqsnn   Container started
+16m         Normal   Completed          job/loadgen-20261030t140706z         Job completed
+16m         Normal   Scheduled          pod/loadgen-20261030t140943z-nc57r   Successfully assigned durexec-lab/loadgen-20261030t140943z-nc57r to ip-10-91-0-126.ec2.internal
+16m         Normal   SuccessfulCreate   job/loadgen-20261030t140943z         Created pod: loadgen-20261030t140943z-nc57r
+16m         Normal   Pulled             pod/loadgen-20261030t140943z-nc57r   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+16m         Normal   Created            pod/loadgen-20261030t140943z-nc57r   Container created
+16m         Normal   Started            pod/loadgen-20261030t140943z-nc57r   Container started
+13m         Normal   Completed          job/loadgen-20261030t140943z         Job completed
+13m         Normal   Scheduled          pod/loadgen-20261030t141221z-vfr8d   Successfully assigned durexec-lab/loadgen-20261030t141221z-vfr8d to ip-10-91-0-126.ec2.internal
+13m         Normal   SuccessfulCreate   job/loadgen-20261030t141221z         Created pod: loadgen-20261030t141221z-vfr8d
+13m         Normal   Pulled             pod/loadgen-20261030t141221z-vfr8d   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+13m         Normal   Created            pod/loadgen-20261030t141221z-vfr8d   Container created
+13m         Normal   Started            pod/loadgen-20261030t141221z-vfr8d   Container started
+11m         Normal   Completed          job/loadgen-20261030t141221z         Job completed
+10m         Normal   Scheduled          pod/loadgen-20261030t141458z-plsbl   Successfully assigned durexec-lab/loadgen-20261030t141458z-plsbl to ip-10-91-0-126.ec2.internal
+10m         Normal   SuccessfulCreate   job/loadgen-20261030t141458z         Created pod: loadgen-20261030t141458z-plsbl
+10m         Normal   Pulled             pod/loadgen-20261030t141458z-plsbl   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+10m         Normal   Created            pod/loadgen-20261030t141458z-plsbl   Container created
+10m         Normal   Started            pod/loadgen-20261030t141458z-plsbl   Container started
+8m37s       Normal   Completed          job/loadgen-20261030t141458z         Job completed
+8m18s       Normal   Scheduled          pod/loadgen-20261030t141735z-tm7nj   Successfully assigned durexec-lab/loadgen-20261030t141735z-tm7nj to ip-10-91-0-126.ec2.internal
+8m18s       Normal   SuccessfulCreate   job/loadgen-20261030t141735z         Created pod: loadgen-20261030t141735z-tm7nj
+8m17s       Normal   Pulled             pod/loadgen-20261030t141735z-tm7nj   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+8m17s       Normal   Created            pod/loadgen-20261030t141735z-tm7nj   Container created
+8m17s       Normal   Started            pod/loadgen-20261030t141735z-tm7nj   Container started
+5m59s       Normal   Completed          job/loadgen-20261030t141735z         Job completed
+5m41s       Normal   Scheduled          pod/loadgen-20261030t142013z-jrcct   Successfully assigned durexec-lab/loadgen-20261030t142013z-jrcct to ip-10-91-0-126.ec2.internal
+5m41s       Normal   SuccessfulCreate   job/loadgen-20261030t142013z         Created pod: loadgen-20261030t142013z-jrcct
+5m40s       Normal   Pulled             pod/loadgen-20261030t142013z-jrcct   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+5m40s       Normal   Created            pod/loadgen-20261030t142013z-jrcct   Container created
+5m40s       Normal   Started            pod/loadgen-20261030t142013z-jrcct   Container started
+3m23s       Normal   Completed          job/loadgen-20261030t142013z         Job completed
+2m22s       Normal   Scheduled          pod/loadgen-20261030t142331z-mxqns   Successfully assigned durexec-lab/loadgen-20261030t142331z-mxqns to ip-10-91-0-126.ec2.internal
+2m22s       Normal   Pulled             pod/loadgen-20261030t142331z-mxqns   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+2m22s       Normal   Created            pod/loadgen-20261030t142331z-mxqns   Container created
+2m22s       Normal   Started            pod/loadgen-20261030t142331z-mxqns   Container started
+2m22s       Normal   SuccessfulCreate   job/loadgen-20261030t142331z         Created pod: loadgen-20261030t142331z-mxqns
+4s          Normal   Completed          job/loadgen-20261030t142331z         Job completed

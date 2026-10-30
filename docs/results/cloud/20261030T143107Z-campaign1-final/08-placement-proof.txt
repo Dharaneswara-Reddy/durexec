@@ -1,0 +1,5 @@
+POD                          NODE                     ROLE
+durexec-0                    ip-10-91-0-170.ec2.internal engine
+durexec-1                    ip-10-91-0-43.ec2.internal engine
+durexec-2                    ip-10-91-0-82.ec2.internal engine
+durexec-probe                ip-10-91-0-126.ec2.internal harness
