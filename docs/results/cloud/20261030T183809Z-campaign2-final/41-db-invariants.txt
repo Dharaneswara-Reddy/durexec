@@ -1,0 +1,10 @@
+events=1438788
+executions=119899
+pending_tasks=0
+executions_by_status=COMPLETED:119899
+dup_run_seq=0
+dup_activity_completion=0
+seq_gaps=0
+multi_terminal=0
+stuck_running_gt_5min=0
+lease_rows=64

@@ -1,0 +1,42 @@
+ts_epoch_ms=<ACCT>0
+server_version=160015
+xact_commit=62326958
+xact_rollback=61
+blks_read=2529048
+blks_hit=634731553
+tup_inserted=18914915
+tup_updated=8752486
+tup_deleted=4571506
+conflicts=0
+temp_bytes=2522757138
+deadlocks=0
+blk_read_time_ms=5165.168
+blk_write_time_ms=14123.051
+wal_records=68198383
+wal_fpi=54694
+wal_bytes=7428360482
+wal_buffers_full=0
+wal_write=3670798
+wal_sync=3571491
+ckpt_timed=22
+ckpt_req=1
+ckpt_write_ms=4919210
+ckpt_sync_ms=525
+buffers_checkpoint=377708
+buffers_backend=303078
+buffers_backend_fsync=0
+g_db_size_bytes=2345720855
+g_conns_total=64
+g_conns_active=0
+g_conns_idle=63
+g_conns_idle_in_txn=0
+g_conns_waiting_lock=0
+g_max_connections=400
+g_locks_not_granted=0
+stmt_calls=90066628
+stmt_exec_ms=12977979.038
+host_cpu|cpu  514697 245 96913 521587 102531 0 118889 1489 0 0
+host_mem|MemTotal:        7966548 kB MemAvailable:    5960964 kB Dirty:               488 kB Writeback:             0 kB
+host_disk|259 0 nvme0n1 15616 12 522861 12561 12782 9332 2922185 70058 0 13480 82620 0 0 0 0 0 0;259 4 nvme1n1 185 0 6634 121 3617883 13923 86234272 3425577 0 3326090 3425698 0 0 0 0 0 0
+host_loadavg|3.64 9.46 8.88 1/261 2444
+

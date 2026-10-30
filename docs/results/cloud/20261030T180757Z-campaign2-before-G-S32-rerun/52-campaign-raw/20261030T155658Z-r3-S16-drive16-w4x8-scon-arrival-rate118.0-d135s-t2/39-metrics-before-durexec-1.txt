@@ -1,0 +1,246 @@
+# HELP db_pool_acquire_wait_seconds_total Cumulative time spent waiting for a connection.
+# TYPE db_pool_acquire_wait_seconds_total counter
+db_pool_acquire_wait_seconds_total 62009.165242469
+# HELP db_pool_acquires_total Connection acquisitions from the pool.
+# TYPE db_pool_acquires_total counter
+db_pool_acquires_total 4.924561e+06
+# HELP db_pool_canceled_acquires_total Acquisitions abandoned before a connection became free.
+# TYPE db_pool_canceled_acquires_total counter
+db_pool_canceled_acquires_total 0
+# HELP db_pool_conns_acquired Connections currently checked out of the pool.
+# TYPE db_pool_conns_acquired gauge
+db_pool_conns_acquired 0
+# HELP db_pool_conns_idle Connections currently open and unused.
+# TYPE db_pool_conns_idle gauge
+db_pool_conns_idle 20
+# HELP db_pool_conns_max Configured ceiling on open connections for this node.
+# TYPE db_pool_conns_max gauge
+db_pool_conns_max 20
+# HELP db_pool_conns_total Connections currently open, busy or idle.
+# TYPE db_pool_conns_total gauge
+db_pool_conns_total 20
+# HELP db_pool_empty_acquires_total Acquisitions that had to wait because the pool was exhausted.
+# TYPE db_pool_empty_acquires_total counter
+db_pool_empty_acquires_total 1.167575e+06
+# HELP dedup_latency_seconds Wall time of one semantic dedup check, including the embedding call.
+# TYPE dedup_latency_seconds histogram
+dedup_latency_seconds_bucket{le="0.001"} 0
+dedup_latency_seconds_bucket{le="0.002"} 0
+dedup_latency_seconds_bucket{le="0.004"} 0
+dedup_latency_seconds_bucket{le="0.008"} 0
+dedup_latency_seconds_bucket{le="0.016"} 0
+dedup_latency_seconds_bucket{le="0.032"} 0
+dedup_latency_seconds_bucket{le="0.064"} 0
+dedup_latency_seconds_bucket{le="0.128"} 0
+dedup_latency_seconds_bucket{le="0.256"} 0
+dedup_latency_seconds_bucket{le="0.512"} 0
+dedup_latency_seconds_bucket{le="1.024"} 0
+dedup_latency_seconds_bucket{le="2.048"} 0
+dedup_latency_seconds_bucket{le="+Inf"} 0
+dedup_latency_seconds_sum 0
+dedup_latency_seconds_count 0
+# HELP go_gc_duration_seconds A summary of the wall-time pause (stop-the-world) duration in garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 3.0834e-05
+go_gc_duration_seconds{quantile="0.25"} 7.0787e-05
+go_gc_duration_seconds{quantile="0.5"} 0.00010412
+go_gc_duration_seconds{quantile="0.75"} 0.000142328
+go_gc_duration_seconds{quantile="1"} 0.004444742
+go_gc_duration_seconds_sum 0.420214038
+go_gc_duration_seconds_count 5313
+# HELP go_gc_gogc_percent Heap size target percentage configured by the user, otherwise 100. This value is set by the GOGC environment variable, and the runtime/debug.SetGCPercent function. Sourced from /gc/gogc:percent.
+# TYPE go_gc_gogc_percent gauge
+go_gc_gogc_percent 100
+# HELP go_gc_gomemlimit_bytes Go runtime memory limit configured by the user, otherwise math.MaxInt64. This value is set by the GOMEMLIMIT environment variable, and the runtime/debug.SetMemoryLimit function. Sourced from /gc/gomemlimit:bytes.
+# TYPE go_gc_gomemlimit_bytes gauge
+go_gc_gomemlimit_bytes 9.<ACCT>776e+18
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 170
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.25.14"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated in heap and currently in use. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 9.410848e+06
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated in heap until now, even if released already. Equals to /gc/heap/allocs:bytes.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 2.6717440768e+10
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table. Equals to /memory/classes/profiling/buckets:bytes.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 1.444444e+06
+# HELP go_memstats_frees_total Total number of heap objects frees. Equals to /gc/heap/frees:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 4.0125362e+08
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata. Equals to /memory/classes/metadata/other:bytes.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 3.959072e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and currently in use, same as go_memstats_alloc_bytes. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 9.410848e+06
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used. Equals to /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 6.8001792e+07
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 1.601536e+07
+# HELP go_memstats_heap_objects Number of currently allocated objects. Equals to /gc/heap/objects:objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 38258
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS. Equals to /memory/classes/heap/released:bytes.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 5.9949056e+07
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes + /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 8.4017152e+07
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.<ACCT>7463e+09
+# HELP go_memstats_mallocs_total Total number of heap objects allocated, both live and gc-ed. Semantically a counter version for go_memstats_heap_objects gauge. Equals to /gc/heap/allocs:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 4.01291878e+08
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures. Equals to /memory/classes/metadata/mcache/inuse:bytes.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 2416
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system. Equals to /memory/classes/metadata/mcache/inuse:bytes + /memory/classes/metadata/mcache/free:bytes.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 15704
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures. Equals to /memory/classes/metadata/mspan/inuse:bytes.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 301280
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system. Equals to /memory/classes/metadata/mspan/inuse:bytes + /memory/classes/metadata/mspan/free:bytes.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 1.32192e+06
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place. Equals to /gc/heap/goal:bytes.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 1.6340042e+07
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations. Equals to /memory/classes/other:bytes.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 1.70714e+06
+# HELP go_memstats_stack_inuse_bytes Number of bytes obtained from system for stack allocator in non-CGO environments. Equals to /memory/classes/heap/stacks:bytes.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 4.063232e+06
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator. Equals to /memory/classes/heap/stacks:bytes + /memory/classes/os-stacks:bytes.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 4.063232e+06
+# HELP go_memstats_sys_bytes Number of bytes obtained from system. Equals to /memory/classes/total:byte.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 9.6528664e+07
+# HELP go_sched_gomaxprocs_threads The current runtime.GOMAXPROCS setting, or the number of operating system threads that can execute user-level Go code simultaneously. Sourced from /sched/gomaxprocs:threads.
+# TYPE go_sched_gomaxprocs_threads gauge
+go_sched_gomaxprocs_threads 2
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 28
+# HELP lease_transitions_total Shard lease ownership changes, by shard and direction.
+# TYPE lease_transitions_total counter
+lease_transitions_total{direction="acquired",shard="10"} 1
+lease_transitions_total{direction="acquired",shard="11"} 1
+lease_transitions_total{direction="acquired",shard="12"} 1
+lease_transitions_total{direction="acquired",shard="13"} 1
+lease_transitions_total{direction="acquired",shard="3"} 1
+lease_transitions_total{direction="acquired",shard="5"} 1
+lease_transitions_total{direction="acquired",shard="6"} 1
+lease_transitions_total{direction="acquired",shard="7"} 1
+lease_transitions_total{direction="acquired",shard="9"} 1
+lease_transitions_total{direction="renewed",shard="10"} 329
+lease_transitions_total{direction="renewed",shard="11"} 329
+lease_transitions_total{direction="renewed",shard="12"} 329
+lease_transitions_total{direction="renewed",shard="13"} 329
+lease_transitions_total{direction="renewed",shard="3"} 329
+lease_transitions_total{direction="renewed",shard="5"} 329
+lease_transitions_total{direction="renewed",shard="6"} 329
+lease_transitions_total{direction="renewed",shard="7"} 329
+lease_transitions_total{direction="renewed",shard="9"} 329
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 558.81
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048575e+06
+# HELP process_network_receive_bytes_total Number of bytes received by the process over the network.
+# TYPE process_network_receive_bytes_total counter
+process_network_receive_bytes_total 2.347271319e+09
+# HELP process_network_transmit_bytes_total Number of bytes sent by the process over the network.
+# TYPE process_network_transmit_bytes_total counter
+process_network_transmit_bytes_total 2.341111115e+09
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 61
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 4.5592576e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.79337463852e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.341083648e+09
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes 1.<ACCT>9552e+19
+# HELP replay_duration_seconds Time to rebuild workflow state by replaying its history.
+# TYPE replay_duration_seconds histogram
+replay_duration_seconds_bucket{le="0.0005"} 266835
+replay_duration_seconds_bucket{le="0.001"} 269685
+replay_duration_seconds_bucket{le="0.002"} 270104
+replay_duration_seconds_bucket{le="0.004"} 270190
+replay_duration_seconds_bucket{le="0.008"} 270231
+replay_duration_seconds_bucket{le="0.016"} 270234
+replay_duration_seconds_bucket{le="0.032"} 270234
+replay_duration_seconds_bucket{le="0.064"} 270234
+replay_duration_seconds_bucket{le="0.128"} 270234
+replay_duration_seconds_bucket{le="0.256"} 270234
+replay_duration_seconds_bucket{le="0.512"} 270234
+replay_duration_seconds_bucket{le="1.024"} 270234
+replay_duration_seconds_bucket{le="2.048"} 270234
+replay_duration_seconds_bucket{le="4.096"} 270234
+replay_duration_seconds_bucket{le="+Inf"} 270234
+replay_duration_seconds_sum 37.<ACCT>9
+replay_duration_seconds_count 270234
+# HELP shard_recovery_seconds Time from a shard becoming ownerless to another node owning it.
+# TYPE shard_recovery_seconds histogram
+shard_recovery_seconds_bucket{le="0.05"} 0
+shard_recovery_seconds_bucket{le="0.1"} 0
+shard_recovery_seconds_bucket{le="0.2"} 0
+shard_recovery_seconds_bucket{le="0.4"} 0
+shard_recovery_seconds_bucket{le="0.8"} 0
+shard_recovery_seconds_bucket{le="1.6"} 0
+shard_recovery_seconds_bucket{le="3.2"} 0
+shard_recovery_seconds_bucket{le="6.4"} 0
+shard_recovery_seconds_bucket{le="12.8"} 0
+shard_recovery_seconds_bucket{le="25.6"} 0
+shard_recovery_seconds_bucket{le="51.2"} 0
+shard_recovery_seconds_bucket{le="102.4"} 0
+shard_recovery_seconds_bucket{le="204.8"} 0
+shard_recovery_seconds_bucket{le="409.6"} 0
+shard_recovery_seconds_bucket{le="+Inf"} 0
+shard_recovery_seconds_sum 0
+shard_recovery_seconds_count 0
+# HELP task_queue_oldest_ready_seconds How long the oldest claimable task in a shard's queue has waited, by task type. Zero means nothing is claimable.
+# TYPE task_queue_oldest_ready_seconds gauge
+task_queue_oldest_ready_seconds{shard="10",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="10",task_type="WORKFLOW"} 0
+task_queue_oldest_ready_seconds{shard="11",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="11",task_type="WORKFLOW"} 0
+task_queue_oldest_ready_seconds{shard="12",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="12",task_type="WORKFLOW"} 0
+task_queue_oldest_ready_seconds{shard="13",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="13",task_type="WORKFLOW"} 0
+task_queue_oldest_ready_seconds{shard="3",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="3",task_type="WORKFLOW"} 0
+task_queue_oldest_ready_seconds{shard="5",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="5",task_type="WORKFLOW"} 0
+task_queue_oldest_ready_seconds{shard="6",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="6",task_type="WORKFLOW"} 0
+task_queue_oldest_ready_seconds{shard="7",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="7",task_type="WORKFLOW"} 0
+task_queue_oldest_ready_seconds{shard="9",task_type="ACTIVITY"} 0
+task_queue_oldest_ready_seconds{shard="9",task_type="WORKFLOW"} 0
+# HELP workflow_completed_total Workflow executions that reached a terminal state, by type and final status.
+# TYPE workflow_completed_total counter
+workflow_completed_total{status="COMPLETED",workflow_type="DeliveryOrder"} 45039
+# HELP workflow_starts_total Workflow start requests handled by this node, by type and outcome.
+# TYPE workflow_starts_total counter
+workflow_starts_total{outcome="accepted",workflow_type="DeliveryOrder"} 45039
+workflow_starts_total{outcome="not_owned",workflow_type="DeliveryOrder"} 12074

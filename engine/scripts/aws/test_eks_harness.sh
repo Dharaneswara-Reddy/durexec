@@ -32,3 +32,15 @@ for script in scripts/aws/eks_loadgen.sh scripts/aws/eks_fault_trial.sh; do
     || { echo "FAIL: $script has $n_mode loadgen arg lists but $n_count pass -shard-count"; exit 1; }
 done
 echo "loadgen -shard-count self-test: PASS"
+
+# `cmd | head -1 | grep` under pipefail fails at random once the input is large
+# (SIGPIPE on the first command). None may remain in the EKS scripts.
+if grep -nE 'head -1 \| grep' scripts/aws/eks_*.sh; then
+  echo "FAIL: pipefail-unsafe 'head -1 | grep' pattern above"; exit 1
+fi
+big="$tmp/big.csv"; python3 -c "print(\"h,e,a\"); print(\"x,y,z\\n\" * 20000, end=\"\")" > "$big"
+for _ in 1 2 3 4 5; do
+  bash -c 'set -o pipefail; awk "!/^#/ {print; exit}" "$1" | grep -qxF h,e,a' _ "$big" \
+    || { echo "FAIL: header check is not pipefail-safe"; exit 1; }
+done
+echo "pipefail-safe header check self-test: PASS"

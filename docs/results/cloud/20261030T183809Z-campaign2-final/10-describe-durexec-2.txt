@@ -1,0 +1,166 @@
+Name:             durexec-2
+Namespace:        durexec-lab
+Priority:         0
+Service Account:  durexec
+Node:             ip-10-91-0-43.ec2.internal/10.91.0.43
+Start Time:       Fri, 30 Oct 2026 18:09:14 +0000
+Labels:           app=durexec
+                  apps.kubernetes.io/pod-index=2
+                  controller-revision-hash=durexec-59b95cb587
+                  statefulset.kubernetes.io/pod-name=durexec-2
+                  topology.kubernetes.io/region=us-east-1
+                  topology.kubernetes.io/zone=us-east-1a
+Annotations:      prometheus.io/path: /metrics
+                  prometheus.io/port: 8080
+                  prometheus.io/scrape: true
+Status:           Running
+SeccompProfile:   RuntimeDefault
+IP:               10.91.0.64
+IPs:
+  IP:           10.91.0.64
+Controlled By:  StatefulSet/durexec
+Init Containers:
+  wait-for-postgres:
+    Container ID:  containerd://e8c2bcf19d2f131e8d8d987cced2226eea9f66cead638272100c68985bad5802
+    Image:         pgvector/pgvector:pg16
+    Image ID:      docker.io/pgvector/pgvector@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -c
+      # No `set -x`: tracing would echo PGPASSWORD into the pod log.
+      set -eu
+      host="$DB_HOST"; port=5432; user=durexec; db=durexec
+      deadline=$(( $(date +%s) + READY_DEADLINE_SECONDS ))
+      authfail=0
+      
+      echo "gate: waiting for postgres at ${host}:${port} (deadline ${READY_DEADLINE_SECONDS}s)"
+      
+      while :; do
+        now=$(date +%s)
+        if [ "$now" -ge "$deadline" ]; then
+          echo "GATE FAILED [TIMEOUT]: ${host}:${port} not usable within ${READY_DEADLINE_SECONDS}s" >&2
+          exit 1
+        fi
+      
+        # Stage 1 -- is anything listening and accepting?
+        # Two traps here, both found by testing rather than reading.
+        # `$?` after `if ! cmd` is the status of the NEGATION, always
+        # 0, so the diagnostic category becomes a lie. And a BARE
+        # failing command under `set -e` kills the script before the
+        # retry loop can classify anything. `|| rc=$?` avoids both.
+        rc=0
+        pg_isready -h "$host" -p "$port" -U "$user" -d "$db" -t 5 >/dev/null 2>&1 || rc=$?
+        if [ "$rc" -ne 0 ]; then
+          case "$rc" in
+            2) echo "gate: no response from ${host}:${port} (DNS, routing or security group); retrying" ;;
+            1) echo "gate: ${host}:${port} reachable but rejecting connections (starting up); retrying" ;;
+            *) echo "gate: pg_isready rc=${rc} against ${host}:${port}; retrying" ;;
+          esac
+          sleep 3
+          continue
+        fi
+      
+        # Stage 2 -- can we actually authenticate and run a query?
+        # This is what pg_isready cannot tell us. Output is discarded
+        # so a verbose server notice cannot carry anything sensitive
+        # into the log; only our own classification is printed.
+        if err=$(psql -h "$host" -p "$port" -U "$user" -d "$db" \
+                   -v ON_ERROR_STOP=1 -tAc 'select 1' 2>&1 >/dev/null); then
+          echo "gate: OK -- ${host}:${port} accepted an authenticated query"
+          exit 0
+        fi
+      
+        case "$err" in
+          *"authentication failed"*|*"password"*|*"role \""*"does not exist"*)
+            authfail=$(( authfail + 1 ))
+            echo "GATE [AUTH] failure ${authfail}/${MAX_AUTH_FAILURES} for user '${user}' at ${host}" >&2
+            if [ "$authfail" -ge "$MAX_AUTH_FAILURES" ]; then
+              # Bad credentials never fix themselves. Retrying to the
+              # deadline would waste three minutes of a paid cluster
+              # and bury the real cause.
+              echo "GATE FAILED [AUTH]: credentials rejected ${authfail} times; check the durexec-db secret" >&2
+              exit 1
+            fi
+            ;;
+          *"does not exist"*)
+            echo "GATE FAILED [NO_DATABASE]: database '${db}' absent on ${host}" >&2
+            exit 1
+            ;;
+          *)
+            echo "gate: server up but query failed (category UNKNOWN); retrying" >&2
+            ;;
+        esac
+        sleep 3
+      done
+      
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Fri, 30 Oct 2026 18:09:15 +0000
+      Finished:     Fri, 30 Oct 2026 18:09:15 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     200m
+      memory:  64Mi
+    Requests:
+      cpu:     10m
+      memory:  32Mi
+    Environment:
+      PGPASSWORD:              <REDACTED> to the key 'password' in secret 'durexec-db'>  Optional: false
+      PGCONNECT_TIMEOUT:       5
+      DB_HOST:                 10.91.0.102
+      READY_DEADLINE_SECONDS:  180
+      MAX_AUTH_FAILURES:       3
+    Mounts:                    <none>
+Containers:
+  engined:
+    Container ID:   containerd://bbd588f71310a9aa2c7f43d04acb20b0f<ACCT>e3212b8f02fdf59b91a
+    Image:          <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb
+    Image ID:       <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine@sha256:652717ed63aade33baea5707e7dae5d6d467a5745b6e56c13b35e4231e6e97af
+    Port:           8080/TCP (http)
+    Host Port:      0/TCP (http)
+    State:          Running
+      Started:      Fri, 30 Oct 2026 18:09:15 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     2
+      memory:  512Mi
+    Requests:
+      cpu:      150m
+      memory:   128Mi
+    Liveness:   http-get http://:http/healthz delay=30s timeout=1s period=10s successThreshold=1 failureThreshold=6
+    Readiness:  http-get http://:http/healthz delay=0s timeout=1s period=5s successThreshold=1 failureThreshold=3
+    Startup:    http-get http://:http/healthz delay=0s timeout=1s period=2s successThreshold=1 failureThreshold=45
+    Environment Variables from:
+      durexec-config  ConfigMap  Optional: false
+    Environment:
+      POD_NAME:      durexec-2 (v1:metadata.name)
+      NODE_ID:       $(POD_NAME).durexec-hl
+      DATABASE_URL:  <set to the key 'url' in secret 'durexec-db'>  Optional: false
+    Mounts:          <none>
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:                      <none>
+QoS Class:                    Burstable
+Node-Selectors:               durexec.io/role=engine
+Tolerations:                  node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                              node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  29m   default-scheduler  Successfully assigned durexec-lab/durexec-2 to ip-10-91-0-43.ec2.internal
+  Normal  Pulled     29m   kubelet            spec.initContainers{wait-for-postgres}: Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+  Normal  Created    29m   kubelet            spec.initContainers{wait-for-postgres}: Container created
+  Normal  Started    29m   kubelet            spec.initContainers{wait-for-postgres}: Container started
+  Normal  Pulled     29m   kubelet            spec.containers{engined}: Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+  Normal  Created    29m   kubelet            spec.containers{engined}: Container created
+  Normal  Started    29m   kubelet            spec.containers{engined}: Container started

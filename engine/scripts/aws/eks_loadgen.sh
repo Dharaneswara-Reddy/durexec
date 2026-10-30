@@ -84,7 +84,10 @@ HEADER="run_id,exp,config_id,kind,mode,offered_rate,service_floor,lg_verdict,dro
 if [ -f "$CSV" ]; then
   # Refuse to append rows of a different shape; a mixed-schema file is not
   # analysable and would be silently misread.
-  grep -v '^#' "$CSV" | head -1 | grep -qxF "$HEADER" \
+  # awk stops by itself after the first data line. The former
+  # grep-v/head-1/grep pipeline died of SIGPIPE under pipefail once the file
+  # grew, and the run was refused as "different header" (campaign 2, G-S32).
+  awk '!/^#/ {print; exit}' "$CSV" | grep -qxF "$HEADER" \
     || { echo "FATAL: $CSV has a different header; use a new OUT" >&2; exit 1; }
 else
   { echo "# durexec cloud campaign. One row per load point; raw samples under raw/<run_id>-<config_id>/."

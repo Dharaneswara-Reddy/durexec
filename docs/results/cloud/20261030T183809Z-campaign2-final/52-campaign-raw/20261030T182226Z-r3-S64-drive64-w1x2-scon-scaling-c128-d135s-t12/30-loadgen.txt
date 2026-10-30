@@ -1,0 +1,32 @@
+cluster: durexec-0.durexec-hl=http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-1.durexec-hl=http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-2.durexec-hl=http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080
+
+--- throughput: 64 shard(s) [0,2,3,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63] owned by [durexec-0.durexec-hl durexec-2.durexec-hl durexec-1.durexec-hl] ---
+    window 2m0s (after 15s warm-up), concurrency 128, poll 100ms, prep 50ms
+    completed 7136 in 120.000s = 59.47 wf/s (started 8029, failed 0, ended non-COMPLETED 0, 409 follows 0)
+
+NFR    METRIC                        VALUE           TARGET                                VERDICT      KIND
+---    ------                        -----           ------                                -------      ----
+NFR-5  completed_per_sec @64shard    59.467 wf/s     no absolute target; NFR-5 is a ratio  -            measured
+NFR-5  completed @64shard            7136 workflows  -                                     -            measured
+NFR-5  latency_p50 @64shard          2.1047 s        -                                     -            measured
+NFR-5  latency_p95 @64shard          3.0077 s        -                                     -            measured
+NFR-5  latency_p99 @64shard          3.5058 s        -                                     -            measured
+NFR-5  workload @64shard             DeliveryOrder   -                                     -            assumed
+-      routing_409_follows @64shard  0 requests      -                                     -            measured
+NFR-5  scaling_1_to_2                (not measured)  >= 1.7x from 1 to 2 shards            NO EVIDENCE  not-measured
+
+notes
+  completed_per_sec @64shard         shards 0,2,3,1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63 owned by 3 node(s): [durexec-0.durexec-hl durexec-2.durexec-hl durexec-1.durexec-hl]; fewer owners than shards, so this point measures one machine more than once and is NOT evidence of horizontal scaling
+  completed @64shard                 status COMPLETED observed inside the 120.000s window; 8029 started, 0 errored, 0 reached a terminal status other than COMPLETED and are excluded
+  latency_p50 @64shard               end to end, start request to terminal status; 7136 samples; upper bound by up to one 100ms poll interval
+  latency_p99 @64shard               7136 samples
+  workload @64shard                  prep timer forced to 50ms (the workflow's own default is 12m); amount 2450 cents; concurrency 128; these are inputs this tool chose, not properties of the engine
+  routing_409_follows @64shard       requests re-sent to the named owner after a 409; 0 more hit a shard nobody owned, 0 got 503 LostOwnership, 1 failed at the transport
+  scaling_1_to_2                     the 1-shard run produced no completions, so there is no baseline to divide by
+
+how to read the 'kind' column
+  measured      an observation taken from the running cluster in this run
+  derived       arithmetic over this run's measurements (a ratio, a percentile)
+  assumed       a value this tool was told, not something it checked
+  not-measured  this run produced no evidence; the target column still shows
+                what the design document asks for, and the value column is empty

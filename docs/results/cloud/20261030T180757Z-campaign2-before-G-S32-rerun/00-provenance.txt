@@ -1,0 +1,7 @@
+campaign    : campaign2-before-G-S32-rerun
+collected_at: 20261030T180757Z
+context     : arn:aws:eks:us-east-1:<ACCT>:cluster/durexec-bench
+namespace   : durexec-lab
+git_sha     : 283fb8b
+git_tree    : clean
+aws_identity: arn:aws:sts::<ACCT>:assumed-role/durexec-bench-operator/i-079bac0ce945144bc

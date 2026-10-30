@@ -1,0 +1,163 @@
+LAST SEEN   TYPE      REASON             OBJECT                               MESSAGE
+58m         Normal    Killing            pod/durexec-2                        Stopping container engined
+58m         Normal    Killing            pod/durexec-0                        Stopping container engined
+58m         Normal    Killing            pod/durexec-1                        Stopping container engined
+58m         Warning   Unhealthy          pod/durexec-0                        Readiness probe failed: Get "http://10.91.0.93:8080/healthz": dial tcp 10.91.0.93:8080: connect: connection refused
+58m         Warning   Unhealthy          pod/durexec-2                        Readiness probe failed: Get "http://10.91.0.74:8080/healthz": dial tcp 10.91.0.74:8080: connect: connection refused
+58m         Warning   Unhealthy          pod/durexec-1                        Readiness probe failed: Get "http://10.91.0.185:8080/healthz": dial tcp 10.91.0.185:8080: connect: connection refused
+58m         Normal    Scheduled          pod/durexec-1                        Successfully assigned durexec-lab/durexec-1 to ip-10-91-0-43.ec2.internal
+58m         Normal    Scheduled          pod/durexec-0                        Successfully assigned durexec-lab/durexec-0 to ip-10-91-0-170.ec2.internal
+58m         Normal    Scheduled          pod/durexec-2                        Successfully assigned durexec-lab/durexec-2 to ip-10-91-0-82.ec2.internal
+58m         Normal    Pulled             pod/durexec-2                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+58m         Normal    Started            pod/durexec-0                        Container started
+58m         Normal    Created            pod/durexec-1                        Container created
+58m         Normal    Started            pod/durexec-2                        Container started
+58m         Normal    Pulled             pod/durexec-1                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+58m         Normal    Created            pod/durexec-2                        Container created
+58m         Normal    Started            pod/durexec-1                        Container started
+58m         Normal    Pulled             pod/durexec-0                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+58m         Normal    Created            pod/durexec-0                        Container created
+58m         Normal    Started            pod/durexec-0                        Container started
+58m         Normal    Pulled             pod/durexec-0                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+58m         Normal    Created            pod/durexec-0                        Container created
+58m         Normal    Started            pod/durexec-1                        Container started
+58m         Normal    Pulled             pod/durexec-1                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+58m         Normal    Pulled             pod/durexec-2                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+58m         Normal    Created            pod/durexec-2                        Container created
+58m         Normal    Started            pod/durexec-2                        Container started
+58m         Normal    Created            pod/durexec-1                        Container created
+51m         Normal    Killing            pod/durexec-0                        Stopping container engined
+51m         Normal    Killing            pod/durexec-2                        Stopping container engined
+51m         Normal    Killing            pod/durexec-1                        Stopping container engined
+51m         Warning   Unhealthy          pod/durexec-1                        Readiness probe failed: Get "http://10.91.0.127:8080/healthz": dial tcp 10.91.0.127:8080: connect: connection refused
+51m         Normal    Created            pod/durexec-0                        Container created
+51m         Normal    Pulled             pod/durexec-1                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+51m         Normal    Scheduled          pod/durexec-0                        Successfully assigned durexec-lab/durexec-0 to ip-10-91-0-82.ec2.internal
+51m         Normal    Pulled             pod/durexec-0                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+51m         Normal    Started            pod/durexec-0                        Container started
+51m         Normal    Started            pod/durexec-2                        Container started
+51m         Normal    Created            pod/durexec-2                        Container created
+51m         Normal    Pulled             pod/durexec-2                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+51m         Normal    Scheduled          pod/durexec-2                        Successfully assigned durexec-lab/durexec-2 to ip-10-91-0-170.ec2.internal
+51m         Normal    Scheduled          pod/durexec-1                        Successfully assigned durexec-lab/durexec-1 to ip-10-91-0-43.ec2.internal
+51m         Normal    Created            pod/durexec-1                        Container created
+51m         Normal    Started            pod/durexec-1                        Container started
+51m         Normal    Started            pod/durexec-0                        Container started
+51m         Normal    Created            pod/durexec-0                        Container created
+51m         Normal    Pulled             pod/durexec-0                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+51m         Normal    Pulled             pod/durexec-2                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+51m         Normal    Created            pod/durexec-2                        Container created
+51m         Normal    Started            pod/durexec-2                        Container started
+51m         Normal    Started            pod/durexec-1                        Container started
+51m         Normal    Created            pod/durexec-1                        Container created
+51m         Normal    Pulled             pod/durexec-1                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+43m         Normal    Killing            pod/durexec-0                        Stopping container engined
+43m         Normal    Killing            pod/durexec-2                        Stopping container engined
+43m         Normal    Killing            pod/durexec-1                        Stopping container engined
+43m         Warning   Unhealthy          pod/durexec-1                        Readiness probe failed: Get "http://10.91.0.40:8080/healthz": dial tcp 10.91.0.40:8080: connect: connection refused
+43m         Normal    Scheduled          pod/durexec-2                        Successfully assigned durexec-lab/durexec-2 to ip-10-91-0-82.ec2.internal
+43m         Normal    Scheduled          pod/durexec-0                        Successfully assigned durexec-lab/durexec-0 to ip-10-91-0-170.ec2.internal
+43m         Normal    Scheduled          pod/durexec-1                        Successfully assigned durexec-lab/durexec-1 to ip-10-91-0-43.ec2.internal
+43m         Normal    Started            pod/durexec-1                        Container started
+43m         Normal    Started            pod/durexec-0                        Container started
+43m         Normal    Pulled             pod/durexec-2                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+43m         Normal    Created            pod/durexec-2                        Container created
+43m         Normal    Pulled             pod/durexec-0                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+43m         Normal    Pulled             pod/durexec-1                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+43m         Normal    Created            pod/durexec-1                        Container created
+43m         Normal    Started            pod/durexec-2                        Container started
+43m         Normal    Pulled             pod/durexec-1                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+43m         Normal    Created            pod/durexec-1                        Container created
+43m         Normal    Created            pod/durexec-0                        Container created
+43m         Normal    Started            pod/durexec-0                        Container started
+43m         Normal    Created            pod/durexec-0                        Container created
+43m         Normal    Pulled             pod/durexec-0                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+43m         Normal    Started            pod/durexec-1                        Container started
+43m         Normal    Pulled             pod/durexec-2                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+43m         Normal    Created            pod/durexec-2                        Container created
+43m         Normal    Started            pod/durexec-2                        Container started
+36m         Normal    Killing            pod/durexec-1                        Stopping container engined
+36m         Warning   Unhealthy          pod/durexec-1                        Readiness probe failed: Get "http://10.91.0.185:8080/healthz": dial tcp 10.91.0.185:8080: connect: connection refused
+36m         Normal    Killing            pod/durexec-2                        Stopping container engined
+36m         Normal    Killing            pod/durexec-0                        Stopping container engined
+36m         Warning   Unhealthy          pod/durexec-0                        Readiness probe failed: Get "http://10.91.0.218:8080/healthz": dial tcp 10.91.0.218:8080: connect: connection refused
+36m         Normal    Scheduled          pod/durexec-0                        Successfully assigned durexec-lab/durexec-0 to ip-10-91-0-170.ec2.internal
+36m         Normal    Pulled             pod/durexec-2                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+36m         Normal    Scheduled          pod/durexec-2                        Successfully assigned durexec-lab/durexec-2 to ip-10-91-0-82.ec2.internal
+36m         Normal    Created            pod/durexec-2                        Container created
+36m         Normal    Started            pod/durexec-2                        Container started
+36m         Normal    Pulled             pod/durexec-0                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+36m         Normal    Created            pod/durexec-0                        Container created
+36m         Normal    Started            pod/durexec-0                        Container started
+36m         Normal    SuccessfulCreate   statefulset/durexec                  Create Pod durexec-1 in StatefulSet durexec successful
+36m         Normal    Started            pod/durexec-1                        Container started
+36m         Normal    Created            pod/durexec-1                        Container created
+36m         Normal    Pulled             pod/durexec-1                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+36m         Normal    Scheduled          pod/durexec-1                        Successfully assigned durexec-lab/durexec-1 to ip-10-91-0-43.ec2.internal
+36m         Normal    Pulled             pod/durexec-2                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+36m         Normal    Created            pod/durexec-0                        Container created
+36m         Normal    Started            pod/durexec-2                        Container started
+36m         Normal    Started            pod/durexec-1                        Container started
+36m         Normal    Pulled             pod/durexec-1                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+36m         Normal    Created            pod/durexec-1                        Container created
+36m         Normal    Pulled             pod/durexec-0                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+36m         Normal    Created            pod/durexec-2                        Container created
+36m         Normal    Started            pod/durexec-0                        Container started
+29m         Normal    Killing            pod/durexec-0                        Stopping container engined
+29m         Normal    SuccessfulDelete   statefulset/durexec                  Delete Pod durexec-1 in StatefulSet durexec successful
+29m         Normal    SuccessfulDelete   statefulset/durexec                  Delete Pod durexec-0 in StatefulSet durexec successful
+29m         Normal    SuccessfulDelete   statefulset/durexec                  Delete Pod durexec-2 in StatefulSet durexec successful
+29m         Normal    Killing            pod/durexec-2                        Stopping container engined
+29m         Normal    Killing            pod/durexec-1                        Stopping container engined
+29m         Warning   Unhealthy          pod/durexec-1                        Readiness probe failed: Get "http://10.91.0.142:8080/healthz": dial tcp 10.91.0.142:8080: connect: connection refused
+29m         Warning   Unhealthy          pod/durexec-2                        Readiness probe failed: Get "http://10.91.0.190:8080/healthz": dial tcp 10.91.0.190:8080: connect: connection refused
+29m         Warning   Unhealthy          pod/durexec-0                        Readiness probe failed: Get "http://10.91.0.184:8080/healthz": dial tcp 10.91.0.184:8080: connect: connection refused
+29m         Normal    NoPods             poddisruptionbudget/durexec          No matching pods found
+29m         Normal    Pulled             pod/durexec-0                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+29m         Normal    Pulled             pod/durexec-2                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+29m         Normal    Pulled             pod/durexec-1                        Container image "pgvector/pgvector:pg16" already present on machine and can be accessed by the pod
+29m         Normal    Scheduled          pod/durexec-1                        Successfully assigned durexec-lab/durexec-1 to ip-10-91-0-43.ec2.internal
+29m         Normal    Scheduled          pod/durexec-2                        Successfully assigned durexec-lab/durexec-2 to ip-10-91-0-82.ec2.internal
+29m         Normal    Created            pod/durexec-1                        Container created
+29m         Normal    Scheduled          pod/durexec-0                        Successfully assigned durexec-lab/durexec-0 to ip-10-91-0-170.ec2.internal
+29m         Normal    Started            pod/durexec-0                        Container started
+29m         Normal    Started            pod/durexec-1                        Container started
+29m         Normal    Created            pod/durexec-0                        Container created
+29m         Normal    SuccessfulCreate   statefulset/durexec                  Create Pod durexec-2 in StatefulSet durexec successful
+29m         Normal    Created            pod/durexec-2                        Container created
+29m         Normal    Started            pod/durexec-2                        Container started
+29m         Normal    SuccessfulCreate   statefulset/durexec                  Create Pod durexec-0 in StatefulSet durexec successful
+29m         Normal    Created            pod/durexec-1                        Container created
+29m         Normal    Pulled             pod/durexec-1                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+29m         Normal    Pulled             pod/durexec-2                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+29m         Normal    Started            pod/durexec-1                        Container started
+29m         Normal    Started            pod/durexec-2                        Container started
+29m         Normal    Created            pod/durexec-2                        Container created
+29m         Normal    Started            pod/durexec-0                        Container started
+29m         Normal    Pulled             pod/durexec-0                        Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:cf986fb" already present on machine and can be accessed by the pod
+29m         Normal    Created            pod/durexec-0                        Container created
+28m         Normal    Scheduled          pod/loadgen-20261030t131350z-zspwt   Successfully assigned durexec-lab/loadgen-20261030t131350z-zspwt to ip-10-91-0-126.ec2.internal
+28m         Normal    SuccessfulCreate   job/loadgen-20261030t131350z         Created pod: loadgen-20261030t131350z-zspwt
+28m         Normal    Pulling            pod/loadgen-20261030t131350z-zspwt   Pulling image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb"
+28m         Normal    Pulled             pod/loadgen-20261030t131350z-zspwt   Successfully pulled image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" in 1.106s (1.106s including waiting). Image size: 4581506 bytes.
+28m         Normal    Created            pod/loadgen-20261030t131350z-zspwt   Container created
+28m         Normal    Started            pod/loadgen-20261030t131350z-zspwt   Container started
+20m         Normal    Completed          job/loadgen-20261030t131350z         Job completed
+20m         Normal    Scheduled          pod/loadgen-20261030t132127z-v5dh9   Successfully assigned durexec-lab/loadgen-20261030t132127z-v5dh9 to ip-10-91-0-126.ec2.internal
+20m         Normal    SuccessfulCreate   job/loadgen-20261030t132127z         Created pod: loadgen-20261030t132127z-v5dh9
+20m         Normal    Created            pod/loadgen-20261030t132127z-v5dh9   Container created
+20m         Normal    Started            pod/loadgen-20261030t132127z-v5dh9   Container started
+20m         Normal    Pulled             pod/loadgen-20261030t132127z-v5dh9   Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+13m         Normal    Completed          job/loadgen-20261030t132127z         Job completed
+12m         Normal    SuccessfulCreate   job/loadgen-20261030t132903z         Created pod: loadgen-20261030t132903z-nq95w
+12m         Normal    Scheduled          pod/loadgen-20261030t132903z-nq95w   Successfully assigned durexec-lab/loadgen-20261030t132903z-nq95w to ip-10-91-0-126.ec2.internal
+12m         Normal    Pulled             pod/loadgen-20261030t132903z-nq95w   Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+12m         Normal    Created            pod/loadgen-20261030t132903z-nq95w   Container created
+12m         Normal    Started            pod/loadgen-20261030t132903z-nq95w   Container started
+5m40s       Normal    Completed          job/loadgen-20261030t132903z         Job completed
+5m23s       Normal    Scheduled          pod/loadgen-20261030t133639z-qr86c   Successfully assigned durexec-lab/loadgen-20261030t133639z-qr86c to ip-10-91-0-126.ec2.internal
+5m23s       Normal    SuccessfulCreate   job/loadgen-20261030t133639z         Created pod: loadgen-20261030t133639z-qr86c
+5m22s       Normal    Pulled             pod/loadgen-20261030t133639z-qr86c   Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+5m22s       Normal    Created            pod/loadgen-20261030t133639z-qr86c   Container created
+5m22s       Normal    Started            pod/loadgen-20261030t133639z-qr86c   Container started
+3s          Normal    Completed          job/loadgen-20261030t133639z         Job completed

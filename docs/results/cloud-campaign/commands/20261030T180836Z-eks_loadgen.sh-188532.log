@@ -1,0 +1,2 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T180836Z-eks_loadgen.sh-188532.log
+FATAL: ../docs/results/cloud-campaign/results.csv has a different header; use a new OUT

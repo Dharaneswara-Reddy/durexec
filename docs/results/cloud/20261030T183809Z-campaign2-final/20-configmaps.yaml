@@ -1,0 +1,95 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    ACTIVITY_WORKERS: "2"
+    CLUSTER_NODES: durexec-0.durexec-hl,durexec-1.durexec-hl,durexec-2.durexec-hl
+    EXTSIM_URL: ""
+    FAULT_CRASH_AT: ""
+    FAULT_INJECTION: "off"
+    LEASE_RENEW: 3s
+    LEASE_TTL: 10s
+    LISTEN_ADDR: :8080
+    NODE_COUNT: "3"
+    SEMANTIC_HYBRID: "false"
+    SHARD_COUNT: "64"
+    SYNC_COMMIT: "on"
+    TASK_LOCK: 30s
+    WORKFLOW_WORKERS: "1"
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","data":{"ACTIVITY_WORKERS":"2","CLUSTER_NODES":"durexec-0.durexec-hl,durexec-1.durexec-hl,durexec-2.durexec-hl","EXTSIM_URL":"","FAULT_CRASH_AT":"","FAULT_INJECTION":"off","LEASE_RENEW":"3s","LEASE_TTL":"10s","LISTEN_ADDR":":8080","NODE_COUNT":"3","SEMANTIC_HYBRID":"false","SHARD_COUNT":"64","SYNC_COMMIT":"on","TASK_LOCK":"30s","WORKFLOW_WORKERS":"1"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"durexec-config","namespace":"durexec-lab"}}
+    creationTimestamp: "2026-10-30T15:37:10Z"
+    name: durexec-config
+    namespace: durexec-lab
+    resourceVersion: "45378"
+    uid: 3af66551-b527-4012-91d4-8d0c4cacd7bc
+- apiVersion: v1
+  data:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      MIIDMjCCAhqgAwIBAgIRAJbOGOj+D1jjStboE+RZYS0wDQYJKoZIhvcNAQELBQAw
+      JzEQMA4GA1UEChMHQVdTIEVLUzETMBEGA1UEAxMKa3ViZXJuZXRlczAeFw0yNjEw
+      MzAxNTIyNDBaFw0zMTEwMjkxNTIyNDBaMCcxEDAOBgNVBAoTB0FXUyBFS1MxEzAR
+      BgNVBAMTCmt1YmVybmV0ZXMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB
+      AQDOloCO+hd4eXFEKl3BzDy3/l/cqolF1r/oA/OuIWKbmI5U9gnEcd1hqiDDw+Yg
+      yoVji7PvByuhWt7fhQP/vtRgNmJkpAxfUfKBfy6WaC4GpuUhreScrznipgkYz2SO
+      fkBK4rW3x/qI3ztldLv0JLnq1VHlX6/vlf8Cw5piNcFri3/MLHOCuvAhbqFpaLVB
+      9me6DgRqxMRNU3TJPN+kTBnZhl8IEtI5imOHKftGMEsAqqRe4BVB2QqIPZk7kN4R
+      n0cu5fw8U9t/JbwpSCT/0vrovLHVGQCWHbDMQP6RiCkdh7cAjS+WODb326pquh+5
+      xxbYcLF/1QoQFpx4GVKwHsvNAgMBAAGjWTBXMA4GA1UdDwEB/wQEAwICpDAPBgNV
+      HRMBAf8EBTADAQH/MB0GA1UdDgQWBBQNpHXc1OvMQILwmTJcyz6oW0vFcjAVBgNV
+      HREEDjAMggprdWJlcm5ldGVzMA0GCSqGSIb3DQEBCwUAA4IBAQBqOOG46kA4a3Hh
+      6sJt45XGStMidSjENZO+czSnZFDyO4YbKb27ssGBduPd2p9sfIj5K3Lih8fOIPOB
+      GmQNmJhbW/mra6IjudjuXTjI5HxwcIOKDFTf5PYcjecwcQ42YXsvD7alkXqdgpic
+      BPuQM+lHeiaaZA7Lh6NRJ8fWgGSVbekgULcV6l3Ifo+GN2jp2mQO7M7yiQYJSicx
+      hvuOOM2SomuC8MUSi2C0udTM6pNaQOVvFOvi6UziWaMbfCmrzIlHxLIuLHJ4oG4q
+      /PJQlmA9iQ8yxdVpyKIgNqxbbEKx1bqxodOkCpbk6K/A2hcdoF5DUOsQmERNkckf
+      qo+AHEjf
+      -----END CERTIFICATE-----
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2026-10-30T15:37:02Z"
+    name: kube-root-ca.crt
+    namespace: durexec-lab
+    resourceVersion: "2449"
+    uid: e350ca09-55c1-4c07-8ff2-c2f031bd70d5
+- apiVersion: v1
+  data:
+    POSTGRES_DB: durexec
+    POSTGRES_USER: durexec
+    postgresql.conf: |
+      listen_addresses = '*'
+      max_connections = 250
+      shared_buffers = 256MB
+      synchronous_commit = on
+      wal_level = replica
+      # Transaction-duration visibility, required by spec section 2.2. Anything
+      # slower than 200ms is logged with its statement.
+      log_min_duration_statement = 200
+      log_lock_waits = on
+      log_checkpoints = on
+      track_io_timing = on
+      # pg_stat_statements gives per-query latency without a sidecar.
+      shared_preload_libraries = 'pg_stat_statements'
+      pg_stat_statements.track = all
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","data":{"POSTGRES_DB":"durexec","POSTGRES_USER":"durexec","postgresql.conf":"listen_addresses = '*'\nmax_connections = 250\nshared_buffers = 256MB\nsynchronous_commit = on\nwal_level = replica\n# Transaction-duration visibility, required by spec section 2.2. Anything\n# slower than 200ms is logged with its statement.\nlog_min_duration_statement = 200\nlog_lock_waits = on\nlog_checkpoints = on\ntrack_io_timing = on\n# pg_stat_statements gives per-query latency without a sidecar.\nshared_preload_libraries = 'pg_stat_statements'\npg_stat_statements.track = all\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"postgres-config","namespace":"durexec-lab"}}
+    creationTimestamp: "2026-10-30T15:37:10Z"
+    name: postgres-config
+    namespace: durexec-lab
+    resourceVersion: "2502"
+    uid: f86398d0-35a7-4525-ad8c-c047789f7a98
+kind: List
+metadata:
+  resourceVersion: ""
