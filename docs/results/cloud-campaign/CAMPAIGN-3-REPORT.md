@@ -96,4 +96,25 @@ rolling restart); variance across days or availability zones.
 
 ## Teardown and cost
 
-_Teardown in progress at the time of this commit; verified results are added in the next commit._
+In-cluster objects deleted from the operator (no PersistentVolumes), then
+`terraform destroy` from the cloud session: **44 destroyed**, no error (no
+leaked network interface this time). Terraform state: 0 resources.
+
+Read-only sweep, 21:58 UTC: no EKS cluster, no pilot EC2, no EBS volumes or
+snapshots, no load balancers, no secrets, no log groups, no pilot VPC or
+network interfaces; no `durexec-` IAM roles or instance profiles. Running
+instances in the account belong to CodeArena and churn-ml-system — untouched.
+
+**Remaining, deliberately:** ECR `durexec/{engine,loadgen,extsimd}` (tag
+`cf986fb`, ~$0.01/month) and the S3 bucket `durexec-tfstate-183192605828`
+(evidence, collector archives, empty state). Elastic IP `3.82.134.71` is
+`churn-ml-system`/`prod` — unrelated, untouched.
+
+**Duration and cost** (estimates at ~$0.75/h, not billing data):
+
+| Session | Infrastructure up | Estimate |
+|---|---|---|
+| 1 (Stages A–D) | 12:17–15:05 UTC, 2 h 50 min | ~$2.10 |
+| 2 (Stages E–G) | 15:21–19:16 UTC, 3 h 55 min | ~$2.95 |
+| 3 (Stage H, faults) | 19:16–21:58 UTC, 2 h 42 min | ~$2.00 |
+| **Campaign total** | **9 h 27 min** | **~$7.05** |

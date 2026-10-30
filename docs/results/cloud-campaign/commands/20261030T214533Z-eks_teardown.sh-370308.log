@@ -1,0 +1,15 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T214533Z-eks_teardown.sh-370308.log
+namespace "durexec-lab" deleted
+storageclass.storage.k8s.io "durexec-gp3" deleted
+serviceaccount "durexec" deleted from durexec-lab namespace
+configmap "durexec-config" deleted from durexec-lab namespace
+configmap "postgres-config" deleted from durexec-lab namespace
+service "durexec" deleted from durexec-lab namespace
+service "durexec-0-np" deleted from durexec-lab namespace
+service "durexec-1-np" deleted from durexec-lab namespace
+service "durexec-hl" deleted from durexec-lab namespace
+service "durexec-np" deleted from durexec-lab namespace
+statefulset.apps "durexec" deleted from durexec-lab namespace
+poddisruptionbudget.policy "durexec" deleted from durexec-lab namespace
+No resources found
+in-cluster cleanup done; TEARDOWN_K8S_ONLY=1, so no terraform destroy here
