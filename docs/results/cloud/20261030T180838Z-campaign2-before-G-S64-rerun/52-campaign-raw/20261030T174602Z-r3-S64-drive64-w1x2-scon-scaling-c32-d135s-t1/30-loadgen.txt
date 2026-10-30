@@ -1,2 +1,0 @@
-cluster: durexec-0.durexec-hl=http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-1.durexec-hl=http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080 durexec-2.durexec-hl=http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080
-loadgen: -shards 64 exceeds -shard-count 16

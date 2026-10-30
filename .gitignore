@@ -43,3 +43,7 @@ Report_Template_AIDS_LaTeX
 # Raw kubelet samples are committed gzipped (*.jsonl.gz); originals stay in S3.
 docs/results/cloud-campaign/**/*.jsonl
 docs/results/cloud/**/*.jsonl
+# Collector archives live in S3; bundles no longer copy raw runs (manifest instead).
+docs/results/cloud/*.tar.gz
+docs/results/cloud/*/51-raw/
+docs/results/cloud/*/52-campaign-raw/

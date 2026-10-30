@@ -187,8 +187,16 @@ for f in docs/results/eks-pilot/results.csv docs/results/cloud-campaign/results.
   b="50-$(basename "$(dirname "$f")")-$(basename "$f")"
   [ -f "$f" ] && { cp "$f" "$OUT/$b"; note "ok       $b"; collected=$((collected+1)); }
 done
-[ -d docs/results/eks-pilot/raw ] && { cp -r docs/results/eks-pilot/raw "$OUT/51-raw" 2>/dev/null; note "ok       51-raw/"; }
-[ -d docs/results/cloud-campaign/raw ] && { cp -r docs/results/cloud-campaign/raw "$OUT/52-campaign-raw" 2>/dev/null; note "ok       52-campaign-raw/"; }
+# A MANIFEST of the raw runs, not a copy: copying every raw directory into
+# every bundle made each bundle repeat all earlier evidence (campaign 2: 300+
+# MB per bundle, archives heading past GitHub's 100 MB file limit). The raw
+# runs stay in docs/results/*/raw; the manifest pins what existed, by hash.
+for d in docs/results/eks-pilot/raw docs/results/cloud-campaign/raw; do
+  [ -d "$d" ] || continue
+  m="$OUT/5x-raw-manifest-$(basename "$(dirname "$d")").txt"
+  ( cd "$d" && find . -type f ! -name '*.jsonl' -print0 | sort -z | xargs -0 -r sha256sum ) > "$m" 2>/dev/null \
+    && note "ok       $(basename "$m") ($(wc -l < "$m") files)"
+done
 
 # --- 7. redaction -----------------------------------------------------------
 # Belt and braces: nothing above should contain a credential, but a connection

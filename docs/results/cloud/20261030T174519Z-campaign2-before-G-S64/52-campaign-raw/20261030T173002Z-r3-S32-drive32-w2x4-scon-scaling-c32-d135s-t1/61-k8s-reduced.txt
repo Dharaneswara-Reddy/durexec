@@ -1,6 +1,0 @@
-pod|durexec-lab/durexec-2|ip-10-91-0-67.ec2.internal|samples=1
-pod|durexec-lab/durexec-2|ip-10-91-0-67.ec2.internal|mem_peak_bytes=9211904
-pod|durexec-lab/durexec-2|ip-10-91-0-67.ec2.internal|cpu_cores=unavailable
-pod|kube-system/ebs-csi-controller-6dc6cdf65-7zmlt|ip-10-91-0-67.ec2.internal|samples=1
-pod|kube-system/ebs-csi-controller-6dc6cdf65-7zmlt|ip-10-91-0-67.ec2.internal|mem_peak_bytes=71016448
-pod|kube-system/ebs-csi-controller-6dc6cdf65-7zmlt|ip-10-91-0-67.ec2.internal|cpu_cores=unavailable

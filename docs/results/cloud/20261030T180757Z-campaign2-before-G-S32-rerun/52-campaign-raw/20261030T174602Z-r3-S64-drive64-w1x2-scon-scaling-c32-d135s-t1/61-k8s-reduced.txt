@@ -1,3 +1,0 @@
-pod|kube-system/aws-node-qnwqs|ip-10-91-0-43.ec2.internal|samples=1
-pod|kube-system/aws-node-qnwqs|ip-10-91-0-43.ec2.internal|mem_peak_bytes=122318848
-pod|kube-system/aws-node-qnwqs|ip-10-91-0-43.ec2.internal|cpu_cores=unavailable
