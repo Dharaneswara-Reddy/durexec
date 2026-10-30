@@ -63,6 +63,19 @@ data "aws_iam_policy_document" "operator" {
     actions   = ["secretsmanager:GetSecretValue"]
     resources = [aws_secretsmanager_secret.db.arn]
   }
+  # Fault campaign: eks_fault.sh reboot-db checks the DB host's Project tag and
+  # reboots it. Describe cannot be resource-scoped; reboot is limited to the
+  # pilot's own database instance.
+  statement {
+    sid       = "FaultDescribe"
+    actions   = ["ec2:DescribeInstances"]
+    resources = ["*"]
+  }
+  statement {
+    sid       = "FaultRebootDb"
+    actions   = ["ec2:RebootInstances"]
+    resources = [aws_instance.database.arn]
+  }
   statement {
     sid       = "BucketList"
     actions   = ["s3:ListBucket"]
