@@ -177,6 +177,12 @@ while [ $(( $(date +%s) - start )) -lt "$MAX_WAIT_S" ]; do
   [ "$(crashloop)" = 0 ] || CRASHLOOP=1
   [ "$HEALED" = no ] && [ $(( $(date +%s) - start )) -ge "$hold" ] && heal
   [ "$T_CLAIM" != NA ] && [ "$T_PROGRESS" != NA ] && [ "$HEALED" = yes ] && break
+  # netem and sever-db are not expected to move leases, so T_CLAIM never sets
+  # and the loop used to run out its full MAX_WAIT_S, which then appeared as a
+  # ~150 s t_ring for a ring that was never broken (campaign 3, sever-db).
+  case "$SCENARIO" in netem|sever-db)
+    [ "$T_PROGRESS" != NA ] && [ "$HEALED" = yes ] && break ;;
+  esac
   sleep 0.5
 done
 heal
