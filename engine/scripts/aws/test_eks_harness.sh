@@ -44,3 +44,24 @@ for _ in 1 2 3 4 5; do
     || { echo "FAIL: header check is not pipefail-safe"; exit 1; }
 done
 echo "pipefail-safe header check self-test: PASS"
+
+# eks_fault.sh's engine-pod check against a kubectl that, like the real one,
+# refuses a pod name together with -l (campaign 3: every fault target failed).
+mkdir -p "$tmp/kbin"
+cat > "$tmp/kbin/kubectl" <<'K'
+#!/usr/bin/env bash
+case " $* " in
+  *" get pod "*" -l "*) echo "error: name cannot be provided when a selector is specified" >&2; exit 1 ;;
+  *" get pod durexec-1 "*labels.app*) printf durexec ;;
+  *" get pod other "*labels.app*) printf other ;;
+  *) exit 1 ;;
+esac
+K
+chmod +x "$tmp/kbin/kubectl"
+check_pod() { PATH="$tmp/kbin:$PATH" NS=durexec-lab bash -c '
+  die() { echo "$*" >&2; exit 1; }
+  eval "$(sed -n "/^engine_pod() {/,/^}/p" scripts/aws/eks_fault.sh)"
+  engine_pod "$1"' _ "$1"; }
+check_pod durexec-1 || { echo "FAIL: engine_pod rejects a real engine pod"; exit 1; }
+if check_pod other 2>/dev/null; then echo "FAIL: engine_pod accepts a non-engine pod"; exit 1; fi
+echo "fault injector engine-pod check self-test: PASS"

@@ -1,0 +1,9 @@
+NAME                                   READY   STATUS    RESTARTS   AGE     IP            NODE                          NOMINATED NODE   READINESS GATES
+durexec-0                              1/1     Running   0          5m14s   10.91.0.239   ip-10-91-0-39.ec2.internal    <none>           <none>
+durexec-1                              1/1     Running   0          5m13s   10.91.0.122   ip-10-91-0-67.ec2.internal    <none>           <none>
+durexec-2                              1/1     Running   0          5m13s   10.91.0.35    ip-10-91-0-43.ec2.internal    <none>           <none>
+durexec-probe                          1/1     Running   0          4h44m   10.91.0.41    ip-10-91-0-252.ec2.internal   <none>           <none>
+loadgen-fault-20261030t201621z-9qrdv   1/1     Running   0          3m9s    10.91.0.38    ip-10-91-0-252.ec2.internal   <none>           <none>
+loadgen-fault-20261030t201840z-pljn5   1/1     Running   0          2m31s   10.91.0.6     ip-10-91-0-252.ec2.internal   <none>           <none>
+loadgen-fault-20261030t201918z-rb2zm   1/1     Running   0          114s    10.91.0.204   ip-10-91-0-252.ec2.internal   <none>           <none>
+loadgen-fault-20261030t202034z-cf4lv   0/1     Pending   0          38s     <none>        <none>                        <none>           <none>

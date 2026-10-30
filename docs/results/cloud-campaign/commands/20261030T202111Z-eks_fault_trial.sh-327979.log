@@ -1,0 +1,3 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T202111Z-eks_fault_trial.sh-327979.log
+run_id=20261030T202111Z scenario=reboot-db trial=1 victim=database git=4dcdbaac23b1c3d6270cf9f2c6395e8427d3dc0c image=cf986fb
+verdict=INVALID_ring_not_healthy_before_start (not started)

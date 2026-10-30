@@ -1,0 +1,5 @@
+NAME                             STATUS    COMPLETIONS   DURATION   AGE     CONTAINERS   IMAGES                                                                 SELECTOR
+loadgen-fault-20261030t201621z   Running   0/1           3m10s      3m10s   loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb   batch.kubernetes.io/controller-uid=8f6eb75c-884c-48d1-bc7e-66656ff0b755
+loadgen-fault-20261030t201840z   Running   0/1           2m32s      2m32s   loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb   batch.kubernetes.io/controller-uid=c08fc2a1-95ae-45a0-a006-1c116480798d
+loadgen-fault-20261030t201918z   Running   0/1           115s       115s    loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb   batch.kubernetes.io/controller-uid=819ba072-ea80-4e0d-b6a2-7cf228bd09f4
+loadgen-fault-20261030t202034z   Running   0/1           39s        39s     loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb   batch.kubernetes.io/controller-uid=65b8b665-918a-4dbb-8c78-4276ac627a99

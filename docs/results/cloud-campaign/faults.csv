@@ -1,0 +1,14 @@
+# durexec cloud fault trials; t_* in ms from t_inject on the PostgreSQL clock; NA = not reached within MAX_WAIT_S
+run_id,scenario,trial,victim,victim_node,replicas,shards_held,tok_before,tok_after,t_expire_ms,t_claim_ms,t_progress_ms,t_ring_ms,new_owners,restarts_before,restarts_after,crashloop_seen,policy_enforced,stale_fencing_rejections,load_rate,lg_completed,lg_errored,lg_timedout,lg_p99_s,inv_runs,inv_dup_run_seq,inv_dup_activity_completion,inv_seq_gaps,inv_multi_terminal,inv_exec_status,drained,verdict,raw_dir
+20261030T201956Z,kill,1,durexec-1,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T201956Z-fault-kill-t1
+20261030T201959Z,kill,2,durexec-2,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T201959Z-fault-kill-t2
+20261030T202003Z,kill,3,durexec-0,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202003Z-fault-kill-t3
+20261030T202006Z,freeze,1,durexec-1,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202006Z-fault-freeze-t1
+20261030T202010Z,freeze,2,durexec-2,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202010Z-fault-freeze-t2
+20261030T202013Z,freeze,3,durexec-0,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202013Z-fault-freeze-t3
+20261030T202016Z,sever-db,1,durexec-1,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202016Z-fault-sever-db-t1
+20261030T202020Z,sever-db,2,durexec-2,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202020Z-fault-sever-db-t2
+20261030T202023Z,sever-db,3,durexec-0,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202023Z-fault-sever-db-t3
+20261030T202027Z,drain,1,durexec-1,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202027Z-fault-drain-t1
+20261030T202030Z,drain,2,durexec-2,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202030Z-fault-drain-t2
+20261030T202111Z,reboot-db,1,database,,3,,,,,,,,,durexec-0=0;durexec-1=0;durexec-2=0;,,,,,65.6,,,,,,,,,,,,INVALID_ring_not_healthy_before_start,raw/20261030T202111Z-fault-reboot-db-t1

@@ -1,0 +1,85 @@
+Name:             loadgen-fault-20261030t201918z-rb2zm
+Namespace:        durexec-lab
+Priority:         0
+Service Account:  default
+Node:             ip-10-91-0-252.ec2.internal/10.91.0.252
+Start Time:       Fri, 30 Oct 2026 20:19:22 +0000
+Labels:           app=durexec-loadgen
+                  batch.kubernetes.io/controller-uid=819ba072-ea80-4e0d-b6a2-7cf228bd09f4
+                  batch.kubernetes.io/job-name=loadgen-fault-20261030t201918z
+                  controller-uid=819ba072-ea80-4e0d-b6a2-7cf228bd09f4
+                  job-name=loadgen-fault-20261030t201918z
+                  topology.kubernetes.io/region=us-east-1
+                  topology.kubernetes.io/zone=us-east-1a
+Annotations:      <none>
+Status:           Running
+IP:               10.91.0.204
+IPs:
+  IP:           10.91.0.204
+Controlled By:  Job/loadgen-fault-20261030t201918z
+Containers:
+  loadgen:
+    Container ID:  containerd://ab35ec663eba6e516294ec244e372beb19ffc40a54bd144ee5edca5d19d47429
+    Image:         <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb
+    Image ID:      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:8b0b831783873c833071b13b810431624e32dbfea5de2bac84718e6a7469ad75
+    Port:          <none>
+    Host Port:     <none>
+    Args:
+      -mode
+      arrival
+      -rates
+      65.6
+      -service-floor
+      2.2086s
+      -shard-count
+      16
+      -shards
+      16
+      -duration
+      180s
+      -warmup
+      5s
+      -grace
+      120s
+      -id-prefix
+      lg-fault-20261030t201918z
+      -base
+      http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080
+    State:          Running
+      Started:      Fri, 30 Oct 2026 20:19:24 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      memory:  512Mi
+    Requests:
+      cpu:        500m
+      memory:     128Mi
+    Environment:  <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-gk9x5 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-gk9x5:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              durexec.io/role=harness
+Tolerations:                 durexec.io/harness=true:NoSchedule
+                             node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  2m8s  default-scheduler  Successfully assigned durexec-lab/loadgen-fault-20261030t201918z-rb2zm to ip-10-91-0-252.ec2.internal
+  Normal  Pulled     2m8s  kubelet            spec.containers{loadgen}: Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:cf986fb" already present on machine and can be accessed by the pod
+  Normal  Created    2m8s  kubelet            spec.containers{loadgen}: Container created
+  Normal  Started    2m7s  kubelet            spec.containers{loadgen}: Container started

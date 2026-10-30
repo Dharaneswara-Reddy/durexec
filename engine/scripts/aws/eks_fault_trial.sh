@@ -96,6 +96,13 @@ ARGS=$(printf '["-mode","arrival","-rates","%s","-service-floor","%s","-shard-co
 sed -e "s|LOADGEN_JOB_NAME|$JOB|" -e "s|LOADGEN_IMAGE|$IMAGE|" -e "s|LOADGEN_ARGS|$ARGS|" \
     deploy/kubernetes/loadgen/job.yaml | kubectl apply -f - >/dev/null
 log "load: $LOAD_RATE wf/s for $LOAD_DUR (job $JOB)"
+# From here on the load job must not outlive this trial on ANY exit path. A
+# trial that died early used to leave its job running, and the next trials'
+# loads stacked on top of it (campaign 3: ~200 wf/s offered, lease loss,
+# every later trial refused as "ring not healthy").
+JOB_DONE=0
+drop_job() { [ "$JOB_DONE" = 1 ] || kubectl -n "$NS" delete job "$JOB" --ignore-not-found >/dev/null 2>&1 || true; }
+trap drop_job EXIT
 sleep "$PRE_S"
 
 # --- snapshot what the victim holds, then inject ----------------------------------
@@ -125,7 +132,13 @@ case "$SCENARIO" in
   terminate-node)  "$FAULT" terminate-node "$VICTIM" ;;
   reboot-db)       "$FAULT" reboot-db ;;
   *) echo "unknown SCENARIO $SCENARIO" >&2; exit 2 ;;
-esac 2>&1 | tee -a "$RAW/00-timeline.txt"
+esac 2>&1 | tee -a "$RAW/00-timeline.txt" && INJ_RC=0 || INJ_RC=$?
+if [ "$INJ_RC" != 0 ]; then
+  # Nothing (or not all of it) was injected: this is not a recovery trial.
+  log "verdict=INVALID_injection_failed (injector exit $INJ_RC)"
+  ( IFS=,; echo "$RUN_ID,$SCENARIO,$TRIAL,$VICTIM,$VNODE,$REPLICAS,$HELD,${TOK_BEFORE},,,,,,,${RESTARTS_BEFORE// /;},,,${POLICY_ENFORCED},,$LOAD_RATE,,,,,,,,,,,,INVALID_injection_failed,${RAW#"$OUT"/}" ) >> "$CSV"
+  exit 1
+fi
 
 # --- oracle -------------------------------------------------------------------------
 T_EXPIRE=NA; T_CLAIM=NA; T_PROGRESS=NA; HEALED=no; CRASHLOOP=0
@@ -138,7 +151,7 @@ heal() {
     drain)     "$FAULT" uncordon "$VICTIM" ;;
   esac 2>&1 | tee -a "$RAW/00-timeline.txt"
 }
-trap 'heal' EXIT
+trap 'heal; drop_job' EXIT
 hold=$FREEZE_S; [ "$SCENARIO" = freeze ] || hold=$HOLD_S
 start=$(date +%s)
 while [ $(( $(date +%s) - start )) -lt "$MAX_WAIT_S" ]; do
@@ -205,6 +218,7 @@ ji() { sed -n "s/^inv|$1=//p" "$RAW/40-journal-latency-invariants.txt" | head -1
 kubectl -n "$NS" get events --sort-by=.lastTimestamp > "$RAW/50-events.txt" 2>&1 || true
 [ "$VICTIM" != database ] && kubectl -n "$NS" logs "$VICTIM" --previous --tail=500 > "$RAW/51-victim-previous.log" 2>/dev/null || true
 kubectl -n "$NS" delete job "$JOB" --ignore-not-found >/dev/null 2>&1 || true
+JOB_DONE=1
 
 bad=""
 for k in dup_run_seq dup_activity_completion seq_gaps multi_terminal; do

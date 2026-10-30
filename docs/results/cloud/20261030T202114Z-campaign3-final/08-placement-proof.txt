@@ -1,0 +1,9 @@
+POD                          NODE                     ROLE
+durexec-0                    ip-10-91-0-39.ec2.internal engine
+durexec-1                    ip-10-91-0-67.ec2.internal engine
+durexec-2                    ip-10-91-0-43.ec2.internal engine
+durexec-probe                ip-10-91-0-252.ec2.internal harness
+loadgen-fault-20261030t201621z-9qrdv ip-10-91-0-252.ec2.internal harness
+loadgen-fault-20261030t201840z-pljn5 ip-10-91-0-252.ec2.internal harness
+loadgen-fault-20261030t201918z-rb2zm ip-10-91-0-252.ec2.internal harness
+loadgen-fault-20261030t202034z-cf4lv ?                        <none>

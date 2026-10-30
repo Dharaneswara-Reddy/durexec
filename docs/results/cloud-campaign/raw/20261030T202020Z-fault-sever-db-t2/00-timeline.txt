@@ -1,0 +1,2 @@
+run_id=20261030T202020Z scenario=sever-db trial=2 victim=durexec-2 git=4dcdbaac23b1c3d6270cf9f2c6395e8427d3dc0c image=cf986fb
+verdict=INVALID_ring_not_healthy_before_start (not started)

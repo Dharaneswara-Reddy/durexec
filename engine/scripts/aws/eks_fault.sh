@@ -41,7 +41,11 @@ die()  { echo "FATAL: $*" >&2; exit 1; }
 engine_pod() {
   local p="$1"
   [[ "$p" =~ ^durexec-[0-9]+$ ]] || die "'$p' is not an engine pod name (durexec-N)"
-  kubectl -n "$NS" get pod "$p" -l app=durexec -o name >/dev/null 2>&1 || die "no engine pod $p in $NS"
+  # By name, then the label: kubectl refuses a name together with -l ("name
+  # cannot be provided when a selector is specified"), which made this check
+  # fail for every pod (campaign 3: no fault could be injected).
+  [ "$(kubectl -n "$NS" get pod "$p" -o jsonpath='{.metadata.labels.app}' 2>/dev/null)" = durexec ] \
+    || die "no engine pod $p in $NS"
 }
 node_of() { kubectl -n "$NS" get pod "$1" -o jsonpath='{.spec.nodeName}'; }
 # A node of the pilot cluster carrying the engine role.

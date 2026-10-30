@@ -1,0 +1,3 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261030T202003Z-eks_fault_trial.sh-326504.log
+run_id=20261030T202003Z scenario=kill trial=3 victim=durexec-0 git=4dcdbaac23b1c3d6270cf9f2c6395e8427d3dc0c image=cf986fb
+verdict=INVALID_ring_not_healthy_before_start (not started)
