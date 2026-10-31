@@ -1,0 +1,447 @@
+% =====================================================================
+%  PROJECT REPORT TEMPLATE - Dept. of CSE, Amrita School of Computing,
+%  Bengaluru  (LaTeX version of "Template - Report - CSE.docx")
+%
+%  AUTOMATIC:  Table of Contents, List of Figures, List of Tables,
+%              chapter name in the header, figure/table numbering,
+%              reference numbering [1], [2] ...
+%
+%  HOW TO COMPILE
+%    Overleaf : Menu -> Compiler -> XeLaTeX, then Recompile.
+%    Locally  : run  xelatex report_template_auto.tex  TWO times
+%               (the 2nd run fills in the contents and page numbers).
+%  Keep "amrita_logo.png" in the same folder as this file.
+%
+%  HOW TO WRITE
+%    New chapter      : \clearpage  then  \chapter{Chapter Title}
+%    Section / sub    : \section{...}   \subsection{...}
+%    Figure           : see the "figure" example in Chapter 1
+%    Table            : see the "table"  example in Chapter 1
+%    Cite a reference : \cite{uhrig1995}  ->  [1]
+%  Everything appears in the TOC / lists automatically.
+% =====================================================================
+\documentclass[12pt]{report}
+
+% ---------------- Page setup (same as the Word file) -----------------
+\usepackage[letterpaper,
+            top=1.38in, bottom=1.18in, left=1.58in, right=1.18in,
+            headsep=0.38in, footskip=0.5in]{geometry}
+
+% ---------------- Fonts ----------------------------------------------
+\usepackage{fontspec}
+% Body: Times New Roman (falls back to a Times clone if not installed)
+\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{%
+  \IfFontExistsTF{TeX Gyre Termes}{\setmainfont{TeX Gyre Termes}}{%
+    \setmainfont{Liberation Serif}}}
+% Header / footer: Calibri (falls back to Carlito, its metric clone)
+\IfFontExistsTF{Calibri}{\newfontfamily\hffont{Calibri}}{%
+  \IfFontExistsTF{Carlito}{\newfontfamily\hffont{Carlito}}{%
+    \newfontfamily\hffont{Liberation Sans}}}
+
+% ---------------- Packages -------------------------------------------
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{titletoc}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[labelsep=colon]{caption}
+\usepackage[numbers,square,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}   % clickable TOC entries, no coloured boxes
+
+\definecolor{wordred}{HTML}{FF0000}
+\newcommand{\red}[1]{\textcolor{wordred}{#1}}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% =====================================================================
+%  EDIT THESE DETAILS
+% =====================================================================
+\newcommand{\projecttitle}{Project Title}
+\newcommand{\monthyear}{December 2026}       % header (right) and title page
+\newcommand{\guidename}{<GUIDE NAME AND DESIGNATION>}
+
+% ---------------- Headers and footers --------------------------------
+% Front matter: centred roman page number only
+\fancypagestyle{front}{%
+  \fancyhf{}
+  \renewcommand{\headrulewidth}{0pt}
+  \fancyfoot[C]{\thepage}}
+
+% Main chapters: CURRENT CHAPTER NAME (left, automatic) | Month, year (right)
+% Footer: Dept. of CSE, ASC, Bengaluru (left) | Page | n (right)
+\fancypagestyle{main}{%
+  \fancyhf{}
+  \renewcommand{\headrulewidth}{0pt}
+  \fancyhead[L]{\hffont\small\leftmark}
+  \fancyhead[R]{\hffont\small\monthyear}
+  \fancyfoot[L]{\hffont\small\vspace*{\baselineskip}Dept. of CSE, ASAI, Bengaluru}
+  \fancyfoot[R]{\hffont\small Page | \thepage\vspace*{\baselineskip}}}
+\fancypagestyle{plain}{}          % chapter pages keep the same header
+
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}   % header = chapter title
+\renewcommand{\sectionmark}[1]{}
+
+% \chapter does NOT start a new page by itself (so notes can sit above
+% the heading). Put \clearpage before every \chapter.
+\makeatletter
+\renewcommand{\chapter}{\global\@topnum\z@\@afterindentfalse
+  \secdef\@chapter\@schapter}
+\makeatother
+
+% ---------------- Headings -------------------------------------------
+% Chapter:  "CHAPTER - n"  and the title below, centred, bold, 14 pt
+\titleformat{\chapter}[display]
+  {\normalfont\fontsize{14}{17}\bfseries\centering}
+  {CHAPTER - \thechapter}{6pt}{\MakeUppercase}
+\titlespacing*{\chapter}{0pt}{0pt}{18pt}
+% Section 1.1 (bold 12 pt), Subsection 1.1.1 (bold 12 pt)
+\titleformat{\section}{\normalfont\fontsize{12}{14}\bfseries}{\thesection}{0.6em}{}
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+\titleformat{\subsection}{\normalfont\fontsize{12}{14}\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}          % TOC shows chapters, sections, subsections
+
+% ---------------- Table of Contents style ----------------------------
+\contentsmargin{0.5in}
+\newcommand{\tocdots}{\titlerule*[0.6pc]{.}}
+% Chapters: "CHAPTER 1 – INTRODUCTION ........ 1"
+\titlecontents{chapter}[0pt]{\addvspace{3pt}}
+  {CHAPTER \thecontentslabel\ -- \MakeUppercase}
+  {\hspace*{0.25in}\MakeUppercase}            % un-numbered entries
+  {\tocdots\contentspage}
+% Sections: "1.1 INTRODUCTION TO ....... 2"
+\titlecontents{section}[0.95in]{}
+  {\contentslabel{0.45in}\MakeUppercase}{\MakeUppercase}
+  {\tocdots\contentspage}
+% Subsections: "5.2.1 ..........  4"
+\titlecontents{subsection}[1.55in]{}
+  {\contentslabel{0.6in}\MakeUppercase}{\MakeUppercase}
+  {\tocdots\contentspage}
+% Figures and tables: "1.1   Role hierarchy ........ 5"
+\titlecontents{figure}[0.55in]{\addvspace{2pt}}
+  {\contentslabel{0.55in}}{}{\tocdots\contentspage}
+\titlecontents{table}[0.55in]{\addvspace{2pt}}
+  {\contentslabel{0.55in}}{}{\tocdots\contentspage}
+
+\renewcommand{\contentsname}{TABLE OF CONTENTS}
+\renewcommand{\listfigurename}{List Of Figures}
+\renewcommand{\listtablename}{List Of Tables}
+\renewcommand{\bibname}{REFERENCES}
+
+% ---------------- Captions -------------------------------------------
+% Figures: "Fig. 1.1: Title" below the figure; Tables: "Table 1.1: Title" above
+\captionsetup[figure]{name=Fig., font=bf, labelfont=bf, skip=6pt}
+\captionsetup[table]{name=Table, font=bf, labelfont=bf, position=top, skip=6pt}
+
+% ---------------- References (IEEE style numbering "[1].") -----------
+\renewcommand{\bibnumfmt}[1]{[#1].}
+\setlength{\bibsep}{2pt}
+\renewcommand{\bibpreamble}{Follow IEEE format and if websites are there
+  put it at the end and also books.\par\vspace{6pt}}
+
+% ---------------- Red instruction notes from the Word template -------
+% (delete these \figurenote / \headernote lines when writing the report)
+\newcommand{\figurenote}{%
+  \begin{center}\fontsize{14}{16}\selectfont\bfseries
+  \red{All figures must be numbered and titled.}\\
+  \red{All figures should be referred and explained in detailed}
+  \end{center}}
+\newcommand{\headernote}{%
+  {\fontsize{8}{9}\selectfont\bfseries
+   \red{Chapter name to be included in the leftside of the header}}\par}
+
+% Heading for un-numbered front-matter pages, also added to the TOC
+\newcommand{\frontchapter}[1]{%
+  \clearpage\phantomsection
+  \addcontentsline{toc}{chapter}{#1}%
+  \chapter*{#1}}
+
+% Placeholder box for figures (replace with \includegraphics)
+\newcommand{\figplaceholder}[1]{%
+  \fbox{\parbox[c][1.6in][c]{0.7\linewidth}{\centering\itshape #1}}}
+
+\begin{document}
+
+% "Page No." heading on the right of the Table of Contents
+\addtocontents{toc}{\protect\hfill\textbf{Page No.}\protect\par}
+
+% =====================================================================
+%  TITLE PAGE
+% =====================================================================
+\begin{titlepage}
+\centering
+\vspace*{0.6in}
+{\fontsize{14}{17}\selectfont\bfseries \projecttitle\par}
+\vspace{10pt}
+A PROJECT REPORT\par
+\vspace{10pt}
+{\fontsize{14}{17}\selectfont\bfseries\itshape Submitted by\par}
+\vspace{14pt}
+\begin{tabular}{@{}l@{\hspace{0.45in}}l@{}}
+BL.EN.U4AID2------ & Name1\\[16pt]
+BL.EN.U4AID2-----  & Name2\\[16pt]
+BL.EN.U4AID2-----  & Name3\\
+\end{tabular}\par
+\vspace{18pt}
+{\fontsize{14}{17}\selectfont\bfseries\itshape in partial fulfillment for the award of the degree of\par}
+\vspace{18pt}
+{\fontsize{14}{17}\selectfont\bfseries BACHELOR OF TECHNOLOGY\par}
+\vspace{16pt}
+{\small IN\par}
+\vspace{16pt}
+ARTIFICIAL INTELLIGENCE AND DATA SCIENCE\par \\
+\vspace{12pt}
+\includegraphics[width=1.75in]{amrita_logo.png}\par
+\vspace{12pt}
+AMRITA SCHOOL OF ARTIFICIAL INTELLIGENCE, BENGALURU\par
+\vspace{12pt}
+{\fontsize{14}{17}\selectfont AMRITA VISHWA VIDYAPEETHAM\par}
+\vspace{12pt}
+BENGALURU 560 035\par
+\vspace{12pt}
+\MakeUppercase{\monthyear}\par
+\end{titlepage}
+
+% =====================================================================
+%  FRONT MATTER  (roman page numbers)
+% =====================================================================
+\pagestyle{front}
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+% ---------------- ACKNOWLEDGEMENTS -----------------------------------
+\frontchapter{ACKNOWLEDGEMENTS}
+\begin{spacing}{1.5}
+\setlength{\parindent}{0.5in}
+\indent The satisfaction that accompanies successful completion of any task would
+be incomplete without mention of people who made it possible, and whose
+constant encouragement and guidance have been source of inspiration
+throughout the course of this project work.
+
+We offer our sincere pranams at the lotus feet of \textbf{``AMMA'',
+MATA AMRITANANDAMAYI DEVI} who showered her blessing upon us throughout the
+course of this project work.
+
+We owe our gratitude to \textbf{Prof. Manoj P.}, Director, Amrita VishwaVidyapeetham Bengaluru Campus. We would like to place our heartfelt gratitude to \textbf{Dr. Gopalakrishnan E.A.,} Principal, Amrita School of Computing and Amrita School of Artificial Intelligence, Bengaluru for his
+valuable support and inspiration.
+
+It is a great pleasure to express our gratitude and indebtedness to our
+project guide \red{\textbf{\guidename}}, Department of
+Computer Science and Engineering, Amrita School of Computing, Bengaluru for
+her/his valuable guidance, encouragement, moral support, and affection
+throughout the project work.
+
+We would like to thank express our gratitude to project panel members for
+their suggestions, encouragement, and moral support during the process of
+project work and all faculty members for their academic support. Finally,
+we are forever grateful to our parents, who have loved, supported and
+encouraged us in all our endeavors.
+\end{spacing}
+
+% ---------------- ABSTRACT -------------------------------------------
+\frontchapter{ABSTRACT}
+\begin{spacing}{1.5}
+\red{One paragraph summary of the project..}
+\end{spacing}
+
+% ---------------- AUTOMATIC LISTS ------------------------------------
+\clearpage
+{\linespread{0.95}\selectfont\tableofcontents}
+
+\clearpage\phantomsection
+\addcontentsline{toc}{chapter}{LIST OF FIGURES}
+\listoffigures
+
+\clearpage\phantomsection
+\addcontentsline{toc}{chapter}{LIST OF TABLES}
+\listoftables
+
+% =====================================================================
+%  MAIN CHAPTERS  (arabic page numbers starting at 1)
+% =====================================================================
+\clearpage
+\pagestyle{main}
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\onehalfspacing   % body text: 1.5 line spacing, justified
+
+% ---------------- CHAPTER 1 ------------------------------------------
+{\fontsize{8}{9}\selectfont\bfseries
+ \red{The content of the report should be of minimum 50 pages}\par}
+\vspace{-6pt}
+\headernote
+\chapter{Introduction}
+
+In the past few years, there has been a huge change in Customer
+Relationship Management and one such aspect is Salesforce.
+\textbf{(Ensure the line spacing is 1.5 and alignment has to be justified
+and not left aligned / not right aligned / center aligned)}
+
+\figurenote
+
+\section{Introduction to \ldots}
+Write the introduction here. Refer to every figure and table in the text,
+for example Fig.~\ref{fig:role} shows the role hierarchy and
+Table~\ref{tab:params} lists the model parameters \cite{uhrig1995}.
+
+% ---- Example figure: numbered, titled, and listed automatically ----
+\begin{figure}[htbp]
+  \centering
+  \figplaceholder{Insert figure here}
+  % \includegraphics[width=0.8\linewidth]{role_hierarchy.png}
+  \caption{Role hierarchy}
+  \label{fig:role}
+\end{figure}
+
+% ---- Example table: numbered, titled, and listed automatically ----
+\begin{table}[htbp]
+  \centering
+  \caption{Table of model parameters}
+  \label{tab:params}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+    \midrule
+    Learning rate & 0.001 & Optimizer step size \\
+    Epochs        & 50    & Training passes     \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Motivation}
+Write the motivation here.
+
+% ---------------- CHAPTER 2 ------------------------------------------
+\clearpage
+\chapter{Literature Survey}
+
+\figurenote
+\headernote
+
+\section{Title of Section}
+Literature review text \cite{carni2006}.
+
+\begin{figure}[htbp]
+  \centering
+  \figplaceholder{Insert figure here}
+  \caption{Creating a web to lead form}
+  \label{fig:weblead}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Dataset specifications}
+  \label{tab:dataset}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Attribute} & \textbf{Value} \\
+    \midrule
+    Number of samples & --- \\
+    Number of classes & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Title of Section}
+Text.
+
+% ---------------- CHAPTER 3 ------------------------------------------
+\clearpage
+\headernote
+\chapter{System Requirements and Analysis}
+
+\section{Software Requirements}
+List the software requirements here.
+
+\section{Hardware Requirements}
+List the hardware requirements here (if hardware project).
+
+\headernote
+\figurenote
+
+% ---------------- CHAPTER 4 ------------------------------------------
+\clearpage
+\chapter{System Design}
+
+\begin{center}\bfseries\singlespacing
+Any architectural diagram is must\ldots\\
+Low level Design with description\\
+High Level Design with description
+\end{center}
+
+\figurenote
+
+\section{High Level Design}
+Describe the architecture diagram here.
+
+\section{Low Level Design}
+Describe the low level design here.
+
+% ---------------- CHAPTER 5 ------------------------------------------
+\clearpage
+\headernote
+\chapter{System Implementation}
+
+\figurenote
+
+\section{Modules Used with Description}
+Describe each module here.
+
+\section{Implementation Details}
+Text.
+
+\subsection{Sub Module}
+Text.
+
+% ---------------- CHAPTER 6 ------------------------------------------
+\clearpage
+\headernote
+\chapter{System Testing}
+Write the testing details here.
+
+% ---------------- CHAPTER 7 ------------------------------------------
+\clearpage
+\headernote
+\chapter{Results and Analysis}
+Write the results here.
+
+% ---------------- CHAPTER 8 ------------------------------------------
+\clearpage
+\headernote
+\chapter{Conclusion and Future Scope}
+Write the conclusion and future scope here.
+
+% =====================================================================
+%  REFERENCES  (numbered automatically in the order they are cited)
+%  Journal / conference papers first, then books and websites.
+% =====================================================================
+\clearpage\phantomsection
+\addcontentsline{toc}{chapter}{REFERENCES}
+\markboth{References}{}
+\begin{singlespace}
+\begin{thebibliography}{99}
+
+\bibitem{uhrig1995}
+R.E. Uhrig, ``Introduction to Artificial Neural Networks'', Industrial
+Electronics, Control, and Instrumentation, Proceedings of the IEEE IECON
+21st International Conference, Vol. 1, pp. 33-37, 1995.
+
+\bibitem{carni2006}
+Domenico Luca Carn, Domenico Grimaldi, ``ANN based demodulator for UMTS
+signal measurements'', Measurement Journal, Vol. 39, Issue. 10,
+pp. 877-883, 2006.
+
+\bibitem{books}
+Books and websites after other journal/ conference references.
+
+\end{thebibliography}
+\end{singlespace}
+
+\end{document}

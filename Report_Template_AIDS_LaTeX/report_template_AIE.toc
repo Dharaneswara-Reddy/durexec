@@ -1,0 +1,73 @@
+\hfill \textbf {Page No.}\par 
+\contentsline {chapter}{ACKNOWLEDGEMENTS}{i}{section*.1}%
+\contentsline {chapter}{ABSTRACT}{ii}{section*.3}%
+\contentsline {chapter}{LIST OF FIGURES}{vii}{section*.6}%
+\contentsline {chapter}{LIST OF TABLES}{ix}{section*.8}%
+\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Introduction to Durable Execution}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Motivation}{4}{section.1.2}%
+\contentsline {subsection}{\numberline {1.2.1}Existing engines require a great deal of infrastructure}{4}{subsection.1.2.1}%
+\contentsline {subsection}{\numberline {1.2.2}Horizontal partitioning and operational simplicity are usually traded against one another}{5}{subsection.1.2.2}%
+\contentsline {subsection}{\numberline {1.2.3}Agent-driven workflows break the assumption behind deduplication}{5}{subsection.1.2.3}%
+\contentsline {section}{\numberline {1.3}Problem Statement}{6}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Objectives}{7}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Scope and Limitations}{7}{section.1.5}%
+\contentsline {section}{\numberline {1.6}Contributions}{9}{section.1.6}%
+\contentsline {section}{\numberline {1.7}Organisation of the Report}{9}{section.1.7}%
+\contentsline {chapter}{\numberline {2}Literature Survey}{11}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Durable Execution and Workflow Correctness}{11}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Sharding and Partition Management}{12}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Ownership, Coordination and Fencing}{14}{section.2.3}%
+\contentsline {section}{\numberline {2.4}The Saga Pattern and Compensation}{15}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Failure Modes of LLM Agent Systems}{17}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Semantic Caching and Embedding-Based Similarity}{18}{section.2.6}%
+\contentsline {section}{\numberline {2.7}Comparative Synthesis}{19}{section.2.7}%
+\contentsline {section}{\numberline {2.8}Identified Research Gap}{20}{section.2.8}%
+\contentsline {chapter}{\numberline {3}System Requirements and Analysis}{23}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Functional Requirements}{23}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Non-Functional Requirements}{23}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Software Requirements}{27}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Hardware Requirements}{27}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Assumptions and Constraints}{29}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Analysis of the Chosen Approach}{32}{section.3.6}%
+\contentsline {chapter}{\numberline {4}System Design}{34}{chapter.4}%
+\contentsline {section}{\numberline {4.1}High Level Design}{34}{section.4.1}%
+\contentsline {subsection}{\numberline {4.1.1}The Governing Design Principle}{34}{subsection.4.1.1}%
+\contentsline {subsection}{\numberline {4.1.2}Architectural Overview}{35}{subsection.4.1.2}%
+\contentsline {subsection}{\numberline {4.1.3}The Separation of Workflow and Activity}{37}{subsection.4.1.3}%
+\contentsline {subsection}{\numberline {4.1.4}The Two-Level Mapping: Workflows, Shards and Nodes}{38}{subsection.4.1.4}%
+\contentsline {subsection}{\numberline {4.1.5}Ownership, Leases and the Fencing Invariant}{39}{subsection.4.1.5}%
+\contentsline {subsection}{\numberline {4.1.6}Replication and Failover}{43}{subsection.4.1.6}%
+\contentsline {subsection}{\numberline {4.1.7}Design Rationale and Rejected Alternatives}{44}{subsection.4.1.7}%
+\contentsline {section}{\numberline {4.2}Low Level Design}{45}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Persistent Data Model}{45}{subsection.4.2.1}%
+\contentsline {subsubsection}{\numberline {4.2.1.1}The event log}{45}{subsubsection.4.2.1.1}%
+\contentsline {subsubsection}{\numberline {4.2.1.2}The execution pointer}{47}{subsubsection.4.2.1.2}%
+\contentsline {subsubsection}{\numberline {4.2.1.3}Event types}{48}{subsubsection.4.2.1.3}%
+\contentsline {subsection}{\numberline {4.2.2}The Workflow Task Loop}{48}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}Program Order as the Replay Join Key}{48}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4}The Cooperative Scheduler}{51}{subsection.4.2.4}%
+\contentsline {subsection}{\numberline {4.2.5}Determinism in Practice}{52}{subsection.4.2.5}%
+\contentsline {subsection}{\numberline {4.2.6}A Worked Execution Trace}{52}{subsection.4.2.6}%
+\contentsline {subsection}{\numberline {4.2.7}The Durable Task Queue}{55}{subsection.4.2.7}%
+\contentsline {subsection}{\numberline {4.2.8}Durable Timers and Signals}{56}{subsection.4.2.8}%
+\contentsline {subsubsection}{\numberline {4.2.8.1}Timers}{56}{subsubsection.4.2.8.1}%
+\contentsline {subsubsection}{\numberline {4.2.8.2}Racing a timer against an activity}{57}{subsubsection.4.2.8.2}%
+\contentsline {subsubsection}{\numberline {4.2.8.3}Signals}{57}{subsubsection.4.2.8.3}%
+\contentsline {subsection}{\numberline {4.2.9}Retry Semantics and the Crash-Window Analysis}{57}{subsection.4.2.9}%
+\contentsline {subsection}{\numberline {4.2.10}Saga Compensation}{59}{subsection.4.2.10}%
+\contentsline {subsection}{\numberline {4.2.11}The Semantic Idempotency Decision Path}{62}{subsection.4.2.11}%
+\contentsline {subsubsection}{\numberline {4.2.11.1}The precise failure being addressed}{62}{subsubsection.4.2.11.1}%
+\contentsline {subsubsection}{\numberline {4.2.11.2}Where the verdict must be computed, and why}{63}{subsubsection.4.2.11.2}%
+\contentsline {subsubsection}{\numberline {4.2.11.3}Storage and the candidate set}{65}{subsubsection.4.2.11.3}%
+\contentsline {subsubsection}{\numberline {4.2.11.4}Failure modes, stated first}{66}{subsubsection.4.2.11.4}%
+\contentsline {subsection}{\numberline {4.2.12}Node Runtime Composition}{67}{subsection.4.2.12}%
+\contentsline {chapter}{\numberline {5}System Implementation}{69}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Modules Used with Description}{69}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Implementation Details}{69}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Sub Module}{69}{subsection.5.2.1}%
+\contentsline {chapter}{\numberline {6}System Testing}{70}{chapter.6}%
+\contentsline {chapter}{\numberline {7}Results and Analysis}{71}{chapter.7}%
+\contentsline {chapter}{\numberline {8}Conclusion and Future Scope}{72}{chapter.8}%
+\contentsline {chapter}{REFERENCES}{73}{section*.50}%
+\contentsfinish 

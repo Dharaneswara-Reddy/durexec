@@ -1,0 +1,34 @@
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {1.1}{\ignorespaces Terminology used precisely and consistently throughout this report\relax }}{3}{table.caption.11}%
+\contentsline {table}{\numberline {1.2}{\ignorespaces Project objectives, the mechanism realising each, and where each is designed in this report\relax }}{7}{table.caption.13}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Research on durable execution and workflow correctness\relax }}{13}{table.caption.14}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Production workflow orchestrators and the infrastructure each requires, from their own deployment documentation\relax }}{14}{table.caption.15}%
+\contentsline {table}{\numberline {2.3}{\ignorespaces Partitioning, ownership and compensation literature\relax }}{17}{table.caption.17}%
+\contentsline {table}{\numberline {2.4}{\ignorespaces Literature establishing that agent step repetition is a real, measured failure mode\relax }}{18}{table.caption.18}%
+\contentsline {table}{\numberline {2.5}{\ignorespaces Semantic caching and embedding-similarity literature\relax }}{19}{table.caption.19}%
+\contentsline {table}{\numberline {2.6}{\ignorespaces Positioning of this work against the closest prior art\relax }}{22}{table.caption.21}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Functional requirements\relax }}{24}{table.caption.22}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Functional requirements (continued)\relax }}{25}{table.caption.23}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Non-functional requirements\relax }}{26}{table.caption.24}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Software requirements\relax }}{28}{table.caption.25}%
+\contentsline {table}{\numberline {3.5}{\ignorespaces Hardware requirements of the development and measurement environment\relax }}{29}{table.caption.26}%
+\contentsline {table}{\numberline {3.6}{\ignorespaces Assumptions and constraints under which the design was made\relax }}{31}{table.caption.28}%
+\contentsline {table}{\numberline {3.7}{\ignorespaces Architectural alternatives considered and reasons for rejection\relax }}{33}{table.caption.29}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Architectural tiers, their responsibilities and their state\relax }}{37}{table.caption.31}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces The contract between workflow code and activity code\relax }}{38}{table.caption.32}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Partitioning parameters and the reasoning behind each default\relax }}{40}{table.caption.34}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces Event types written to the log, grouped by the mechanism that produces them\relax }}{49}{table.caption.37}%
+\contentsline {table}{\numberline {4.5}{\ignorespaces Constructs forbidden in workflow code, and their replacements\relax }}{54}{table.caption.39}%
+\contentsline {table}{\numberline {4.6}{\ignorespaces The events written when the first workflow task commits\relax }}{55}{table.caption.41}%
+\contentsline {table}{\numberline {4.7}{\ignorespaces Crash-window analysis for a single activity execution\relax }}{58}{table.caption.43}%
+\contentsline {table}{\numberline {4.8}{\ignorespaces Retry policy parameters, evaluated by the workflow worker on seeing an activity failure\relax }}{59}{table.caption.44}%
+\contentsline {table}{\numberline {4.9}{\ignorespaces Failure modes of the semantic comparator. The asymmetry between them is the design's central constraint.\relax }}{66}{table.caption.47}%
+\contentsline {table}{\numberline {4.10}{\ignorespaces Runtime configuration parameters and their defaults\relax }}{68}{table.caption.49}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsfinish 

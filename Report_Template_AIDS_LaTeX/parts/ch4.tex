@@ -1,0 +1,430 @@
+% =====================================================================
+%  CHAPTER 4 — SYSTEM DESIGN
+%  Section 4.1 (High Level Design) is in this file.
+%  Section 4.2 (Low Level Design) is in parts/ch4b.tex, included at the
+%  end of this file.
+% =====================================================================
+\clearpage
+\chapter{System Design}
+
+This chapter presents the design of the engine in two parts. Section~4.1
+establishes the principle from which the architecture is derived, describes
+the resulting structure, and justifies the decisions that the structure
+encodes. Section~4.2 descends to the level of individual tables, queries,
+transactions and goroutine handshakes, and includes the failure analysis that
+determines what the engine can and cannot promise.
+
+The chapter is written so that each mechanism is introduced by the problem it
+solves. Where a design decision was contested, the rejected alternative is
+stated along with the reason for rejecting it, because a design presented
+without its alternatives cannot be assessed.
+
+\section{High Level Design}
+
+\subsection{The Governing Design Principle}
+
+The entire architecture is derived from one invariant, stated here and
+referred to throughout the remainder of the chapter as the governing
+principle:
+
+\begin{quote}
+\textbf{Workflow code is a pure function of its event history.} Given the same
+list of events, executing the workflow function produces the same sequence of
+decisions, every time, on any machine.
+\end{quote}
+
+This is not a stylistic preference. It is the property that purchases every
+capability the engine claims, and the relationship is worth making explicit.
+
+\textbf{Crash recovery} requires no snapshot of memory, threads or stack
+frames. The engine does not attempt to restore a process to the state it was
+in; it re-executes the function against the saved history, and the stack
+rebuilds itself as a side effect of that execution. A mechanism that saved and
+restored memory would have to serialise closures, open connections and
+goroutine stacks, none of which is portable between machines or across code
+versions.
+
+\textbf{Migration} between machines is free. A workflow can resume on a
+completely different node because nothing machine-local was ever part of its
+state. There is no affinity to re-establish and no cache to warm. This is what
+makes shard failover a matter of ownership rather than of data movement.
+
+\textbf{Debuggability} is structural rather than added. The history \emph{is}
+the execution trace; there is no separate log to correlate against it, and no
+possibility of the two disagreeing.
+
+Everything else in this chapter is either machinery that keeps this principle
+true, or machinery that keeps the history durable and available.
+
+Two consequences constrain the programming model and are enforced rather than
+merely documented. First, orchestration code may perform no input or output of
+its own, because any value read from the environment --- the clock, a random
+source, a file, a network response --- would differ between the original
+execution and the replay, and would break determinism. Second, any unavoidable
+non-determinism must be \emph{journalled}: executed once, its result written to
+the log, and thereafter read from the log rather than recomputed.
+Section~4.2.10 applies exactly this technique to the semantic deduplication
+verdict, which is what makes that contribution defensible rather than ad hoc.
+
+\subsection{Architectural Overview}
+
+The system is organised into five tiers, shown in Fig.~\ref{fig:arch} and
+summarised in Table~\ref{tab:tiers}. The tiers are logical rather than
+physical: every node runs the whole stack above the persistence tier in a
+single operating-system process.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_4_1_architecture.png}
+  \caption{The five architectural tiers of the engine. Every node runs the
+    client-facing gateway, the execution tier and the control tier in one
+    process; only the persistence tier is shared. The control tier is where
+    every mutating path is gated by a fencing-token check, which is what makes
+    partitioned execution safe without a coordination service.}
+  \label{fig:arch}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Architectural tiers, their responsibilities and their state}
+  \label{tab:tiers}
+  \small
+  \begin{tabular}{@{}p{0.75in}p{1.95in}p{1.85in}@{}}
+    \toprule
+    \textbf{Tier} & \textbf{Responsibility} & \textbf{State held} \\
+    \midrule
+    Client & Starts workflows, sends signals, observes progress, injects
+      faults during evaluation & None \\
+    Gateway & Routes a request to the node that owns the target shard;
+      redirects when its routing view is stale & None. Deliberately stateless
+      and replicated on every node \\
+    Execution & Replays history, decides what happens next, performs side
+      effects, fires timers, runs compensations & Only transient per-task
+      state, discarded after every commit \\
+    Control & Acquires and renews shard leases; verifies the fencing token
+      inside every mutating transaction; evaluates idempotency &
+      The fencing token currently held, in memory, re-verified on every write \\
+    Persistence & Stores events, executions, tasks, timers, leases and
+      activity intents; replicates to a standby & All durable state in the
+      system, without exception \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Three properties of this structure are deliberate and are worth stating
+separately.
+
+\textbf{The gateway holds no state.} It hashes a workflow identifier, looks up
+the owning node and forwards. If its view of ownership is stale it will
+forward to a node that no longer owns the shard; that node replies with a
+\cd{NotOwner} response naming the current owner, and the gateway refreshes and
+retries. Routing is therefore allowed to be briefly wrong. Correctness is
+enforced at the point of writing, not at the point of routing --- which is the
+difference between a design that requires global agreement on a routing table
+and one that does not.
+
+\textbf{The execution tier keeps nothing between tasks.} When a workflow task
+completes, the in-memory workflow state is discarded. Correctness never
+depends on retaining it. Caching the workflow between tasks --- what Temporal
+calls \emph{sticky execution} --- is a pure latency optimisation that can be
+added and removed without any change in behaviour.
+
+\textbf{The persistence tier is the only shared component}, and therefore the
+only coordination point. This is the architecture's central trade-off, and it
+is stated plainly in Section~4.1.7.
+
+\subsection{The Separation of Workflow and Activity}
+
+The programming model distinguishes two kinds of code, and the engine's
+correctness depends on the distinction being maintained absolutely.
+
+\begin{table}[htbp]
+  \centering
+  \caption{The contract between workflow code and activity code}
+  \label{tab:wfact}
+  \small
+  \begin{tabular}{@{}p{0.7in}p{1.62in}p{1.08in}p{1.1in}@{}}
+    \toprule
+    & \textbf{Workflow} & \textbf{Activity} & \textbf{Enforced by} \\
+    \midrule
+    Decides & What happens next & Nothing &
+      Review and the determinism detector \\
+    Performs & No input or output whatsoever &
+      All external side effects & Absence of I/O in the context object \\
+    Determinism & Mandatory & Not required &
+      Non-determinism error at replay (FR-3) \\
+    Executions & Once per recovery, many times in total &
+      At-least-once, ideally once & The replay mechanism \\
+    Failure & Fails the workflow & Retried under policy &
+      Retry policy on the activity \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The practical rule is that the workflow never does I/O and the activity never
+makes orchestration decisions. Blurring the line does not produce an immediate
+error; it produces intermittent non-determinism failures that appear long
+afterwards and are extremely difficult to attribute. The engine therefore
+makes the separation structural: the context object handed to workflow code
+exposes no facility for performing I/O, so the ordinary way of writing the
+code is also the correct way.
+
+\subsection{The Two-Level Mapping: Workflows, Shards and Nodes}
+
+Partitioning is expressed as two separate mappings, and keeping them separate
+is the single most consequential decision in the architecture:
+\[
+  \texttt{workflow\_id}
+  \;\xrightarrow[\;\text{\footnotesize $N$ fixed at deploy}\;]{\text{hash}}\;
+  \texttt{shard\_id}
+  \;\xrightarrow[\;\text{\footnotesize $\approx$150 virtual nodes}\;]{\text{consistent hash ring}}\;
+  \texttt{node}
+\]
+
+The first mapping is $\texttt{shard\_id} = \mathrm{fnv32}(\texttt{workflow\_id})
+\bmod N$, with $N$ fixed at deployment time and defaulting to sixteen. A
+workflow never changes shard for the whole of its life. That permanence is
+what makes its event log a stable, single-writer append stream, which in turn
+is what allows the primary key alone to serve as the concurrency control
+(Section~4.2.1).
+
+The second mapping assigns shards to nodes through a consistent hash ring with
+approximately one hundred and fifty virtual nodes per physical node. Adding or
+removing a node moves a minority of shards and leaves every other shard
+untouched.
+
+Fig.~\ref{fig:mapping} shows why the indirection matters. Had workflow
+identifiers been hashed directly to nodes, adding a node would move individual
+\emph{workflows} between logs while they were still running, which is a data
+migration performed under load on live state. With the fixed intermediate
+mapping, adding a node moves only the \emph{right to act on} a shard. No event
+is copied, no workflow is rewritten, and the operation reduces to a lease
+changing hands.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_4_2_two_level_mapping.png}
+  \caption{The two-level mapping. The first mapping is fixed for the lifetime
+    of a workflow; only the second changes when the cluster is resized. This
+    is what reduces rebalancing from a data migration to an ownership
+    handoff.}
+  \label{fig:mapping}
+\end{figure}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Partitioning parameters and the reasoning behind each default}
+  \label{tab:ringparams}
+  \small
+  \begin{tabular}{@{}p{1.05in}p{0.55in}p{2.82in}@{}}
+    \toprule
+    \textbf{Parameter} & \textbf{Default} & \textbf{Reasoning} \\
+    \midrule
+    Shard count $N$ & 16 &
+      Must exceed the largest anticipated node count so that every node can
+      own at least one shard, but must stay small enough that per-shard
+      goroutine overhead is negligible. Fixed at deployment because changing it
+      would re-map every workflow. \\
+    Virtual nodes per node & $\approx$150 &
+      Enough points on the ring for the distribution across physical nodes to
+      be near-even; a smaller number produces visible imbalance. \\
+    Hash function & FNV-1a, 32-bit &
+      Fast, dependency-free and adequate for uniformity. Cryptographic
+      strength is not a requirement, because the input is not adversarial. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Ownership, Leases and the Fencing Invariant}
+
+This section contains the central safety argument of the design.
+
+Ownership of a shard is recorded in a single row with four columns: the shard
+identifier, the owning node, a monotonically increasing fencing token, and an
+expiry timestamp. A node acquires a shard with the conditional update shown in
+Listing~\ref{lst:acquire}.
+
+\begin{lstlisting}[language=SQL, caption={Acquiring a shard lease. Zero rows
+  returned means another node holds a live lease.}, label={lst:acquire}]
+UPDATE shard_leases
+SET    owner_node    = $me,
+       fencing_token = fencing_token + 1,
+       expires_at    = now() + interval '10 seconds'
+WHERE  shard_id = $shard
+  AND  (owner_node = $me OR expires_at < now())
+RETURNING fencing_token;
+\end{lstlisting}
+
+Zero rows returned means someone else holds a live lease. One row returned
+means the caller owns the shard and now holds token $T$. The token increments
+on every change of ownership and never decreases. Renewal, performed every
+three seconds against a ten-second expiry, extends \cd{expires\_at} while
+requiring both the owner name and the token to match; a renewal returning zero
+rows tells the node it has been displaced.
+
+\textbf{The lease is not what makes this safe.} This is the point most often
+missed, and it is where naive lease-based designs fail. Consider the following
+sequence:
+
+\begin{enumerate}[leftmargin=*, itemsep=1pt]
+  \item Node A owns shard 2 with token 7. It polls a task and begins work.
+  \item Node A's process freezes --- a garbage-collection pause, a disk stall,
+    a virtual-machine suspension. It has no way of knowing that time is
+    passing.
+  \item Ten seconds elapse. The lease expires. Node B acquires it and receives
+    token 8.
+  \item Node B replays the workflow and begins executing it.
+  \item Node A wakes up mid-transaction, still sincerely believing it holds
+    the lease, and attempts to commit.
+\end{enumerate}
+
+No amount of care in the lease protocol prevents step five, because node A
+cannot detect that it was frozen. What prevents the damage is that every
+mutating transaction re-verifies the token \emph{inside the same transaction
+as its writes}, as shown in Listing~\ref{lst:fence}.
+
+\begin{lstlisting}[language=Go, caption={The fencing check. Every mutating
+  transaction performs this before any write, and \texttt{FOR UPDATE}
+  serialises the check against the write.}, label={lst:fence}]
+tx, _ := db.Begin()
+var tok int64
+tx.QueryRow(`SELECT fencing_token FROM shard_leases
+             WHERE shard_id = $1 AND owner_node = $2
+               AND expires_at > now()
+             FOR UPDATE`, shard, me).Scan(&tok)
+if tok != myToken {
+    tx.Rollback()
+    return ErrLostOwnership
+}
+// ... all event appends, task inserts, timer inserts ...
+tx.Commit()
+\end{lstlisting}
+
+Node A's transaction reads token 8, compares it against the 7 it believes it
+holds, and rolls back. It commits nothing --- not one event, not one task row.
+The \cd{FOR UPDATE} clause is what makes this airtight: it serialises the
+ownership check against the write, so no window exists between ``check'' and
+``write'' during which ownership could change underneath the writer.
+Fig.~\ref{fig:fencing} shows the two outcomes side by side.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_4_6_lease_fencing.png}
+  \caption{Why the lease alone is insufficient and the in-transaction token
+    check is what provides safety. Without fencing, a node that was frozen past
+    its lease expiry commits alongside the new owner and produces split-brain.
+    With fencing, it commits nothing.}
+  \label{fig:fencing}
+\end{figure}
+
+The resulting invariant, which satisfies FR-8, is:
+
+\begin{quote}
+\textbf{A node that has lost ownership cannot mutate shard state, regardless of
+what it believes.}
+\end{quote}
+
+This is the fencing-token argument~\cite{kleppmann2017} implemented in a table
+rather than in ZooKeeper, and it is the same technique Temporal applies under
+the name RangeID. Two costs must be stated honestly rather than discovered by
+a reader.
+
+\textbf{There is an availability gap.} Between the old owner's death and the
+new owner's acquisition, the shard is unavailable for up to one lease
+duration. At the default ten-second expiry this bounds unavailability at ten
+seconds for $1/N$ of workflows, which is NFR-3. Shortening the lease speeds
+failover and increases the risk of spuriously fencing a healthy but momentarily
+slow node; this is a genuine tunable trade-off, and the chosen value is a
+default rather than a discovery.
+
+\textbf{This is not consensus.} The design relies on PostgreSQL as a single
+linearizable source of truth for the ownership record. That is a legitimate
+position --- it is the DBOS argument~\cite{dbos2025} --- but it must be stated
+plainly: the coordination problem has been moved into the database, not
+eliminated, and the database is consequently both the coordination bottleneck
+and the availability floor of the whole system.
+
+\subsection{Replication and Failover}
+
+Durability beyond a single machine is obtained from PostgreSQL streaming
+replication: a standby receives the write-ahead log from the leader and can be
+promoted if the leader is lost.
+
+The choice between asynchronous and synchronous commit is a genuine trade-off
+rather than a setting with a right answer. Asynchronous replication
+(\cd{synchronous\_commit = off}) is faster but has a loss window: a leader
+that dies holding unreplicated commits loses them. Synchronous replication
+(\cd{synchronous\_commit = remote\_apply}) has no loss window, but adds a
+network round trip to every commit and stalls entirely if the standby is
+unavailable. The engine defaults to synchronous commit, treating the
+throughput cost as a measurable result rather than as a hidden caveat.
+
+The failover sequence following the loss of a shard-owning node is as follows,
+with the default timings:
+
+\begin{enumerate}[leftmargin=*, itemsep=1pt]
+  \item $t+0.0$\,s --- the node is killed. In-flight task locks are already
+    ticking down.
+  \item $t+3.0$\,s --- the dead node misses its first lease renewal.
+  \item $t+10.0$\,s --- the lease expires.
+  \item $t+10.1$\,s --- a surviving node wins the acquire statement and
+    receives the next fencing token.
+  \item $t+10.3$\,s --- that node polls a workflow task, replays the history
+    from the first event, and resumes.
+  \item $t+40.0$\,s --- any activity task locks held by the dead node expire
+    and those tasks are redelivered.
+\end{enumerate}
+
+Nothing is lost, because nothing was ever held only in the dead node's memory.
+Some work may be \emph{repeated}, specifically activities caught in the window
+analysed in Section~4.2.8, which is why stable deduplication keys exist.
+Recovery time is dominated by the lease expiry and should be reported as a
+distribution over many induced failures rather than as a single observation.
+
+Two limitations are recorded here rather than left for a reader to find.
+First, \textbf{database failover in this design is slower than published work
+and is not automatic}: AMBROSIA~\cite{ambrosia2020} reports automatic failover
+in approximately 1.8 seconds with no loss, whereas promotion of the standby in
+this system is operator-initiated and takes substantially longer. Second,
+shards share one database instance, so the loss of that instance is a
+cluster-wide event rather than a per-shard one. Both are consequences of the
+single-dependency constraint and both are recorded in Section~1.5.
+
+\subsection{Design Rationale and Rejected Alternatives}
+
+The architecture above is one point in a space of possibilities, and the
+decisions that define it are collected here so that they can be assessed
+together. The alternatives are tabulated in Table~\ref{tab:stack} of
+Chapter~3; this section gives the reasoning for the three decisions that most
+shape the design.
+
+\textbf{Why the database and nothing else.} Every mechanism the engine needs
+--- an ordered append-only log, a queue with visibility timeouts, a timer
+store, and a linearizable compare-and-swap for ownership --- is available
+within a single relational database, and crucially they are available
+\emph{within one transaction}. Introducing a message broker for the queue or a
+coordination service for ownership would mean that a workflow decision and its
+consequences could no longer be committed atomically, and the engine would
+have to implement the missing atomicity itself. The dependency count would
+rise and the complexity would rise with it. This reasoning is what makes
+NFR-6 a design asset rather than an arbitrary restriction.
+
+\textbf{Why ownership is a lease rather than consensus.} A full consensus
+protocol would remove the dependence on a single database as the arbiter of
+ownership. It would also require operating a second distributed system, which
+contradicts the project's central thesis. Because the fencing check makes a
+displaced node harmless regardless of what it believes, the weaker mechanism
+is sufficient for the safety property the system actually needs. Consensus
+would improve availability, not correctness, and availability is explicitly
+bounded rather than maximised in NFR-3.
+
+\textbf{Why compensation rather than locking.} Holding database locks for the
+duration of a multi-step workflow would provide isolation between concurrent
+workflows, which sagas do not. AC/DC~\cite{acdc2026} measured the cost of that
+approach directly: with one-second steps their locking variant degraded to
+approximately two orders per second with 42\% of orders failing, while
+compensation sustained sixteen orders per second with no failures. The
+isolation gap that sagas leave is real, and is acknowledged in Section~4.2.9
+rather than solved.
+
+\input{parts/ch4b}
