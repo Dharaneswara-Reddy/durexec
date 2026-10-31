@@ -37,7 +37,17 @@ CLAUDE.md
 engine/fieldeval
 
 
-Report_Template_AIDS_LaTeX
+# Report: sources, figures and the compiled PDF are tracked; LaTeX and Python
+# build artefacts are not.
+Report_Template_AIDS_LaTeX/*.aux
+Report_Template_AIDS_LaTeX/*.log
+Report_Template_AIDS_LaTeX/*.toc
+Report_Template_AIDS_LaTeX/*.lof
+Report_Template_AIDS_LaTeX/*.lot
+Report_Template_AIDS_LaTeX/*.out
+Report_Template_AIDS_LaTeX/*.orig
+Report_Template_AIDS_LaTeX/**/__pycache__/
+Report_Template_AIDS_LaTeX/**/.ruff_cache/
 
 
 # Raw kubelet samples are committed gzipped (*.jsonl.gz); originals stay in S3.

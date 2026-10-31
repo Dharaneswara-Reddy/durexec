@@ -2,37 +2,30 @@
 %  PROJECT REPORT - Dept. of CSE / AI, Amrita School of Artificial
 %  Intelligence, Bengaluru
 %
-%  HOW TO COMPILE
-%    Overleaf : Menu -> Compiler -> XeLaTeX, then Recompile (twice).
-%    Locally  : xelatex report_template_AIE.tex   (run it TWICE so the
-%               table of contents and page numbers fill in)
+%  Compile with XeLaTeX, twice (table of contents and page references):
+%      xelatex report_template_AIE.tex
+%      xelatex report_template_AIE.tex
+%  On Overleaf: Menu -> Compiler -> XeLaTeX.
 %
-%  Keep "amrita_logo.png" and the "figures/" and "parts/" folders beside
-%  this file.
-%
-%  The body is split across parts/ch1.tex ... parts/refs.tex so each file
-%  stays small enough to edit comfortably.
+%  Figures are generated, not drawn by hand:
+%      python3 figures/fig_design.py     (architecture and method diagrams)
+%      python3 figures/fig_results.py    (every result figure, read from
+%                                         docs/results/cloud-campaign/)
 % =====================================================================
 \documentclass[12pt]{report}
 
-% ---------------- Page setup (same as the Word file) -----------------
+% ---------------- Page setup -----------------------------------------
 \usepackage[letterpaper,
             top=1.38in, bottom=1.18in, left=1.58in, right=1.18in,
             headsep=0.38in, footskip=0.5in]{geometry}
 
 % ---------------- Fonts ----------------------------------------------
+% Body: TeX Gyre Termes (a Times clone). Header/footer: Carlito (metrically
+% identical to Calibri). Both are free and installed with TeX Live.
 \usepackage{fontspec}
-% Body: Times New Roman (falls back to a Times clone if not installed)
-\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{%
-  \IfFontExistsTF{TeX Gyre Termes}{\setmainfont{TeX Gyre Termes}}{%
-    \setmainfont{Liberation Serif}}}
-% Header / footer: Calibri (falls back to Carlito, its metric clone)
-\IfFontExistsTF{Calibri}{\newfontfamily\hffont{Calibri}}{%
-  \IfFontExistsTF{Carlito}{\newfontfamily\hffont{Carlito}}{%
-    \newfontfamily\hffont{Liberation Sans}}}
-% Monospace for identifiers, SQL and code listings
-\IfFontExistsTF{DejaVu Sans Mono}{\setmonofont[Scale=0.84]{DejaVu Sans Mono}}{%
-  \IfFontExistsTF{Liberation Mono}{\setmonofont[Scale=0.84]{Liberation Mono}}{}}
+\setmainfont{TeX Gyre Termes}
+\newfontfamily\hffont{Carlito}
+\setmonofont[Scale=0.84]{DejaVu Sans Mono}
 
 % ---------------- Packages -------------------------------------------
 \usepackage{graphicx}
@@ -44,66 +37,50 @@
 \usepackage{enumitem}
 \usepackage{array}
 \usepackage{booktabs}
+\usepackage{multirow}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{listings}
 \usepackage{etoolbox}
 \usepackage[labelsep=colon]{caption}
 \usepackage[numbers,square,sort&compress]{natbib}
-\usepackage[hidelinks]{hyperref}   % clickable TOC entries, no coloured boxes
+\usepackage[hidelinks]{hyperref}
 
 \definecolor{wordred}{HTML}{FF0000}
 \newcommand{\red}[1]{\textcolor{wordred}{#1}}
-
-% Inline identifiers, table names and SQL fragments. \cd is set ragged-right
-% inside its own group so that a long unbreakable identifier overhangs into the
-% inter-word space rather than into the page margin.
 \newcommand{\cd}[1]{\texttt{\small #1}}
 
-% Tables are set single-spaced. At 1.5 line spacing a fifteen-row table does
-% not fit on one page, and a float that cannot fit is silently pushed to the
-% end of the chapter.
 \AtBeginEnvironment{tabular}{\singlespacing}
-
-% Last-resort stretch so an unbreakable identifier at the end of a line does
-% not push into the margin.
 \setlength{\emergencystretch}{3em}
-
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{6pt}
 
-% ---------------- Code listing style ---------------------------------
-\definecolor{lstbg}{HTML}{F7F8FA}
-\definecolor{lstframe}{HTML}{C8CDD4}
-\definecolor{lstkw}{HTML}{2B6CB0}
-\definecolor{lstcomment}{HTML}{6B7A8D}
-\definecolor{lststring}{HTML}{2F855A}
+% Widows and orphans: a single line of a paragraph is never left alone at
+% the top or bottom of a page.
+\widowpenalty=10000
+\clubpenalty=10000
+\raggedbottom
 
+% ---------------- Code listings --------------------------------------
 \lstdefinestyle{report}{
-  backgroundcolor=\color{lstbg},
   basicstyle=\ttfamily\footnotesize,
-  keywordstyle=\color{lstkw}\bfseries,
-  commentstyle=\color{lstcomment}\itshape,
-  stringstyle=\color{lststring},
-  numbers=left, numberstyle=\ttfamily\tiny\color{lstcomment}, numbersep=8pt,
-  frame=single, rulecolor=\color{lstframe}, framesep=5pt,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape,
+  numbers=left, numberstyle=\ttfamily\tiny, numbersep=8pt,
+  frame=lines, framesep=4pt,
   xleftmargin=16pt, xrightmargin=2pt,
   breaklines=true, breakatwhitespace=true,
   showstringspaces=false, tabsize=2,
-  captionpos=b, aboveskip=10pt, belowskip=8pt,
+  captionpos=t, aboveskip=8pt, belowskip=6pt,
 }
 \lstset{style=report}
 \renewcommand{\lstlistingname}{Listing}
 
 % ---------------- Headers and footers --------------------------------
-% Front matter: centred roman page number only
 \fancypagestyle{front}{%
   \fancyhf{}
   \renewcommand{\headrulewidth}{0pt}
   \fancyfoot[C]{\thepage}}
-
-% Main chapters: CURRENT CHAPTER NAME (left, automatic) | Month, year (right)
-% Footer: Dept. of CSE, ASAI, Bengaluru (left) | Page | n (right)
 \fancypagestyle{main}{%
   \fancyhf{}
   \renewcommand{\headrulewidth}{0pt}
@@ -111,84 +88,71 @@
   \fancyhead[R]{\hffont\small\monthyear}
   \fancyfoot[L]{\hffont\small\vspace*{\baselineskip}Dept. of CSE, ASAI, Bengaluru}
   \fancyfoot[R]{\hffont\small Page | \thepage\vspace*{\baselineskip}}}
-\fancypagestyle{plain}{}          % chapter pages keep the same header
-
-\renewcommand{\chaptermark}[1]{\markboth{#1}{}}   % header = chapter title
+\fancypagestyle{plain}{}
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
 \renewcommand{\sectionmark}[1]{}
 
-% \chapter does NOT start a new page by itself. Put \clearpage before every
-% \chapter.
+% Every chapter starts on a new page (\clearpage is issued in each chapter
+% file, so no blank page is ever inserted after a short chapter).
 \makeatletter
 \renewcommand{\chapter}{\global\@topnum\z@\@afterindentfalse
   \secdef\@chapter\@schapter}
 \makeatother
 
 % ---------------- Headings -------------------------------------------
-% Chapter:  "CHAPTER - n"  and the title below, centred, bold, 14 pt
 \titleformat{\chapter}[display]
   {\normalfont\fontsize{14}{17}\bfseries\centering}
   {CHAPTER - \thechapter}{6pt}{\MakeUppercase}
 \titlespacing*{\chapter}{0pt}{0pt}{18pt}
-% Section 1.1 (bold 12 pt), Subsection 1.1.1 (bold 12 pt)
 \titleformat{\section}{\normalfont\fontsize{12}{14}\bfseries}{\thesection}{0.6em}{}
 \titlespacing*{\section}{0pt}{12pt}{6pt}
 \titleformat{\subsection}{\normalfont\fontsize{12}{14}\bfseries}{\thesubsection}{0.6em}{}
 \titlespacing*{\subsection}{0pt}{10pt}{4pt}
-\titleformat{\subsubsection}{\normalfont\fontsize{12}{14}\bfseries\itshape}{\thesubsubsection}{0.6em}{}
-\titlespacing*{\subsubsection}{0pt}{10pt}{4pt}
+\setcounter{secnumdepth}{2}
+\setcounter{tocdepth}{1}
 
-\setcounter{secnumdepth}{3}
-\setcounter{tocdepth}{2}          % TOC shows chapters, sections, subsections
-
-% ---------------- Table of Contents style ----------------------------
+% ---------------- Table of contents ----------------------------------
 \contentsmargin{0.5in}
 \newcommand{\tocdots}{\titlerule*[0.6pc]{.}}
-\titlecontents{chapter}[0pt]{\addvspace{3pt}}
+\titlecontents{chapter}[0pt]{\addvspace{4pt}}
   {CHAPTER \thecontentslabel\ -- \MakeUppercase}
-  {\hspace*{0.25in}\MakeUppercase}            % un-numbered entries
+  {\hspace*{0.25in}\MakeUppercase}
   {\tocdots\contentspage}
 \titlecontents{section}[0.95in]{}
-  {\contentslabel{0.45in}\MakeUppercase}{\MakeUppercase}
-  {\tocdots\contentspage}
-\titlecontents{subsection}[1.55in]{}
-  {\contentslabel{0.6in}\MakeUppercase}{\MakeUppercase}
+  {\contentslabel{0.45in}}{}
   {\tocdots\contentspage}
 \titlecontents{figure}[0.55in]{\addvspace{2pt}}
   {\contentslabel{0.55in}}{}{\tocdots\contentspage}
 \titlecontents{table}[0.55in]{\addvspace{2pt}}
   {\contentslabel{0.55in}}{}{\tocdots\contentspage}
-
 \renewcommand{\contentsname}{TABLE OF CONTENTS}
-\renewcommand{\listfigurename}{List Of Figures}
-\renewcommand{\listtablename}{List Of Tables}
+\renewcommand{\listfigurename}{LIST OF FIGURES}
+\renewcommand{\listtablename}{LIST OF TABLES}
 \renewcommand{\bibname}{REFERENCES}
 
 % ---------------- Captions -------------------------------------------
-\captionsetup[figure]{name=Fig., font=bf, labelfont=bf, skip=6pt}
-\captionsetup[table]{name=Table, font=bf, labelfont=bf, position=top, skip=6pt}
+\captionsetup[figure]{name=Fig., font=small, labelfont=bf, skip=6pt}
+\captionsetup[table]{name=Table, font=small, labelfont=bf, position=top, skip=6pt}
 
-% ---------------- References (IEEE style numbering "[1].") -----------
-\renewcommand{\bibnumfmt}[1]{[#1].}
-\setlength{\bibsep}{2pt}
+% ---------------- References -----------------------------------------
+\renewcommand{\bibnumfmt}[1]{[#1]}
+\setlength{\bibsep}{3pt}
 
-% Heading for un-numbered front-matter pages, also added to the TOC
 \newcommand{\frontchapter}[1]{%
   \clearpage\phantomsection
   \addcontentsline{toc}{chapter}{#1}%
   \chapter*{#1}}
 
 % =====================================================================
-%  EDIT THESE DETAILS
+%  DETAILS
 % =====================================================================
-\newcommand{\projecttitle}{Design and Implementation of a Fault-Tolerant,
-  Horizontally-Sharded Durable Execution Engine for Long-Running
-  Distributed Workflows}
-\newcommand{\monthyear}{December 2026}       % header (right) and title page
-\newcommand{\guidename}{<GUIDE NAME AND DESIGNATION>}
+\newcommand{\projecttitle}{Design, Implementation and Cloud Evaluation of a
+  Fault-Tolerant, Horizontally Sharded Durable Execution Engine}
+\newcommand{\monthyear}{December 2026}
+\newcommand{\guidename}{\red{<GUIDE NAME AND DESIGNATION>}}
 
 \begin{document}
 
-% "Page No." heading on the right of the Table of Contents
 \addtocontents{toc}{\protect\hfill\textbf{Page No.}\protect\par}
 
 % =====================================================================
@@ -196,113 +160,106 @@
 % =====================================================================
 \begin{titlepage}
 \centering
-\vspace*{0.6in}
+\vspace*{0.4in}
 {\fontsize{14}{17}\selectfont\bfseries \projecttitle\par}
 \vspace{10pt}
 A PROJECT REPORT\par
 \vspace{10pt}
 {\fontsize{14}{17}\selectfont\bfseries\itshape Submitted by\par}
-\vspace{14pt}
+\vspace{12pt}
 \begin{tabular}{@{}l@{\hspace{0.45in}}l@{}}
-\red{BL.EN.U4AID2-----} & \red{<NAME 1>}\\[16pt]
-\red{BL.EN.U4AID2-----} & \red{<NAME 2>}\\[16pt]
-\red{BL.EN.U4AID2-----} & \red{<NAME 3>}\\
+BL.EN.U4AID23007 & \red{<NAME 1>}\\[12pt]
+BL.EN.U4AID23031 & \red{<NAME 2>}\\[12pt]
+\red{BL.EN.U4AID230XX} & \red{<NAME 3>}\\[12pt]
+BL.EN.U4AID23065 & \red{<NAME 4>}\\
 \end{tabular}\par
-\vspace{18pt}
+\vspace{16pt}
 {\fontsize{14}{17}\selectfont\bfseries\itshape in partial fulfillment for the award of the degree of\par}
-\vspace{18pt}
+\vspace{16pt}
 {\fontsize{14}{17}\selectfont\bfseries BACHELOR OF TECHNOLOGY\par}
-\vspace{16pt}
+\vspace{12pt}
 {\small IN\par}
-\vspace{16pt}
+\vspace{12pt}
 ARTIFICIAL INTELLIGENCE AND DATA SCIENCE\par
-\vspace{12pt}
-\includegraphics[width=1.75in]{amrita_logo.png}\par
-\vspace{12pt}
+\vspace{10pt}
+\includegraphics[width=1.6in]{amrita_logo.png}\par
+\vspace{10pt}
 AMRITA SCHOOL OF ARTIFICIAL INTELLIGENCE, BENGALURU\par
-\vspace{12pt}
+\vspace{10pt}
 {\fontsize{14}{17}\selectfont AMRITA VISHWA VIDYAPEETHAM\par}
-\vspace{12pt}
+\vspace{10pt}
 BENGALURU 560 035\par
-\vspace{12pt}
+\vspace{10pt}
 \MakeUppercase{\monthyear}\par
 \end{titlepage}
 
 % =====================================================================
-%  FRONT MATTER  (roman page numbers)
+%  FRONT MATTER
 % =====================================================================
 \pagestyle{front}
 \pagenumbering{roman}
 \setcounter{page}{1}
 
-% ---------------- ACKNOWLEDGEMENTS -----------------------------------
 \frontchapter{ACKNOWLEDGEMENTS}
 \begin{spacing}{1.5}
 \setlength{\parindent}{0.5in}
-\indent The satisfaction that accompanies successful completion of any task would
-be incomplete without mention of people who made it possible, and whose
-constant encouragement and guidance have been source of inspiration
-throughout the course of this project work.
+\indent The satisfaction that accompanies the successful completion of any
+task would be incomplete without mention of the people who made it possible,
+and whose constant encouragement and guidance have been a source of
+inspiration throughout the course of this project work.
 
-We offer our sincere pranams at the lotus feet of \textbf{``AMMA'',
-MATA AMRITANANDAMAYI DEVI} who showered her blessing upon us throughout the
-course of this project work.
+We offer our sincere pranams at the lotus feet of \textbf{``AMMA'', MATA
+AMRITANANDAMAYI DEVI}, who showered her blessing upon us throughout the course
+of this project work.
 
 We owe our gratitude to \textbf{Prof. Manoj P.}, Director, Amrita Vishwa
 Vidyapeetham Bengaluru Campus. We would like to place our heartfelt gratitude
-to \textbf{Dr. Gopalakrishnan E.A.,} Principal, Amrita School of Computing and
-Amrita School of Artificial Intelligence, Bengaluru for his valuable support
+to \textbf{Dr. Gopalakrishnan E.A.}, Principal, Amrita School of Computing and
+Amrita School of Artificial Intelligence, Bengaluru, for his valuable support
 and inspiration.
 
 It is a great pleasure to express our gratitude and indebtedness to our
-project guide \red{\textbf{\guidename}}, Department of
-Computer Science and Engineering, Amrita School of Computing, Bengaluru for
-her/his valuable guidance, encouragement, moral support, and affection
-throughout the project work.
+project guide \textbf{\guidename}, Department of Computer Science and
+Engineering, Amrita School of Computing, Bengaluru, for the valuable guidance,
+encouragement, moral support and affection extended to us throughout the
+project work.
 
-We would like to thank express our gratitude to project panel members for
-their suggestions, encouragement, and moral support during the process of
-project work and all faculty members for their academic support. Finally,
-we are forever grateful to our parents, who have loved, supported and
-encouraged us in all our endeavors.
+We express our gratitude to the project panel members for their suggestions,
+encouragement and moral support during the course of the project, and to all
+faculty members for their academic support. Finally, we are forever grateful
+to our parents, who have loved, supported and encouraged us in all our
+endeavours.
 \end{spacing}
 
-% ---------------- ABSTRACT -------------------------------------------
 \frontchapter{ABSTRACT}
 \begin{spacing}{1.5}
-Long-running business processes --- placing an order, settling a payment,
-provisioning infrastructure, or driving a multi-step artificial-intelligence
-agent --- span many services and may take seconds or days to finish. Because
-their individual steps touch the outside world, a crash partway through leaves
-a system that keeps no durable record of progress only two possible outcomes,
-and both are incorrect: the completed work is lost, or it is repeated and a
-customer is charged twice. Industry has converged on \emph{durable execution
-engines} to eliminate this class of failure, but the mechanisms that make one
-work --- event sourcing, deterministic replay, partitioned ownership and
-fenced failover --- are seldom implemented from first principles in an
-academic setting, and existing engines each require between four and six
-cooperating infrastructure components. This report presents the design and
-implementation of \emph{durexec}, an original durable execution engine written
-in Go whose only infrastructure dependency is PostgreSQL. Every decision a
-workflow makes is appended to an immutable event log before it is acted upon;
-recovery is performed by re-executing the workflow function against that log,
-so a process resumes on a different machine at precisely the point the failed
-one reached. Execution is partitioned across a fixed set of shards by
-consistent hashing, and ownership of each shard is held as a renewable lease
-in a database row guarded by a monotonic fencing token that every mutating
-transaction re-verifies --- providing the safety property normally obtained
-from ZooKeeper or Raft without operating a second cluster. The engine further
-contributes a \emph{semantic idempotency} mechanism that compares the meaning,
-rather than the bytes, of an action an agent is about to perform against the
-actions already recorded in the workflow's own history, in order to suppress
-the re-worded duplicate side effects that exact-match deduplication provably
-cannot detect. The verdict is computed once and journalled as an event, which
-keeps replay deterministic, offline and auditable. This report covers the
-problem formulation, a survey of the 2020--2026 literature, the requirements
-analysis, and the complete high-level and low-level design of the engine.
+A long-running workflow, such as an order, a payment or a multi-step software
+agent, changes the state of several external services, and a crash part way
+through it either loses paid-for work or repeats work that must not happen
+twice. Durable execution engines prevent this by journalling every workflow
+decision and recovering by deterministic replay, but production engines depend
+on four to six infrastructure services. This report presents \emph{durexec}, a
+durable execution engine in Go whose only dependency is PostgreSQL. Workflows
+are hashed to a fixed set of shards; each shard is owned through a lease held
+in a database row, and a fencing token re-checked inside every write
+transaction stops a node that has lost its lease from committing. A journalled
+semantic check lets the engine recognise a reworded retry of an action already
+taken by a language-model agent. On Amazon EKS with three engine nodes and one
+PostgreSQL host, a closed-loop workload reached 131 workflows per second at a
+99th-percentile latency of 3.1~s, limited by database CPU, and the sustainable
+open-loop rate was about 100 workflows per second. Workers, shards and engine
+replicas changed throughput by at most 19\%, and extra replicas gave no gain
+while the database was the bottleneck. In sixteen fault-injection trials,
+covering engine termination, a 35~s process freeze, loss of database
+connections, a node drain and a database reboot, every accepted workflow
+completed, no journal invariant was violated and every write by a stale owner
+was rejected.
+
+\vspace{4pt}
+\textbf{Keywords:} durable execution, event sourcing, deterministic replay,
+leases, fencing tokens, sharding, fault tolerance, PostgreSQL.
 \end{spacing}
 
-% ---------------- AUTOMATIC LISTS ------------------------------------
 \clearpage
 {\linespread{0.95}\selectfont\tableofcontents}
 
@@ -315,23 +272,23 @@ analysis, and the complete high-level and low-level design of the engine.
 \listoftables
 
 % =====================================================================
-%  MAIN CHAPTERS  (arabic page numbers starting at 1)
+%  MAIN CHAPTERS
 % =====================================================================
 \clearpage
 \pagestyle{main}
 \pagenumbering{arabic}
 \setcounter{page}{1}
-\onehalfspacing   % body text: 1.5 line spacing, justified
+\onehalfspacing
 
-\input{parts/ch1}
-\input{parts/ch2}
-\input{parts/ch3}
-\input{parts/ch4}
-\input{parts/ch5to8}
+\InputIfFileExists{parts/ch1}{}{}
+\InputIfFileExists{parts/ch2}{}{}
+\InputIfFileExists{parts/ch3}{}{}
+\InputIfFileExists{parts/ch4}{}{}
+\InputIfFileExists{parts/ch5}{}{}
+\InputIfFileExists{parts/ch6}{}{}
+\InputIfFileExists{parts/ch7}{}{}
+\InputIfFileExists{parts/ch8}{}{}
 
-% =====================================================================
-%  REFERENCES
-% =====================================================================
 \input{parts/refs}
 
 \end{document}

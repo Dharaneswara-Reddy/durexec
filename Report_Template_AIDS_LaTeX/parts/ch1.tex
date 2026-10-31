@@ -1,372 +1,252 @@
 % =====================================================================
-%  CHAPTER 1 — INTRODUCTION
+%  CHAPTER 1 - INTRODUCTION
 % =====================================================================
 \clearpage
 \chapter{Introduction}
 
-\section{Introduction to Durable Execution}
+\section{Background}
 
-A substantial and growing fraction of modern software is not a request that is
-answered in milliseconds, but a \emph{process} that unfolds over time. Placing
-a food order charges a card, reserves stock, notifies a restaurant and
-dispatches a driver. Settling an invoice debits one ledger, credits another,
-issues a receipt and files a tax record. Provisioning a cluster allocates
-machines, attaches storage, installs software and registers health checks. An
-artificial-intelligence agent asked to arrange travel plans an itinerary,
-calls a booking tool, waits for a human to approve the result and then
-confirms it. These are all instances of the same computational shape: a
-multi-step process, spanning several independent services, whose steps have
-consequences in the real world, and whose total duration is measured not in
-milliseconds but in seconds, hours or days.
+Much of the software that runs a business is not a single request answered in
+milliseconds but a process that unfolds over seconds, hours or days. Placing a
+food order charges a card, reserves stock, notifies a restaurant and assigns a
+driver. Settling an invoice debits one ledger, credits another and files a tax
+record. An agent built on a large language model that is asked to arrange
+travel plans an itinerary, calls a booking service, waits for a person to
+approve the result and then confirms it. Each of these is a \emph{workflow}: a
+sequence of steps, spread over several independent services, in which every
+step depends on the results of the steps before it and most steps change the
+state of some system outside the workflow itself.
 
-Such a process is called a \emph{workflow}. The defining difficulty of a
-workflow is not its length but the combination of two properties. First, it
-is \emph{stateful}: step four is meaningful only in the context of what steps
-one through three decided. Second, its steps produce \emph{external side
-effects} that cannot be withdrawn by the system that caused them. Once a
-payment gateway has moved money, no amount of local rollback will unmove it.
-A database transaction has neither problem, because it is short enough to hold
-locks for its whole life and because its effects are confined to the database
-that can also undo them. A workflow has both.
+Two properties make workflows hard to run reliably. A workflow is stateful,
+because step four only makes sense in the light of what steps one to three
+decided. Its steps also have external side effects that the workflow cannot
+withdraw: once a payment provider has moved money, no local rollback can move
+it back. A database transaction has neither difficulty, since it is short
+enough to hold its locks throughout and its effects are confined to a system
+that can undo them. A workflow has both.
 
-The consequence is that an ordinary crash --- a process being killed, a
-machine losing power, a container being rescheduled --- becomes a correctness
-problem rather than an availability problem. Consider the order workflow
-interrupted immediately after the card has been charged and the stock
-reserved, but before the restaurant has been notified. A system that has kept
-no durable record of its own progress has exactly two options when it restarts,
-and Fig.~\ref{fig:crashdilemma} shows that both of them are wrong. It may
-begin the process again from the first step, in which case the card is charged
-a second time and the stock is reserved twice. Or it may abandon the process,
-in which case the customer's money has been taken, inventory is held against
-an order that will never be fulfilled, and no food is ever delivered. The
-first outcome duplicates work; the second loses it. There is no third option
-available to a system that does not remember what it had already done.
+As a result, an ordinary crash becomes a correctness problem. Suppose the
+order workflow is interrupted after the card has been charged and the stock
+reserved, but before the restaurant has been told. A system that has kept no
+durable record of its progress has two choices when it restarts. It can run
+the workflow again from the beginning, charging the card a second time, or it
+can abandon the workflow, keeping the customer's money for an order that will
+never be delivered. Without a record of what was already done, there is no
+correct third option.
 
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\linewidth]{figures/fig_1_1_crash_dilemma.png}
-  \caption{The two incorrect outcomes available to a system that keeps no
-    durable record of workflow progress. Restarting the process duplicates
-    side effects that have already happened; abandoning it loses the work
-    that remains. Neither is acceptable when the completed steps have moved
-    money.}
-  \label{fig:crashdilemma}
-\end{figure}
+The usual responses in practice are retry loops, periodic jobs that poll a
+status column, and message queues whose consumers record progress in
+application tables. Each works for the workflow it was written for, and each
+must be written again for the next one. \emph{Durable execution} is the name
+given to systems that solve the problem once for every workflow built on
+them~\cite{temporaldocs, restatedocs}. The idea on which they rest, and on
+which this report rests, is that \emph{every decision a workflow makes is
+appended to a log before it is acted on, and recovery is performed by running
+the workflow's own code again against that log.} Completed steps return their
+recorded results instead of executing a second time, so the re-executed code
+arrives at the point the failed process had reached. Because nothing private
+to one machine is part of the workflow's state, the recovery can take place on
+a different machine.
 
-The practical responses to this problem in ordinary engineering practice are
-ad-hoc retry loops, cron jobs that poll a status column, and message queues
-whose consumers track progress in hand-written application tables. Each of
-these works for a particular workflow and fails for the next one, because the
-recovery logic is written once per process rather than once per system. A
-2026 study of data-oriented workflow systems quantified the resulting burden
-directly, observing that in such applications ``the forward logic is 10\% of
-the application while the error and oops logic are 90\%''~\cite{acdc2026}.
-Nine-tenths of the code exists to handle the ways things go wrong.
-
-\emph{Durable execution} is the name given to the class of systems that solve
-this problem once, generically, for every workflow written on top of them. The
-central idea is deceptively simple, and is stated here because the whole of
-this report follows from it:
-
-\begin{quote}
-\textbf{Every decision a workflow makes is written to an append-only log
-before it is acted upon, and recovery is performed by re-executing the
-workflow's own code against that log.}
-\end{quote}
-
-Because the log is written first, nothing that has happened in the outside
-world can be absent from the record for long. Because recovery is a
-re-execution rather than a restoration of saved memory, the engine does not
-need to snapshot stacks, threads or heaps: it replays the function, the
-completed steps return their recorded results instead of running again, and
-the program counter arrives naturally at the point the failed machine had
-reached. A workflow interrupted on one machine can therefore resume on a
-completely different machine, because nothing machine-local was ever part of
-its state.
+Table~\ref{tab:terminology} fixes the terms used throughout the report.
 
 \begin{table}[htbp]
   \centering
-  \caption{Terminology used precisely and consistently throughout this report}
+  \caption{Terminology used in this report}
   \label{tab:terminology}
   \small
-  \begin{tabular}{@{}p{1.2in}p{3.9in}@{}}
+  \begin{tabular}{@{}p{1.15in}p{4.4in}@{}}
     \toprule
-    \textbf{Term} & \textbf{Meaning as used in this report} \\
+    \textbf{Term} & \textbf{Meaning} \\
     \midrule
-    Workflow & The orchestration code. It decides \emph{what} happens next and
-      performs no input or output of its own. It must be deterministic, because
-      it is executed once for every recovery. \\
-    Activity & A single step with a real-world side effect --- charge a card,
-      call an API, send an email. It may be non-deterministic and is executed
-      at-least-once. \\
-    Event & An immutable record appended to the log, describing something that
-      has already happened. Events are never updated or deleted. \\
-    History & The ordered sequence of all events for one workflow execution.
-      It is the complete state of that workflow. \\
-    Replay & Re-executing the workflow function against its recorded history so
-      that completed steps resolve from the log rather than running again. \\
-    Shard & One of a fixed number of partitions. Every workflow belongs to
-      exactly one shard for its entire life. \\
-    Lease & A time-limited claim on a shard, held in a database row and renewed
-      periodically, that makes one node the shard's owner. \\
-    Fencing token & A counter that increases on every change of ownership, used
-      to prove that a writer still owns what it is writing to. \\
-    Saga & A multi-step transaction that is undone, when it fails partway, by
+    Workflow & Orchestration code that decides what happens next and performs
+      no input or output itself. It must be deterministic, because it is
+      re-executed on every recovery. \\
+    Activity & One step with an external side effect, such as charging a card
+      or calling an API. It may be non-deterministic and runs at least once. \\
+    Event & An immutable record appended to the log describing something that
+      has already happened. \\
+    History & The ordered events of one workflow run; the complete state of
+      that run. \\
+    Replay & Re-executing a workflow against its history so that completed
+      steps resolve from the log. \\
+    Shard & One of a fixed number of partitions. A workflow belongs to one
+      shard for its whole life. \\
+    Lease & A time-limited claim on a shard, held in a database row and
+      renewed periodically, that makes one node the owner of the shard. \\
+    Fencing token & A counter that increases whenever ownership of a shard
+      changes; a write is accepted only with the current value. \\
+    Saga & A multi-step transaction that, if it fails part way, is undone by
       running a compensating action for each step that had succeeded. \\
-    Idempotency & The property that performing an action twice has the same
-      effect as performing it once. \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The industry has converged on this approach. Uber's Cadence executes on the
-order of twelve billion task runs per month for rides and food delivery;
-Netflix's Conductor drives video encoding pipelines that run for days; Temporal
-has become the de-facto commercial standard; and Restate offers a more recent,
-log-native formulation of the same idea. The academic lineage is equally
-clear: the DBOS line of work from Stanford and MIT has argued since 2022 that
-durable execution belongs inside the database rather than outside
-it~\cite{dbos2022, dbos2025}, and R3 gave a formal treatment of
-record-and-replay for database-backed applications~\cite{r3vldb2023}.
-
-What is far less well established is how such an engine is built. The internal
-mechanisms --- how the log is partitioned, how a workflow's state is
-reconstructed deterministically, how ownership of a partition moves safely
-between machines when one of them dies --- are rarely implemented from first
-principles, even in distributed-systems coursework that covers replication,
-partitioning and consensus in the abstract. This project closes that gap by
-designing and building such an engine rather than by using one.
+Industry has adopted this approach widely. Uber's Cadence and its successor
+Temporal run very large numbers of workflows for ride and delivery
+systems~\cite{temporaldocs}; Microsoft's Durable Functions provide the same
+model for serverless code~\cite{durablefunctions2021}; and the DBOS project
+argues that durable execution belongs inside the database rather than in a
+separate service~\cite{dbos2022, r3vldb2023}. The internal mechanisms of such
+an engine, namely how the log is partitioned, how state is reconstructed
+deterministically and how ownership of a partition moves safely between
+machines when one fails, are less often built from first principles. This
+project builds one, and evaluates it on a cloud cluster under load and under
+injected failures.
 
 \section{Motivation}
 
-Three observations motivate this work.
+\subsection{Existing engines depend on several services}
 
-\subsection{Existing engines require a great deal of infrastructure}
+The production engines surveyed for this work each require four to six
+cooperating infrastructure components. Netflix's Conductor uses a database,
+a search cluster, a queue, a server tier and a worker fleet. Temporal runs
+four internal services over a database and, for visibility queries, a search
+cluster~\cite{temporaldocs}. Meta's Shard Manager, which assigns partitions
+across very large fleets, relies on ZooKeeper for coordination~\cite{shardmanager2021,
+zookeeper2010}. Each additional component is a separate failure domain that
+must be configured, monitored and understood during an incident, and for a
+small deployment the orchestration system can cost more to operate than the
+application it serves. This project asks whether the same guarantees can be
+provided with a single dependency.
 
-Every production durable execution system surveyed for this project requires
-between four and six cooperating infrastructure components. Netflix's
-Conductor needs a database, an Elasticsearch cluster, a message queue, a
-central server and a worker fleet. Apache Airflow needs PostgreSQL, Redis or
-RabbitMQ, a scheduler process and Celery workers. Meta's Shard Manager, which
-partitions work across roughly a million machines, still requires ZooKeeper as
-a separate coordination service~\cite{shardmanager2021}.
-Fig.~\ref{fig:depcount} puts these counts side by side.
+\subsection{Partitioning and simplicity are usually traded off}
 
-Each additional component is an independent failure domain, an additional
-thing to configure, monitor, upgrade and reason about during an incident. For
-a small deployment the operational cost of the orchestration system can easily
-exceed the cost of the application it orchestrates. The question this project
-asks is whether the guarantees can be preserved while the dependency count is
-reduced to one.
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\linewidth]{figures/fig_1_2_dependency_count.png}
-  \caption{Infrastructure components required by published workflow
-    orchestrators, compared with the engine designed in this report. Counts are
-    taken from each system's own deployment documentation and are listed again,
-    with sources, in Table~\ref{tab:orchestrators}.}
-  \label{fig:depcount}
-\end{figure}
-
-\subsection{Horizontal partitioning and operational simplicity are usually
-  traded against one another}
-
-The systems that are simple are not partitioned, and the systems that are
-partitioned are not simple. DBOS and the AC/DC work that builds on it obtain
-durable execution with very few moving parts, but run on a single
-node~\cite{dbos2025, acdc2026}. Temporal, Cadence and Shard Manager partition
-execution across machines, but reintroduce either a dedicated coordination
-cluster or a multi-service control plane in order to decide who owns what.
-This project takes the position that the two properties are not in fact in
+The simple systems are not partitioned and the partitioned systems are not
+simple. DBOS obtains durable execution with very few moving parts but runs on
+one node~\cite{dbos2022}; Temporal and Shard Manager partition work across
+machines but add a coordination service or a multi-service control plane to
+decide which machine owns what. Our position is that the two need not be in
 tension, because a relational database already provides the linearizable
-compare-and-swap that partition ownership requires. What is needed is not a
-consensus cluster but a correctly designed use of one database row --- a claim
-developed in detail in Section~4.1.5.
+compare-and-swap that partition ownership requires~\cite{leases1989,
+kleppmann2017}. What is needed is a careful use of one row per shard rather
+than a consensus cluster~\cite{raft2014}.
 
-\subsection{Agent-driven workflows break the assumption behind deduplication}
+\subsection{Agents defeat byte-level deduplication}
 
-The third motivation is newer, and is the research contribution of this work.
-Every durable execution engine prevents duplicate side effects by recognising
-a repeated request. Every one of them recognises it by comparing the request's
-\emph{bytes} --- a hash, an idempotency key, an exact match on recorded
-arguments. That technique is sound when the arguments are frozen at the moment
-the step was first scheduled, which is exactly the case for an engine-driven
-retry.
-
-It is not sound when the caller is a large-language-model agent. When such an
-agent crashes and recovers, it does not replay a frozen argument list: it
-\emph{re-plans}. A planning step that runs again at a non-zero sampling
-temperature produces a semantically equivalent instruction expressed in
-different words. An agent that had decided to book a flight described as
-``BLR$\rightarrow$DEL Friday morning'' may, after recovery, re-issue the same
-intent as ``Bangalore to Delhi, Friday AM''. The two strings hash differently,
-every exact-match check passes them as distinct, and the flight is booked
-twice. This failure mode is not hypothetical; large-scale empirical studies of
-multi-agent system failures identify step repetition as a recurring, measured
-category~\cite{whyfail2025, wherefail2025}, and the Microsoft AI Red Team's
-taxonomy of agentic failure modes documents the same
-class~\cite{msredteam2025}. Chapter~2 develops the point in full, and
-Section~4.2.10 gives the design that addresses it.
+Durable execution engines prevent duplicate side effects by recognising a
+repeated request, and they recognise it by comparing bytes: a hash, an
+idempotency key or an exact match on recorded arguments. This is sound when
+the arguments are fixed at the moment a step is first scheduled. It is not
+sound when the caller is a language-model agent, which after a crash
+\emph{re-plans} rather than replays: an instruction recorded as
+``BLR$\rightarrow$DEL Friday morning'' may be issued again as ``Bangalore to
+Delhi, Friday AM''. The two strings hash differently and the flight is booked
+twice. Step repetition of this kind appears as a recurring category in
+empirical studies of multi-agent failures~\cite{whyfail2025} and in
+Microsoft's taxonomy of agentic failure modes~\cite{msredteam2025}.
 
 \section{Problem Statement}
 
-The problem addressed by this project is stated as follows.
+The problem addressed in this work is to design and implement a horizontally
+sharded durable execution engine that runs long, multi-step workflows to
+completion despite process crashes, node failures and partial failures, using
+event sourcing, deterministic replay, idempotent activity execution and
+lease-based ownership; that is deployable on a small cluster with PostgreSQL
+as its only infrastructure dependency; that detects semantically equivalent
+repeated actions issued by a recovering agent before the side effect occurs a
+second time; and to measure its throughput, its sensitivity to its main
+configuration parameters, and its recovery from injected faults on real cloud
+infrastructure.
 
-\begin{quote}
-To design and implement a horizontally-sharded, replicated durable execution
-engine that guarantees long-running, multi-step workflows execute reliably to
-completion --- surviving worker crashes, node failures and partial failures ---
-through event sourcing, deterministic replay, idempotent activity execution and
-lease-based fault tolerance, deployable across a small multi-node cluster
-without requiring specialised or large-scale infrastructure; and to extend its
-deduplication mechanism so that semantically equivalent but textually different
-repeated actions, of the kind produced by a recovering AI agent, are detected
-before the corresponding side effect is performed a second time.
-\end{quote}
-
-Two parts of that statement deserve emphasis because they bound the work
-honestly. The engine targets \emph{correctness and fault tolerance at a
-moderate, demonstrable scale} rather than hyperscale throughput, which is
-outside the reach of a single-developer academic project. And ownership
-consensus is obtained through a lease-renewal mechanism backed by a
-linearizable database, not through a full Raft implementation, which is noted
-in Section~1.5 as a limitation and a possible extension.
+Two limits are part of the statement. The engine targets correctness and fault
+tolerance at a moderate, measurable scale rather than the throughput of
+large production deployments. Ownership is obtained from a lease in a
+linearizable database rather than from a consensus protocol, which makes the
+database the availability floor of the system.
 
 \section{Objectives}
 
-The project is organised around nine objectives. Table~\ref{tab:objectives}
-maps each to the mechanism that realises it and to the section of this report
-in which that mechanism is designed.
+The work has eight objectives, listed in Table~\ref{tab:objectives} with the
+mechanism that realises each and the chapter in which it is evaluated.
 
 \begin{table}[htbp]
   \centering
-  \caption{Project objectives, the mechanism realising each, and where each is
-    designed in this report}
+  \caption{Project objectives}
   \label{tab:objectives}
   \small
-  \begin{tabular}{@{}p{0.18in}p{2.45in}p{1.45in}p{0.62in}@{}}
+  \begin{tabular}{@{}p{0.2in}p{2.75in}p{1.65in}p{0.75in}@{}}
     \toprule
-    \textbf{\#} & \textbf{Objective} & \textbf{Mechanism} & \textbf{Section} \\
+    \textbf{No.} & \textbf{Objective} & \textbf{Mechanism} & \textbf{Evaluated} \\
     \midrule
-    1 & Persist every workflow state transition as an immutable, append-only
-        event, enabling exact reconstruction after failure
-      & Event log with a composite primary key & 4.2.1 \\
-    2 & Resume a crashed or restarted worker from recorded history rather than
-        from the beginning
-      & Deterministic replay keyed on program order & 4.2.2--4.2.3 \\
-    3 & Ensure external side effects are never duplicated across retries
-      & Stable dedup keys; crash-window analysis & 4.2.8 \\
-    4 & Partition workflow execution across nodes and scale horizontally as
-        nodes join or leave
-      & Fixed shard count plus a consistent hash ring & 4.1.4 \\
-    5 & Ensure the failure of a shard-owning node loses no progress
-      & Leases with monotonic fencing tokens & 4.1.5 \\
-    6 & Replicate each shard's event log so a database failure is survivable
-      & PostgreSQL streaming replication & 4.1.6 \\
-    7 & Compensate multi-step transactions that fail partway
-      & Saga with LIFO compensation & 4.2.9 \\
-    8 & Detect semantically duplicate agent actions before they execute
-      & Journalled embedding-similarity verdict & 4.2.10 \\
-    9 & Observe and benchmark the system under induced failure
-      & Prometheus metrics and a fault injector & 3.1, 4.1.2 \\
+    1 & Record every state transition as an immutable event so that a run can
+        be reconstructed exactly & Append-only event log & Ch.~6, 7 \\
+    2 & Resume a failed run from its history rather than from the start &
+        Deterministic replay & Ch.~6, 7 \\
+    3 & Never repeat an external side effect across retries & Stable
+        deduplication keys & Ch.~6 \\
+    4 & Partition execution across nodes & Fixed shards, consistent-hash
+        ring & Ch.~7 \\
+    5 & Lose no progress when a shard owner fails & Leases with fencing
+        tokens & Ch.~7 \\
+    6 & Undo multi-step transactions that fail part way & Saga
+        compensation & Ch.~6 \\
+    7 & Detect reworded duplicate agent actions & Journalled semantic
+        verdict & Ch.~6 \\
+    8 & Measure capacity, sensitivity and recovery on cloud hardware & EKS
+        test bed, fault injector & Ch.~7 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \section{Scope and Limitations}
 
-The scope of this project is the engine itself and two demonstration
-applications built on it. Stating the limitations plainly at the outset is
-deliberate: several of them are consequences of design decisions defended in
-Chapter~4, and a reader who knows them in advance will read those defences
-more critically.
+The scope is the engine, two demonstration applications built on it, and the
+test bed used to evaluate it. The main limitations are stated here so that the
+design and the results can be read with them in mind.
 
 \begin{enumerate}[leftmargin=*, itemsep=2pt]
-  \item \textbf{This is at-least-once execution with strong deduplication, not
-    exactly-once execution.} A crash occurring after a side effect has been
-    performed but before it has been recorded is indistinguishable, from the
-    engine's point of view, from a crash occurring before the side effect. No
-    system that crosses a process boundary can eliminate this window. The
-    engine's contribution is to generate a stable deduplication key that the
-    downstream resource can use to close it. This is analysed in
-    Section~4.2.8.
-  \item \textbf{Shards share one database instance}, separated by a shard
-    identifier column, rather than each having a database of its own. Every key
-    already carries the shard identifier, so a per-database deployment is a
-    change of configuration rather than of schema, but it has not been built.
-  \item \textbf{Ownership is not consensus.} The design relies on PostgreSQL as
-    a single linearizable source of truth for the ownership record. This is a
-    legitimate and deliberate position, and it is the same one DBOS takes, but
-    it moves the coordination problem into the database rather than eliminating
-    it, and it makes the database the availability floor.
-  \item \textbf{The event log has no garbage collection} and grows without
-    bound. Retention and archival are future work.
-  \item \textbf{Semantic idempotency is opt-in and conservative.} Its failure
-    modes are asymmetric: a false negative merely matches the exact-match
-    baseline, whereas a false positive silently suppresses an action the user
-    genuinely wanted. The design therefore defaults to exact matching, requires
-    the semantic mode to be requested per activity, and journals every verdict
-    for audit. Section~4.2.10 treats this asymmetry as a designed constraint
-    rather than a defect to be hidden.
-  \item \textbf{Measurement is performed on a single development host} running
-    containers, not on a data-centre cluster. Absolute throughput measured in
-    this environment is therefore not comparable with published figures from
-    production systems. What is comparable, and what this project reports, is
-    the \emph{shape} of scaling behaviour and the \emph{counts} of lost and
-    duplicated work, neither of which depends on hardware.
+  \item The engine provides at-least-once execution of activities with strong
+    deduplication, not exactly-once execution. A crash after a side effect has
+    happened but before it has been recorded cannot be told apart from a crash
+    before the side effect. The engine supplies a stable deduplication key
+    that the downstream service can use to close this window.
+  \item Ownership relies on PostgreSQL as the single source of truth. The
+    cloud evaluation used one database host with no standby, so it says
+    nothing about database high availability.
+  \item The event log is never garbage collected; retention is future work.
+  \item Semantic deduplication is opt-in and conservative. A false negative is
+    no worse than exact matching, but a false positive would suppress an
+    action the user wanted, so the semantic mode must be requested per
+    activity and every verdict is journalled.
+  \item All cloud measurements come from one availability zone on burstable
+    (``flex'') instance types, over individual runs of a few minutes. They
+    establish the shape of the behaviour on this configuration, not absolute
+    capacity for other hardware.
 \end{enumerate}
 
 \section{Contributions}
 
-The contributions of this work are the following.
+The contributions of this work are as follows.
 
 \begin{enumerate}[leftmargin=*, itemsep=2pt]
-  \item \textbf{A durable execution engine with exactly one infrastructure
-    dependency.} Event sourcing, deterministic replay, a durable task queue,
-    durable timers, signals, sagas and shard failover are all implemented over
-    PostgreSQL alone, with no message broker, no coordination service and no
-    consensus cluster.
-  \item \textbf{Persistence-layer fencing.} Shard ownership safety is obtained
-    by re-verifying a monotonic fencing token inside the same transaction as
-    every write, using \cd{SELECT \ldots{} FOR UPDATE} to serialise the check
-    against the write. This yields the property normally supplied by ZooKeeper
-    --- a node that has lost ownership cannot mutate shard state regardless of
-    what it believes --- without a second cluster to operate.
-  \item \textbf{A two-level mapping that makes rebalancing an ownership
-    handoff.} Workflows are hashed to a fixed number of shards and shards are
-    assigned to nodes by a consistent hash ring. Because the first mapping never
-    changes, adding a node moves ownership of a minority of shards and migrates
-    no data at all.
-  \item \textbf{Semantic idempotency as a journalled decision.} The engine
-    compares the \emph{meaning} of an action an agent is about to take against
-    the actions already in the workflow's own history, and suppresses the
-    duplicate before the side effect occurs. The non-deterministic verdict is
-    computed once and written to the log, so replay is deterministic, requires
-    no network access, and every suppression is auditable from a row. To the
-    authors' knowledge no existing durable execution engine inspects workflow
-    history in this way.
-  \item \textbf{An explicit account of what the design does not achieve},
-    including the irreducible crash window, the asymmetric false-positive
-    behaviour of the semantic check, and a database failover time that is
-    worse than published work.
+  \item A durable execution engine in which event sourcing, replay, a durable
+    task queue, timers, signals, sagas and shard failover are implemented over
+    PostgreSQL alone, with no message broker or coordination service.
+  \item Fencing at the persistence layer: every transaction that writes shard
+    state re-reads the shard's fencing token with \cd{SELECT ... FOR UPDATE}
+    and commits only if the token is still the writer's. On the cloud test bed
+    this rejected every write attempted by a stale owner after a process
+    freeze.
+  \item A two-level mapping in which workflows hash to a fixed set of shards
+    and shards are assigned to nodes by a consistent-hash ring, so that a
+    change of membership moves ownership but no data.
+  \item A semantic idempotency check that compares the meaning of an agent's
+    intended action with the actions already in the run's history and
+    journals the verdict, keeping replay deterministic and auditable.
+  \item A cloud evaluation on Amazon EKS covering idle overhead, latency
+    floor, closed- and open-loop capacity, sensitivity to workers, shards and
+    replicas, and recovery from six classes of injected fault, together with
+    the evaluation harness and its validity checks.
 \end{enumerate}
 
 \section{Organisation of the Report}
 
-The remainder of this report is organised as follows.
-\textbf{Chapter~2} surveys the 2020--2026 literature across the six areas this
-work touches --- durable execution, partition management, ownership and
-coordination, compensation, agent failure modes and semantic similarity ---
-and identifies the research gap precisely.
-\textbf{Chapter~3} derives the functional and non-functional requirements,
-specifies the software and hardware the system needs, and records the
-assumptions and constraints under which it was built and measured.
-\textbf{Chapter~4} presents the system design: Section~4.1 gives the
-high-level architecture, the principles it follows and the alternatives
-rejected, and Section~4.2 gives the low-level design --- the data model, the
-execution loop, the concurrency mechanism, the failure analysis and the
-semantic deduplication decision path.
-\textbf{Chapters~5 through~8} cover implementation, testing, results and
-conclusions, and are the subject of the subsequent phase of the project.
+Chapter~2 reviews related work on durable execution, partition management,
+ownership and fencing, sagas, and semantic similarity, and identifies the gap
+this work addresses. Chapter~3 states the requirements and the analysis that
+led to the chosen approach. Chapter~4 presents the high-level and low-level
+design. Chapter~5 describes the implementation and Chapter~6 the testing
+methodology, including the cloud test bed and the fault-injection procedure.
+Chapter~7 reports and discusses the results, and Chapter~8 concludes and
+outlines future work.
