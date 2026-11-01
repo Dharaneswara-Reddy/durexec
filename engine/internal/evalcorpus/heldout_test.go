@@ -24,3 +24,13 @@ func TestHeldOutIsBalanced(t *testing.T) {
 	}
 	t.Logf("held-out: 300 pairs, 150 duplicate, %d hard negatives", hard)
 }
+
+func TestHeldOut2IsBalanced(t *testing.T) {
+	pairs, err := HeldOut2()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pairs) != 300 {
+		t.Fatalf("second held-out corpus has %d pairs, want 300", len(pairs))
+	}
+}

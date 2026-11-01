@@ -120,6 +120,9 @@ func load(name, rephraseCSV string) ([]pair, error) {
 	case "heldout":
 		ps, err := evalcorpus.HeldOut()
 		return conv("heldout-300", ps), err
+	case "heldout2":
+		ps, err := evalcorpus.HeldOut2()
+		return conv("heldout2-300", ps), err
 	case "rephrase":
 		return loadRephrase(rephraseCSV)
 	}
