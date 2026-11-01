@@ -1,6 +1,9 @@
 package semantic
 
 import (
+	"context"
+	"encoding/json"
+
 	"testing"
 
 	"github.com/dharaneswar339/durexec/internal/core"
@@ -46,5 +49,34 @@ func TestGenericV2IsSymmetricOnCorpusShapes(t *testing.T) {
 		if x.Verdict != y.Verdict {
 			t.Errorf("asymmetric: %s vs %s", x.Verdict, y.Verdict)
 		}
+	}
+}
+
+func TestCheckerPairwisePath(t *testing.T) {
+	store := &memIntents{}
+	var run core.RunID
+	store.rows = append(store.rows, core.Intent{ShardID: 1, WorkflowID: "w", RunID: run, ScheduledSeq: 4,
+		ActivityType: "SendPayment", IntentText: "pay acme supplies 4500 inr"})
+	c := NewChecker(nil, store)
+	c.Pairwise = GenericV2Compare
+	c.RenderIntent = func(_ string, in json.RawMessage) (string, error) {
+		var s string
+		err := json.Unmarshal(in, &s)
+		return s, err
+	}
+	check := func(text string) core.DedupEvaluated {
+		in, _ := json.Marshal(text)
+		ev, err := c.Check(context.Background(), CheckRequest{ShardID: 1, WorkflowID: "w", RunID: run,
+			ActivityType: "SendPayment", K: 7, Input: in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ev
+	}
+	if ev := check("send inr 4,500 to acme supplies"); ev.Verdict != core.VerdictDuplicate || ev.MatchedK == NoMatch {
+		t.Fatalf("reworded repeat: %+v", ev)
+	}
+	if ev := check("pay borzoi freight 4500 inr"); ev.Verdict == core.VerdictDuplicate {
+		t.Fatalf("different payee suppressed: %+v", ev)
 	}
 }

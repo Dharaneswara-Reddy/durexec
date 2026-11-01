@@ -92,6 +92,13 @@ type Checker struct {
 	// that knows its own shape can hand over just the sentence.
 	RenderIntent func(activityType string, input json.RawMessage) (string, error)
 
+	// Pairwise, when set, answers the duplicate question by comparing this
+	// call's intent text with each prior call's directly, with no embedding
+	// and no threshold: generic-v2 (GenericV2Compare). It takes precedence
+	// over Fields. The verdict and the comparator's explanation are journaled
+	// like any other, so replay needs nothing but the log.
+	Pairwise func(activityType, mine, theirs string) PairVerdict
+
 	// Fields turns on the HYBRID comparator: deciding fields compared
 	// exactly, similarity reserved for the free text around them. Nil, the
 	// default, leaves the pure-semantic path below completely untouched —
@@ -224,6 +231,9 @@ func (c *Checker) Check(ctx context.Context, req CheckRequest) (core.DedupEvalua
 
 	// Which comparator answers is decided here and nowhere else, so the two
 	// paths cannot drift into sharing half a decision.
+	if c.Pairwise != nil {
+		return c.checkPairwise(ctx, req, text, base, start)
+	}
 	if c.Fields != nil {
 		return c.checkHybrid(ctx, req, th, text, base, start)
 	}
@@ -335,4 +345,50 @@ func (c *Checker) renderIntent(activityType string, input json.RawMessage) (stri
 		}
 	}
 	return IntentText(activityType, input)
+}
+
+// checkPairwise is the generic-v2 path: every prior completed call of the same
+// activity type in this run is compared with this one directly. A DUPLICATE
+// against any of them wins (the one sharing most wins a tie); failing that an
+// ESCALATE stands; otherwise the call is DISTINCT. No model is consulted.
+func (c *Checker) checkPairwise(
+	ctx context.Context, req CheckRequest, text string, base core.DedupEvaluated, start time.Time,
+) (core.DedupEvaluated, error) {
+	cands, err := c.Intents.Candidates(ctx, req.ShardID, req.WorkflowID, req.RunID, req.ActivityType)
+	if err != nil {
+		return core.DedupEvaluated{}, fmt.Errorf("semantic: load candidates: %w", err)
+	}
+	ev := base
+	ev.Model = "generic-v2"
+	if len(cands) == 0 {
+		ev.Detail = "generic-v2: first " + req.ActivityType + " in this run"
+		c.observe(req.ActivityType, ev.Verdict, start)
+		return ev, nil
+	}
+	var best *core.Intent
+	var bestV PairVerdict
+	rank := func(v core.DedupVerdict) int {
+		switch v {
+		case core.VerdictDuplicate:
+			return 2
+		case core.VerdictEscalate:
+			return 1
+		}
+		return 0
+	}
+	for i := range cands {
+		v := c.Pairwise(req.ActivityType, text, cands[i].IntentText)
+		if best == nil || rank(v.Verdict) > rank(bestV.Verdict) ||
+			(rank(v.Verdict) == rank(bestV.Verdict) && v.Shared > bestV.Shared) {
+			best, bestV = &cands[i], v
+		}
+	}
+	ev.Verdict = bestV.Verdict
+	ev.Detail = bestV.Reason
+	if ev.Verdict != core.VerdictDistinct {
+		ev.MatchedK = req.matchedK(best.ScheduledSeq)
+		ev.Similarity = 1
+	}
+	c.observe(req.ActivityType, ev.Verdict, start)
+	return ev, nil
 }

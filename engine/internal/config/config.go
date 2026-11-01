@@ -129,6 +129,9 @@ type Config struct {
 	// SemanticFields picks the deciding-field extractor the hybrid comparator
 	// uses: "itinerary" (the flight vocabulary, the default) or "generic"
 	// (value shapes, any domain). Ignored unless SemanticHybrid is on.
+	// "generic-v2" and "generic-v2-places" replace the hybrid comparator with
+	// the pairwise generic-v2 check (internal/idem/semantic/generic2.go),
+	// which needs no embedding model.
 	SemanticFields string
 
 	// SemanticGate is "strict" (a field stated on one side only is a
@@ -349,10 +352,10 @@ func LoadFrom(lookup func(string) (string, bool)) (Config, error) {
 
 	if v, ok := get(EnvSemanticFields); ok {
 		switch v {
-		case "itinerary", "generic":
+		case "itinerary", "generic", "generic-v2", "generic-v2-places":
 			cfg.SemanticFields = v
 		default:
-			errs = append(errs, fmt.Errorf("%s=%q must be itinerary or generic", EnvSemanticFields, v))
+			errs = append(errs, fmt.Errorf("%s=%q must be itinerary, generic, generic-v2 or generic-v2-places", EnvSemanticFields, v))
 		}
 	}
 	if v, ok := get(EnvSemanticGate); ok {

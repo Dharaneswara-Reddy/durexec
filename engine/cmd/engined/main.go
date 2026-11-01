@@ -288,7 +288,15 @@ func run() error {
 	// recover. An activity whose intent it cannot read falls back to the
 	// pure-semantic comparison and journals that it did — see
 	// internal/idem/semantic/hybrid.go.
-	if cfg.SemanticHybrid {
+	switch cfg.SemanticFields {
+	case "generic-v2":
+		checker.Pairwise = semantic.GenericV2Compare
+		log.Info(ctx, "semantic dedup: generic-v2 pairwise comparator enabled", "places", false)
+	case "generic-v2-places":
+		checker.Pairwise = semantic.GenericV2PlacesCompare
+		log.Info(ctx, "semantic dedup: generic-v2 pairwise comparator enabled", "places", true)
+	}
+	if cfg.SemanticHybrid && checker.Pairwise == nil {
 		checker.Fields = semantic.ItineraryFields
 		fields := "itinerary (route, when, daypart, pax)"
 		if cfg.SemanticFields == "generic" {
