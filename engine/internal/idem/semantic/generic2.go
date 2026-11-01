@@ -548,11 +548,13 @@ func g2Analyse(activityType, text string) g2Analysis {
 			}
 			// The noun a count counts ("one seat", "3 passengers", "two
 			// people") names the unit, not the thing: rewordings change it
-			// freely while the number carries the fact.
-			if i == countedAt {
+			// freely while the number carries the fact. Only an ordinary
+			// English word can be such a unit; "50 INFY" or "x60,
+			// Indiranagar" is a count followed by a NAME, which is kept.
+			if i == countedAt && wordnet.Known(t) {
 				continue
 			}
-			if frame[t] || g2IsFrameSynonym(t, frame) {
+			if frame[t] || g2IsFrameInflection(t, frame) {
 				an.frameHit = true
 				continue
 			}
@@ -649,6 +651,21 @@ func g2IsEndpoint(t string, frame map[string]bool) bool {
 		return false
 	}
 	return g2HasLetter(t)
+}
+
+// g2IsFrameInflection reports whether w is an inflected form of a word of the
+// activity type ("booking" for BookFlight, "payments" for SendPayment).
+// Synonyms are deliberately NOT dropped: WordNet files "sell" under "trade",
+// and dropping it for PlaceTrade hid the one word that separated a sale from
+// a purchase. A synonym still matches the other side's word in the ordinary
+// way, so nothing is lost by keeping it.
+func g2IsFrameInflection(w string, frame map[string]bool) bool {
+	for _, b := range wordnet.Bases(w) {
+		if frame[b] {
+			return true
+		}
+	}
+	return false
 }
 
 // g2IsFrameSynonym drops a word that only restates the activity type, such as
