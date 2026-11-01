@@ -131,7 +131,9 @@ previous one completes, so the arrival rate falls when latency rises. In
 completions, which is how independent users behave. By Little's
 law~\cite{little1961}, a closed loop with $c$ clients and latency $W$ carries
 $c/W$ workflows per second, so closed-loop throughput can look stable even
-when the system is overloaded.
+when the system is overloaded. Both the median and the 99th percentile are
+reported, because in a system of many cooperating parts it is the tail that
+determines the experience of users~\cite{tailatscale2013}.
 
 Each measurement point ran for 135\,s, of which the first 15\,s were
 discarded as warm-up; the calibration points ran for 435\,s to collect
@@ -183,7 +185,8 @@ lock waits, and the engines' connection-pool statistics.
 
 Each fault trial ran an open-loop load of 65.6 workflows per second, half the
 closed-loop knee and a rate sustained without loss in Stage~E, and injected
-one fault after the load had settled. Six faults were used, each with three
+one fault after the load had settled, in the manner of chaos engineering
+experiments on production systems~\cite{chaos2016}. Six faults were used, each with three
 trials on a different victim pod, except the database reboot, which was run
 once:
 

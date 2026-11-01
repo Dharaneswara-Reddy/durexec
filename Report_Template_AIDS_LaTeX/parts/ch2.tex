@@ -231,7 +231,7 @@ properties that the engine is designed to combine.
 
 \section{Research Gap}
 
-Three observations follow from the survey. First, the engines that partition
+The survey leaves three gaps. First, the engines that partition
 workflows across machines do so with several cooperating services or a
 coordination service, while the engine that needs only a database does not
 partition. No system in the survey provides partitioned, fenced ownership
@@ -239,13 +239,7 @@ using only the database that already stores the workflow state. Second,
 fencing is well understood in principle, but published descriptions rarely
 report how often a stale owner actually attempts a write in a real deployment,
 or how long ownership takes to move after a failure. Third, every engine
-deduplicates steps by exact comparison of arguments, which is sound for engine
-retries but not for an agent that re-plans after a crash, and the semantic
+deduplicates steps by exact comparison of arguments, which fails for an agent that
+re-plans after a crash, and the semantic
 caching work that could detect such repeats is designed for a setting in which
-a false match is cheap.
-
-This project addresses the three points together: an engine with partitioned,
-fenced ownership over PostgreSQL alone; a cloud evaluation that measures
-ownership transfer and stale writes under injected faults; and a semantic
-deduplication check whose verdict is recorded in the history so that replay
-remains deterministic.
+a false match is cheap. This project addresses all three.

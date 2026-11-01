@@ -253,7 +253,9 @@ while the database was the bottleneck. In sixteen fault-injection trials,
 covering engine termination, a 35~s process freeze, loss of database
 connections, a node drain and a database reboot, every accepted workflow
 completed, no journal invariant was violated and every write by a stale owner
-was rejected.
+was rejected. On a corpus of 213 request pairs, similarity of sentence
+embeddings alone suppressed most similar but distinct requests, whereas
+comparing the deciding fields exactly separated every pair.
 
 \vspace{4pt}
 \textbf{Keywords:} durable execution, event sourcing, deterministic replay,
@@ -261,7 +263,7 @@ leases, fencing tokens, sharding, fault tolerance, PostgreSQL.
 \end{spacing}
 
 \clearpage
-{\linespread{0.95}\selectfont\tableofcontents}
+{\setstretch{1.1}\tableofcontents}
 
 \clearpage\phantomsection
 \addcontentsline{toc}{chapter}{LIST OF FIGURES}

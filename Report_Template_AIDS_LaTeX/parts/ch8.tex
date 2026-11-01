@@ -1,0 +1,76 @@
+% =====================================================================
+%  CHAPTER 8 - CONCLUSION AND FUTURE WORK
+% =====================================================================
+\clearpage
+\chapter{Conclusion and Future Work}
+
+\section{Conclusion}
+
+This project set out to build a durable execution engine that partitions
+long-running workflows across several nodes, survives the failure of any of
+them without losing progress or repeating side effects, and needs no
+infrastructure other than PostgreSQL. The engine records every decision of a
+workflow in an append-only history and recovers a run by replaying its code
+against that history. Workflows are placed on a fixed set of shards, and
+shards on nodes by a consistent-hash ring, so that ownership can move without
+moving data. Ownership is held through a lease row per shard, and every
+transaction that writes shard state re-checks the shard's fencing token under
+a row lock before it commits.
+
+The evaluation on Amazon EKS supports the main claims within the limits set
+out in Section~\ref{sec:validity}. Under sixteen valid fault trials of six kinds, including
+a 35\,s freeze of an engine process that outlived its lease, no journal
+invariant was violated and every accepted run completed; the frozen engine's
+attempts to write after it resumed were rejected by fencing in every trial.
+After a graceful deletion or a process kill, all of a node's shards were
+re-owned within 6\,s. The cost of faults was availability, in the form of
+refused starts and longer tail latency while shards were unowned, and never
+correctness.
+
+The evaluation also located the limits of the design. On a single 2-vCPU
+database host the engine sustained about 131 workflows per second in a
+closed loop and about 100 in an open loop, and adding engine replicas did not
+change this, because the database was the bottleneck in every configuration.
+Much of the database's work was polling: an idle cluster committed about 250
+transactions per second, and at the knee about 100 transactions were spent
+per completed workflow. Polling also set a latency floor of about 2.2\,s for a
+workflow with four activities and a short timer. Under open-loop overload the
+system lost shard leases, which turned overload into unavailability. And a
+general-purpose sentence encoder proved to be a poor basis for semantic
+deduplication on its own, judging most distinct but similar requests to be
+duplicates; comparing the deciding fields of a request exactly, and using
+similarity only for the remainder, resolved this on the evaluation corpus.
+
+\section{Future Work}
+
+The results point to the following work, in roughly the order of its
+expected benefit.
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt]
+  \item \emph{Notification instead of polling.} Waking workers with
+    PostgreSQL \cd{LISTEN}/\cd{NOTIFY} when tasks and timers become ready, and
+    polling only as a fallback, should lower both the idle load and the
+    latency floor, and raise capacity on the same database.
+  \item \emph{Isolated lease renewal.} Renewing leases on a dedicated
+    connection, outside the pool used by workers, should prevent the lease
+    loss seen under open-loop overload. Admission control that refuses work
+    before the pool is exhausted would complement it.
+  \item \emph{Faster adoption of orphaned shards.} Making the adoption delay
+    depend on whether the owner answers its health check would shorten
+    unavailability after a freeze or a drain without causing churn after
+    short pauses.
+  \item \emph{Safe migrations.} Migrations run under an advisory lock, and
+    skipped when the schema is current, would remove the start-up deadlock.
+  \item \emph{Scaling and availability of the database.} Repeating the
+    evaluation with a larger database host, and with a synchronous standby
+    or a managed highly available database, is needed to measure horizontal
+    scaling of the engine itself and to test failover of the database.
+  \item \emph{History retention.} Histories of completed runs should be
+    archived or compacted.
+  \item \emph{Semantic deduplication on real traffic.} The hybrid comparator
+    should be evaluated on agent traces labelled by people, with thresholds
+    chosen on a held-out split, and the escalation path should be studied as
+    a human-in-the-loop interaction.
+  \item \emph{Wider fault coverage.} Network partitions, packet loss,
+    instance termination and rolling upgrades under load remain untested.
+\end{enumerate}
