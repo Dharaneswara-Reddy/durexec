@@ -49,8 +49,12 @@ rewordings 35/45.
   "goods"/"order"). WordNet relations do not separate those from real
   changes ("standard"/"express", "growth"/"scale"), so generic-v2 never
   suppresses on them; a model tie-break for that residue is the next step.
-* Remaining wrong suppressions on held-out-2 (3): cab type, ticket tier and a
-  transfer destination expressed as a multi-word or one-sided phrase.
+* Remaining wrong suppressions on held-out-2 (3), read after the run:
+  a ticket tier hidden by the counted-noun rule ("2 **gold** tickets" vs
+  "2 **silver** tickets"), and two reversed directions phrased without "to"
+  ("out of savings into current"; "pick me up in Whitefield ... drop me at
+  the airport"). Both are general and fixable, and are left unfixed here so
+  the held-out figure stays the one measured.
 * Held-out-1 after the v2.1 fixes (post-hoc, no longer unseen): 66/150, 1/150.
 
 Raw rows: `generic-v2-heldout.csv`, `generic-v2.1-heldout2.csv`.
