@@ -290,8 +290,20 @@ func run() error {
 	// internal/idem/semantic/hybrid.go.
 	if cfg.SemanticHybrid {
 		checker.Fields = semantic.ItineraryFields
+		fields := "itinerary (route, when, daypart, pax)"
+		if cfg.SemanticFields == "generic" {
+			checker.Fields = semantic.GenericFields
+			fields = "generic (value shapes, any domain)"
+		}
+		if cfg.SemanticGate == "neutral" {
+			checker.GateMode = semantic.GateNeutral
+			checker.MinAgreeing = 1
+		}
+		checker.GateOnly = cfg.SemanticGateOnly
 		log.Info(ctx, "semantic dedup: hybrid comparator enabled",
-			"deciding_fields", "route, when, daypart, pax",
+			"deciding_fields", fields,
+			"gate", checker.GateMode.String(),
+			"gate_only", checker.GateOnly,
 			"note", "similarity is consulted only for the free text around those fields")
 	}
 

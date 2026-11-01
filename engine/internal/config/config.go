@@ -22,25 +22,28 @@ import (
 // Environment variable names, listed once so the loader and the documentation
 // cannot drift apart.
 const (
-	EnvShardCount      = "SHARD_COUNT"
-	EnvLeaseTTL        = "LEASE_TTL"
-	EnvLeaseRenew      = "LEASE_RENEW"
-	EnvTaskLock        = "TASK_LOCK"
-	EnvWorkflowWorkers = "WORKFLOW_WORKERS"
-	EnvActivityWorkers = "ACTIVITY_WORKERS"
-	EnvSyncCommit      = "SYNC_COMMIT"
-	EnvTauHigh         = "TAU_HIGH"
-	EnvTauLow          = "TAU_LOW"
-	EnvNodeID          = "NODE_ID"
-	EnvListenAddr      = "LISTEN_ADDR"
-	EnvDatabaseURL     = "DATABASE_URL"
-	EnvEmbedderURL     = "EMBEDDER_URL"
-	EnvFaultInjection  = "FAULT_INJECTION"
-	EnvFaultCrashAt    = "FAULT_CRASH_AT"
-	EnvExtsimURL       = "EXTSIM_URL"
-	EnvEscalationBlock = "ESCALATION_BLOCKS"
-	EnvClusterNodes    = "CLUSTER_NODES"
-	EnvSemanticHybrid  = "SEMANTIC_HYBRID"
+	EnvShardCount       = "SHARD_COUNT"
+	EnvLeaseTTL         = "LEASE_TTL"
+	EnvLeaseRenew       = "LEASE_RENEW"
+	EnvTaskLock         = "TASK_LOCK"
+	EnvWorkflowWorkers  = "WORKFLOW_WORKERS"
+	EnvActivityWorkers  = "ACTIVITY_WORKERS"
+	EnvSyncCommit       = "SYNC_COMMIT"
+	EnvTauHigh          = "TAU_HIGH"
+	EnvTauLow           = "TAU_LOW"
+	EnvNodeID           = "NODE_ID"
+	EnvListenAddr       = "LISTEN_ADDR"
+	EnvDatabaseURL      = "DATABASE_URL"
+	EnvEmbedderURL      = "EMBEDDER_URL"
+	EnvFaultInjection   = "FAULT_INJECTION"
+	EnvFaultCrashAt     = "FAULT_CRASH_AT"
+	EnvExtsimURL        = "EXTSIM_URL"
+	EnvEscalationBlock  = "ESCALATION_BLOCKS"
+	EnvClusterNodes     = "CLUSTER_NODES"
+	EnvSemanticHybrid   = "SEMANTIC_HYBRID"
+	EnvSemanticFields   = "SEMANTIC_FIELDS"
+	EnvSemanticGate     = "SEMANTIC_GATE"
+	EnvSemanticGateOnly = "SEMANTIC_GATE_ONLY"
 )
 
 // leaseRenewSafetyFactor is the number of renewal attempts that must fit
@@ -122,6 +125,21 @@ type Config struct {
 	// and the engine ships with one such extractor, for flight booking. See
 	// internal/idem/semantic/hybrid.go for what that costs.
 	SemanticHybrid bool
+
+	// SemanticFields picks the deciding-field extractor the hybrid comparator
+	// uses: "itinerary" (the flight vocabulary, the default) or "generic"
+	// (value shapes, any domain). Ignored unless SemanticHybrid is on.
+	SemanticFields string
+
+	// SemanticGate is "strict" (a field stated on one side only is a
+	// difference, the default) or "neutral" (only two stated, contradicting
+	// values close the gate; one agreeing field is then required).
+	SemanticGate string
+
+	// SemanticGateOnly drops the similarity half of the hybrid comparator: a
+	// pair whose deciding fields agree is a duplicate. Ignored unless
+	// SemanticHybrid is on.
+	SemanticGateOnly bool
 
 	// FaultInjection arms internal/faultinj. See faultExplicit.
 	FaultInjection bool
@@ -326,6 +344,31 @@ func LoadFrom(lookup func(string) (string, bool)) (Config, error) {
 			errs = append(errs, fmt.Errorf("%s=%q is not a boolean (use on/off, true/false, 1/0)", EnvSemanticHybrid, v))
 		} else {
 			cfg.SemanticHybrid = b
+		}
+	}
+
+	if v, ok := get(EnvSemanticFields); ok {
+		switch v {
+		case "itinerary", "generic":
+			cfg.SemanticFields = v
+		default:
+			errs = append(errs, fmt.Errorf("%s=%q must be itinerary or generic", EnvSemanticFields, v))
+		}
+	}
+	if v, ok := get(EnvSemanticGate); ok {
+		switch v {
+		case "strict", "neutral":
+			cfg.SemanticGate = v
+		default:
+			errs = append(errs, fmt.Errorf("%s=%q must be strict or neutral", EnvSemanticGate, v))
+		}
+	}
+	if v, ok := get(EnvSemanticGateOnly); ok {
+		b, err := parseBool(v)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s=%q is not a boolean (use on/off, true/false, 1/0)", EnvSemanticGateOnly, v))
+		} else {
+			cfg.SemanticGateOnly = b
 		}
 	}
 
