@@ -1,0 +1,9 @@
+window 120s, 0 not-owner/unavailable retries
+type            started completed     wf/s failed errors      p50      p95      p99
+MixPipeline        1869      1837    15.31      0      0    2.04s    2.55s    2.76s
+ALL                1869      1837    15.31      0      0    2.04s    2.55s    2.76s
+=== BEGIN types.csv ===
+type,started,completed_in_window,wf_per_s,failed,errors,p50_s,p95_s,p99_s
+MixPipeline,1869,1837,15.308,0,0,2.044,2.552,2.756
+ALL,1869,1837,15.308,0,0,2.044,2.552,2.756
+=== END types.csv ===

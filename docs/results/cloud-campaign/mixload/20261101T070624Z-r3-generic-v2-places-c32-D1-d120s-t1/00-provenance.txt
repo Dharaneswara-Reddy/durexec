@@ -1,0 +1,13 @@
+run_id=20261101T070624Z
+exp=M1-single
+config_id=r3-generic-v2-places-c32-D1-d120s-t1
+git_sha=69c9d9e2a1a32a2c9572c2bbaa82b6297dc8b36f
+image_tag=69c9d9e
+mix=DeliveryOrder=1
+semantic_fields=generic-v2-places
+args=["-nodes", "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080", "-mix", "DeliveryOrder=1", "-concurrency", "32", "-rate", "0", "-duration", "120s", "-warmup", "15s", "-agent-corpora", "flight,multidomain,heldout,heldout2", "-id-prefix", "mx-20261101t070624z-", "-seed", "1", "-out", "/tmp/mix", "-emit-csv"]
+NAME            READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
+durexec-0       1/1     Running   0          69s   10.91.0.13    ip-10-91-0-65.ec2.internal    <none>           <none>
+durexec-1       1/1     Running   0          69s   10.91.0.61    ip-10-91-0-56.ec2.internal    <none>           <none>
+durexec-2       1/1     Running   0          69s   10.91.0.171   ip-10-91-0-167.ec2.internal   <none>           <none>
+durexec-probe   1/1     Running   0          76s   10.91.0.83    ip-10-91-0-54.ec2.internal    <none>           <none>

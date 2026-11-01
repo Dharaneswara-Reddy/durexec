@@ -1,0 +1,13 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261101T071355Z-eks_mixload.sh-42871.log
+20261101T071356Z r3-generic-v2-places-c32-A1-d120s-t1 job=SuccessCriteriaMet raw=../docs/results/cloud-campaign/mixload/20261101T071356Z-r3-generic-v2-places-c32-A1-d120s-t1
+type            started completed     wf/s failed errors      p50      p95      p99
+MixApproval        2826      2794    23.28      0      0    1.33s    1.74s    1.94s
+ALL                2826      2794    23.28      0      0    1.33s    1.74s    1.94s
+inv|runs=3144
+inv|dup_run_seq=0
+inv|dup_activity_completion=0
+inv|orphan_completion=0
+inv|seq_gaps=0
+inv|multi_terminal=0
+inv|executions_by_status=COMPLETED:3144
+inv|pending_tasks=0

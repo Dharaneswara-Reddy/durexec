@@ -57,3 +57,9 @@ docs/results/cloud/**/*.jsonl
 docs/results/cloud/*.tar.gz
 docs/results/cloud/*/51-raw/
 docs/results/cloud/*/52-campaign-raw/
+# Bulky raw samples of mixed-workload points; the reduced files are committed
+# and the raw ones are kept in the campaign S3 bucket.
+docs/results/cloud-campaign/mixload/*/20-kubelet-samples.jsonl
+docs/results/cloud-campaign/mixload/*/39-metrics-before-*.txt
+docs/results/cloud-campaign/mixload/*/40-metrics-*.txt
+docs/results/cloud-campaign/mixload/*/12-pgstat-during.txt

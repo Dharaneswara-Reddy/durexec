@@ -1,0 +1,9 @@
+window 120s, 0 not-owner/unavailable retries
+type            started completed     wf/s failed errors      p50      p95      p99
+MixFanOut          3265      3233    26.94      0      0    1.13s    1.75s    2.24s
+ALL                3265      3233    26.94      0      0    1.13s    1.75s    2.24s
+=== BEGIN types.csv ===
+type,started,completed_in_window,wf_per_s,failed,errors,p50_s,p95_s,p99_s
+MixFanOut,3265,3233,26.942,0,0,1.126,1.748,2.241
+ALL,3265,3233,26.942,0,0,1.126,1.748,2.241
+=== END types.csv ===

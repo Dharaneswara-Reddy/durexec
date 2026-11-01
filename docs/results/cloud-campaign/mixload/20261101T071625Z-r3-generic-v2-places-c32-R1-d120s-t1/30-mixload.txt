@@ -1,0 +1,9 @@
+window 120s, 0 not-owner/unavailable retries
+type            started completed     wf/s failed errors      p50      p95      p99
+MixRetry           2504      2472    20.60      0      0    1.53s    2.05s    2.35s
+ALL                2504      2472    20.60      0      0    1.53s    2.05s    2.35s
+=== BEGIN types.csv ===
+type,started,completed_in_window,wf_per_s,failed,errors,p50_s,p95_s,p99_s
+MixRetry,2504,2472,20.600,0,0,1.534,2.045,2.349
+ALL,2504,2472,20.600,0,0,1.534,2.045,2.349
+=== END types.csv ===
