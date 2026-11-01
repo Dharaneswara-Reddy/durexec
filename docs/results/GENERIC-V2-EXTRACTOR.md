@@ -59,3 +59,25 @@ rewordings 35/45.
 
 Raw rows: `generic-v2-heldout.csv`, `generic-v2.1-heldout2.csv`.
 Reproduce: `cd engine && go run ./cmd/genericeval -corpora heldout2`.
+
+## Does an embedding model help with what generic-v2 leaves undecided?
+
+all-MiniLM-L6-v2 (the engine's embedding model) was run on the AWS operator
+over all 1,158 pairs (`minilm-pair-cosines.csv`, whole-intent cosine). Policy
+tested: keep every generic-v2 verdict, but for pairs it did NOT call
+duplicate only because ordinary words were swapped (no value conflict, no
+reversed direction), call DUPLICATE when cosine >= t. With generic-v2+places:
+
+| Corpus | generic-v2 alone (caught / wrongly suppressed) | + tie-break t=0.90 | + tie-break t=0.85 | + tie-break t=0.80 |
+|---|---|---|---|---|
+| flight-213 (dev) | 81/98, 0/115 | 81/98, 3/115 | 81/98, 7/115 | 87/98, 8/115 |
+| multidomain-300 (dev) | 78/150, 1/150 | 80/150, 5/150 | 103/150, 7/150 | 120/150, 13/150 |
+| **heldout-300** | 66/150, **1/150** | 69/150, 10/150 | 87/150, 19/150 | 106/150, 27/150 |
+| **heldout2-300** | 82/150, **3/150** | 83/150, 8/150 | 94/150, 10/150 | 107/150, 15/150 |
+| rephrase-live (real wordings, no negatives) | 35/45 | 40/45 | 43/45 | 43/45 |
+
+Every threshold that buys recall on unseen tasks costs several wrongly
+suppressed real actions per repeat caught. The model does not separate a
+paraphrase from a one-word change of identity any better than WordNet does,
+so it is not used to decide; generic-v2 alone stays the safe default and the
+residue is left to run (with the per-call dedup key as the backstop).
