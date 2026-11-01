@@ -1,0 +1,199 @@
+% =====================================================================
+%  CHAPTER 5 - IMPLEMENTATION
+% =====================================================================
+\clearpage
+\chapter{Implementation}
+
+The engine was implemented in Go~1.25 as a single binary, \cd{engined}, of
+about 43,000 lines of non-test code, together with roughly 23,000 lines of
+tests. This chapter describes the structure of the code and the parts of the
+implementation where the details matter for correctness or performance. The
+design that the code realises was given in Chapter~4 and is not repeated.
+
+\section{Code Organisation}
+
+Table~\ref{tab:packages} lists the main packages. Dependencies point
+downwards: \cd{core} defines the event types, identifiers and interfaces and
+imports nothing from the engine, and the storage packages depend only on
+\cd{core} and the PostgreSQL driver. The runtime package wires the pieces
+together, and \cd{cmd/engined} builds the process from configuration.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Main packages of the engine}
+  \label{tab:packages}
+  \small
+  \begin{tabular}{@{}p{1.25in}p{0.55in}p{3.7in}@{}}
+    \toprule
+    \textbf{Package} & \textbf{Lines} & \textbf{Responsibility} \\
+    \midrule
+    \cd{core} & 625 & Event types, identifiers, decision and store interfaces \\
+    \cd{eventlog} & 1,005 & Reading histories; the fenced decision commit \\
+    \cd{taskq} & 1,002 & Durable task queue: poll, lock, heartbeat, complete,
+      retry \\
+    \cd{lease} & 789 & Lease store and the ownership state machine \\
+    \cd{shard} & 275 & Workflow-to-shard hash and the consistent-hash ring \\
+    \cd{timers} & 264 & Durable timers and the due-timer scanner \\
+    \cd{workflow} & 1,644 & Workflow context, replay by program order,
+      cooperative dispatcher \\
+    \cd{activity} & 729 & Activity registry, retry policy, deduplication keys \\
+    \cd{saga} & 202 & Compensation stack \\
+    \cd{idem} & 3,454 & Exact and semantic deduplication, embedder client,
+      hybrid comparator \\
+    \cd{runtime} & 2,954 & Workflow, activity and timer workers; per-shard
+      worker pools \\
+    \cd{api} & 1,959 & HTTP API, error mapping, request routing \\
+    \cd{obs} & 444 & Prometheus metrics and structured logging \\
+    \cd{faultinj} & 364 & Named crash points for tests \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{The Fenced Commit}
+
+All writes produced by one workflow task are made by a single function,
+\cd{CommitDecision}, in one transaction. Its first statement is
+
+\begin{lstlisting}[caption={Fencing check at the start of every commit},
+  label={lst:verify}]
+SELECT fencing_token FROM shard_leases WHERE shard_id = $1 FOR UPDATE
+\end{lstlisting}
+
+\noindent and the function returns a \cd{NotOwner} error, after rolling back,
+if the value differs from the token held by the caller. The remaining steps
+follow the order given in Section~4.2.2. Placing the start of a new run
+after the fencing check was a deliberate change made during development: in
+an earlier version the insert into \cd{executions} for a start was performed
+outside the fenced transaction, so a node that had lost a shard could still
+admit new runs to it. The same pattern, a token check under a row lock in the
+writing transaction, is used by the timer scanner and by the signal path.
+
+\section{Task Queue}
+
+Each worker polls one owned shard at a time with a query that selects one
+ready row and locks it in the same statement:
+
+\begin{lstlisting}[caption={Task poll (simplified)}, label={lst:poll}]
+WITH pick AS (
+  SELECT shard_id, task_id FROM tasks
+   WHERE shard_id = $1 AND task_type = $2 AND ready_at <= now()
+   ORDER BY shard_id, task_type, ready_at
+   FOR UPDATE SKIP LOCKED LIMIT 1)
+UPDATE tasks t
+   SET locked_until = now() + $3::interval,
+       lock_token = gen_random_uuid(), attempt = t.attempt + 1
+  FROM pick p
+ WHERE t.shard_id = p.shard_id AND t.task_id = p.task_id
+RETURNING t.*
+\end{lstlisting}
+
+\noindent Here \cd{ready\_at} stands for the later of the visibility time and
+the lock expiry.
+A partial index on ready tasks, added in the second migration, keeps the
+inner query to an index scan. Completion and failure are accepted only with
+the lock token issued by the poll, so a worker whose lock has expired and
+whose task has been given to another worker cannot complete it. Idle workers
+back off between polls; Chapter~7 shows that this polling is the dominant
+database load on an idle cluster and that it sets part of the latency floor.
+
+\section{Lease Manager}
+
+The ownership policy is written as two pure functions. \cd{Decide} takes the
+remembered state of one shard and the current time and returns one action:
+acquire, renew, declare lost or do nothing. \cd{Apply} takes the outcome of
+the database call and returns the new state. Neither function touches the
+database or a clock, so all combinations of late renewals, failed queries and
+expired leases are covered by table-driven unit tests that run in
+microseconds. Two rules in these functions matter for safety. Expiry is
+checked before renewal, so a node never renews a lease that has already
+lapsed. A renewal that fails because the database is unreachable does not
+advance the time of the last successful renewal, so if the failure persists
+the node gives up the shard on its own. The loop that calls these functions
+runs every renewal interval and calls back into the runtime to start or stop
+the shard's workers.
+
+\section{Workflow Execution}
+
+Each workflow task runs the workflow function in a goroutine controlled by a
+dispatcher. When the function calls \cd{Get} on a future that has no recorded
+result, the goroutine hands control back and is then discarded; the run will
+be re-executed from the start on its next task. This keeps the runtime free of
+long-lived per-run goroutines, so a run sleeping for a week costs one row in
+\cd{timers} and nothing in memory. The context counts calls in program order
+and, on each call, compares the requested command with the event recorded at
+that position; a mismatch fails the run with a non-determinism error that
+names the position, the recorded command and the requested one.
+
+\section{Semantic and Hybrid Deduplication}
+
+The semantic checker builds a canonical intent string from the activity type
+and its normalised, sorted arguments, obtains an embedding from the embedder
+service, and compares it by cosine similarity with the stored embeddings of
+completed activities of the same type in the run. The verdict and its inputs
+are journalled as a \cd{SemanticDedupEvaluated} event before any command is
+issued. Lookups and inserts of embeddings use the \cd{pgvector} type in
+\cd{activity\_intents}.
+
+The evaluation in Chapter~7 showed that a general sentence encoder answers a
+different question from the one deduplication asks. It judges two requests
+for the same route on different days as very similar, which they are, though
+they are two different bookings. An opt-in \emph{hybrid} comparator was
+therefore added. The activity declares its deciding fields, for example the
+origin, destination and date of a flight; these are normalised (``BLR'' and
+``Bangalore'' map to one code, ``Friday AM'' to a date and time window) and
+compared exactly, and similarity is applied only to the remaining free text.
+The verdict is journalled in the same way, so the hybrid comparator changes
+the decision but not the replay mechanism.
+
+\section{API, Routing and Observability}
+
+The HTTP API (Table~\ref{tab:api}) is served by every node. A request for a
+run on a shard the node does not own is answered with HTTP~409 \cd{NotOwner} and, when
+known, the name of the current owner, and clients retry against that node. Every node exports
+Prometheus metrics for task latencies, commits, lease transitions, fencing
+rejections, deduplication verdicts and connection-pool use, and writes
+structured JSON logs. The fencing-rejection counter is the one used in
+Chapter~7 to count stale writes.
+
+\begin{table}[htbp]
+  \centering
+  \caption{HTTP API}
+  \label{tab:api}
+  \small
+  \begin{tabular}{@{}p{2.6in}p{2.9in}@{}}
+    \toprule
+    \textbf{Endpoint} & \textbf{Purpose} \\
+    \midrule
+    \cd{POST /v1/workflows} & Start a run (idempotent on identifier) \\
+    \cd{GET /v1/workflows/\{id\}} & Status of a run \\
+    \cd{GET /v1/workflows/\{id\}/history} & Event history of a run \\
+    \cd{POST /v1/workflows/\{id\}/signals} & Send a named signal \\
+    \cd{POST /v1/workflows/\{id\}/cancel} & Request cancellation \\
+    \cd{GET /v1/shards} & Current lease table \\
+    \cd{GET /v1/dedup/verdicts} & Recorded semantic verdicts \\
+    \cd{GET /healthz}, \cd{GET /metrics} & Liveness and metrics \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Demonstration Applications}
+
+Two applications exercise the engine. The first is a food-delivery order
+written as a saga: payment, restaurant confirmation, driver assignment and
+notification, each with a compensation, and a durable timer for the
+preparation time. Every step has a natural exact key such as the order
+identifier, so it uses no semantic deduplication. It is the workload used for
+all load tests in Chapter~7. The second is a travel agent whose planner
+proposes flight and hotel bookings. It can run with a recorded fixture or a
+live language model, and it reproduces the double-booking case of
+Section~1.2.3 when a crash is injected between two planning steps.
+
+\section{Deployment}
+
+The binary is built into a small container image. Locally, Docker Compose
+starts three engine nodes, PostgreSQL with \cd{pgvector}, the embedder,
+Prometheus and Grafana. On Kubernetes the engine runs as a StatefulSet, so
+that each pod has a stable name that is also its node identifier on the ring;
+pod anti-affinity places one engine per node. The AWS environment of
+Chapter~6 is created by Terraform and contains no component other than
+those listed here: no message broker, cache or coordination service.
