@@ -1,0 +1,22 @@
+run_id=20261101T072938Z
+exp=M2-ladder
+config_id=r3-generic-v2-places-c256-D30P15F15A15R10G15-d120s-t1
+git_sha=69c9d9e2a1a32a2c9572c2bbaa82b6297dc8b36f
+image_tag=69c9d9e
+mix=DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15
+semantic_fields=generic-v2-places
+args=["-nodes", "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080", "-mix", "DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15", "-concurrency", "256", "-rate", "0", "-duration", "120s", "-warmup", "15s", "-agent-corpora", "flight,multidomain,heldout,heldout2", "-id-prefix", "mx-20261101t072938z-", "-seed", "1", "-out", "/tmp/mix", "-emit-csv"]
+NAME                             READY   STATUS      RESTARTS   AGE     IP            NODE                          NOMINATED NODE   READINESS GATES
+durexec-0                        1/1     Running     0          24m     10.91.0.13    ip-10-91-0-65.ec2.internal    <none>           <none>
+durexec-1                        1/1     Running     0          24m     10.91.0.61    ip-10-91-0-56.ec2.internal    <none>           <none>
+durexec-2                        1/1     Running     0          24m     10.91.0.171   ip-10-91-0-167.ec2.internal   <none>           <none>
+durexec-probe                    1/1     Running     0          24m     10.91.0.83    ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t070624z-kfstk   0/1     Completed   0          23m     10.91.0.38    ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t070856z-269wg   0/1     Completed   0          20m     10.91.0.207   ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t071127z-rg9zp   0/1     Completed   0          18m     10.91.0.178   ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t071356z-zkflz   0/1     Completed   0          15m     10.91.0.80    ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t071625z-4g26m   0/1     Completed   0          13m     10.91.0.122   ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t071854z-9v7tx   0/1     Completed   0          10m     10.91.0.207   ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t072205z-qdggw   0/1     Completed   0          7m30s   10.91.0.178   ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t072436z-57cjb   0/1     Completed   0          4m59s   10.91.0.172   ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t072707z-ch7qf   0/1     Completed   0          2m28s   10.91.0.207   ip-10-91-0-54.ec2.internal    <none>           <none>

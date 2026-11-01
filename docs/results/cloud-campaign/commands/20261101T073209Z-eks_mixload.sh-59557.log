@@ -1,0 +1,25 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261101T073209Z-eks_mixload.sh-59557.log
+20261101T073210Z r3-generic-v2-places-c128-D30P15F15A15R10G15-d120s-t2 job=SuccessCriteriaMet raw=../docs/results/cloud-campaign/mixload/20261101T073210Z-r3-generic-v2-places-c128-D30P15F15A15R10G15-d120s-t2
+type            started completed     wf/s failed errors      p50      p95      p99
+DeliveryOrder      3495      3446    28.72      0      0    1.51s    2.01s    2.20s
+DomainAgent        1740      1738    14.48      0      0    0.32s    0.56s    0.76s
+MixApproval        1597      1580    13.17      0      0    1.25s    1.39s    1.52s
+MixFanOut          1757      1748    14.57      0      0    1.15s    1.86s    2.26s
+MixPipeline        1727      1689    14.07      0      0    2.17s    3.07s    3.89s
+MixRetry           1140      1127     9.39      0      0    1.34s    1.75s    1.95s
+ALL               11456     11328    94.40      0      0    1.30s    2.38s    2.99s
+DomainAgent, the engine's own verdicts (suppressed = the commit tool really ran once):
+  flight       repeats suppressed 120/148, different actions suppressed 0/173, escalated 28, verdict/side-effect mismatches 0
+  heldout      repeats suppressed 103/234, different actions suppressed 2/243, escalated 12, verdict/side-effect mismatches 0
+  heldout2     repeats suppressed 137/248, different actions suppressed 4/237, escalated 31, verdict/side-effect mismatches 0
+  multidomain  repeats suppressed 115/227, different actions suppressed 2/230, escalated 11, verdict/side-effect mismatches 0
+=== BEGIN types.csv ===
+type,started,completed_in_window,wf_per_s,failed,errors,p50_s,p95_s,p99_s
+inv|runs=12812
+inv|dup_run_seq=0
+inv|dup_activity_completion=0
+inv|orphan_completion=0
+inv|seq_gaps=0
+inv|multi_terminal=0
+inv|executions_by_status=COMPLETED:12812
+inv|pending_tasks=0
