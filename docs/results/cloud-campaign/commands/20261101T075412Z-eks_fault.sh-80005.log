@@ -1,0 +1,3 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261101T075412Z-eks_fault.sh-80005.log
+mark 1793519652714 kill durexec-1
+Warning: metadata.name: this is used in the Pod's hostname, which can result in surprising behavior; a DNS label is recommended: [must not contain dots]

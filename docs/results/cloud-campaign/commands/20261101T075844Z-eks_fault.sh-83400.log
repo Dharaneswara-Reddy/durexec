@@ -1,0 +1,3 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261101T075844Z-eks_fault.sh-83400.log
+mark 1793519924542 freeze durexec-2
+Warning: metadata.name: this is used in the Pod's hostname, which can result in surprising behavior; a DNS label is recommended: [must not contain dots]

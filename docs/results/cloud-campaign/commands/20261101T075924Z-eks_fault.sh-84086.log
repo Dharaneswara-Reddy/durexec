@@ -1,0 +1,3 @@
+command transcript: /opt/durexec/docs/results/cloud-campaign/commands/20261101T075924Z-eks_fault.sh-84086.log
+Warning: metadata.name: this is used in the Pod's hostname, which can result in surprising behavior; a DNS label is recommended: [must not contain dots]
+mark 1793519970008 thaw durexec-2

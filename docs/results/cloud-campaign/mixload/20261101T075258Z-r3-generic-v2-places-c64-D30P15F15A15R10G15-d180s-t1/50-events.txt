@@ -1,0 +1,157 @@
+LAST SEEN   TYPE     REASON             OBJECT                                               MESSAGE
+51m         Normal   Scheduled          pod/durexec-probe                                    Successfully assigned durexec-lab/durexec-probe to ip-10-91-0-54.ec2.internal
+51m         Normal   Pulling            pod/durexec-probe                                    Pulling image "pgvector/pgvector:pg16"
+51m         Normal   Started            pod/durexec-probe                                    Container started
+51m         Normal   Created            pod/durexec-probe                                    Container created
+51m         Normal   Pulled             pod/durexec-probe                                    Successfully pulled image "pgvector/pgvector:pg16" in 3.343s (3.343s including waiting). Image size: 156219717 bytes.
+51m         Normal   NoPods             poddisruptionbudget/durexec                          No matching pods found
+51m         Normal   SuccessfulCreate   statefulset/durexec                                  Create Pod durexec-1 in StatefulSet durexec successful
+51m         Normal   Scheduled          pod/durexec-2                                        Successfully assigned durexec-lab/durexec-2 to ip-10-91-0-167.ec2.internal
+51m         Normal   Pulling            pod/durexec-2                                        Pulling image "pgvector/pgvector:pg16"
+51m         Normal   Scheduled          pod/durexec-1                                        Successfully assigned durexec-lab/durexec-1 to ip-10-91-0-56.ec2.internal
+51m         Normal   Pulling            pod/durexec-1                                        Pulling image "pgvector/pgvector:pg16"
+51m         Normal   Scheduled          pod/durexec-0                                        Successfully assigned durexec-lab/durexec-0 to ip-10-91-0-65.ec2.internal
+51m         Normal   Pulling            pod/durexec-0                                        Pulling image "pgvector/pgvector:pg16"
+51m         Normal   SuccessfulCreate   statefulset/durexec                                  Create Pod durexec-0 in StatefulSet durexec successful
+51m         Normal   SuccessfulCreate   statefulset/durexec                                  Create Pod durexec-2 in StatefulSet durexec successful
+51m         Normal   Started            pod/durexec-1                                        Container started
+51m         Normal   Created            pod/durexec-1                                        Container created
+51m         Normal   Pulled             pod/durexec-1                                        Successfully pulled image "pgvector/pgvector:pg16" in 3.063s (3.063s including waiting). Image size: 156219717 bytes.
+51m         Normal   Pulled             pod/durexec-0                                        Successfully pulled image "pgvector/pgvector:pg16" in 3.125s (3.126s including waiting). Image size: 156219717 bytes.
+51m         Normal   Started            pod/durexec-2                                        Container started
+51m         Normal   Pulled             pod/durexec-2                                        Successfully pulled image "pgvector/pgvector:pg16" in 3.044s (3.044s including waiting). Image size: 156219717 bytes.
+51m         Normal   Created            pod/durexec-2                                        Container created
+51m         Normal   Created            pod/durexec-0                                        Container created
+51m         Normal   Started            pod/durexec-0                                        Container started
+51m         Normal   Pulling            pod/durexec-0                                        Pulling image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e"
+51m         Normal   Created            pod/durexec-0                                        Container created
+51m         Normal   Created            pod/durexec-2                                        Container created
+51m         Normal   Started            pod/durexec-2                                        Container started
+51m         Normal   Pulled             pod/durexec-0                                        Successfully pulled image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e" in 763ms (763ms including waiting). Image size: 9183111 bytes.
+51m         Normal   Pulled             pod/durexec-2                                        Successfully pulled image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e" in 635ms (635ms including waiting). Image size: 9183111 bytes.
+51m         Normal   Pulling            pod/durexec-2                                        Pulling image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e"
+51m         Normal   Started            pod/durexec-0                                        Container started
+51m         Normal   Pulling            pod/durexec-1                                        Pulling image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e"
+51m         Normal   Pulled             pod/durexec-1                                        Successfully pulled image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e" in 601ms (601ms including waiting). Image size: 9183111 bytes.
+50m         Normal   SuccessfulCreate   job/mixload-20261101t070624z                         Created pod: mixload-20261101t070624z-kfstk
+50m         Normal   Scheduled          pod/mixload-20261101t070624z-kfstk                   Successfully assigned durexec-lab/mixload-20261101t070624z-kfstk to ip-10-91-0-54.ec2.internal
+49m         Normal   Pulling            pod/mixload-20261101t070624z-kfstk                   Pulling image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e"
+49m         Normal   Started            pod/mixload-20261101t070624z-kfstk                   Container started
+49m         Normal   Created            pod/mixload-20261101t070624z-kfstk                   Container created
+49m         Normal   Pulled             pod/mixload-20261101t070624z-kfstk                   Successfully pulled image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" in 927ms (927ms including waiting). Image size: 7224790 bytes.
+47m         Normal   Completed          job/mixload-20261101t070624z                         Job completed
+47m         Normal   SuccessfulCreate   job/mixload-20261101t070856z                         Created pod: mixload-20261101t070856z-269wg
+47m         Normal   Scheduled          pod/mixload-20261101t070856z-269wg                   Successfully assigned durexec-lab/mixload-20261101t070856z-269wg to ip-10-91-0-54.ec2.internal
+47m         Normal   Pulled             pod/mixload-20261101t070856z-269wg                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+47m         Normal   Created            pod/mixload-20261101t070856z-269wg                   Container created
+47m         Normal   Started            pod/mixload-20261101t070856z-269wg                   Container started
+45m         Normal   Completed          job/mixload-20261101t070856z                         Job completed
+44m         Normal   SuccessfulCreate   job/mixload-20261101t071127z                         Created pod: mixload-20261101t071127z-rg9zp
+44m         Normal   Scheduled          pod/mixload-20261101t071127z-rg9zp                   Successfully assigned durexec-lab/mixload-20261101t071127z-rg9zp to ip-10-91-0-54.ec2.internal
+44m         Normal   Started            pod/mixload-20261101t071127z-rg9zp                   Container started
+44m         Normal   Pulled             pod/mixload-20261101t071127z-rg9zp                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+44m         Normal   Created            pod/mixload-20261101t071127z-rg9zp                   Container created
+42m         Normal   Completed          job/mixload-20261101t071127z                         Job completed
+42m         Normal   Scheduled          pod/mixload-20261101t071356z-zkflz                   Successfully assigned durexec-lab/mixload-20261101t071356z-zkflz to ip-10-91-0-54.ec2.internal
+42m         Normal   SuccessfulCreate   job/mixload-20261101t071356z                         Created pod: mixload-20261101t071356z-zkflz
+42m         Normal   Started            pod/mixload-20261101t071356z-zkflz                   Container started
+42m         Normal   Pulled             pod/mixload-20261101t071356z-zkflz                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+42m         Normal   Created            pod/mixload-20261101t071356z-zkflz                   Container created
+40m         Normal   Completed          job/mixload-20261101t071356z                         Job completed
+39m         Normal   Scheduled          pod/mixload-20261101t071625z-4g26m                   Successfully assigned durexec-lab/mixload-20261101t071625z-4g26m to ip-10-91-0-54.ec2.internal
+39m         Normal   SuccessfulCreate   job/mixload-20261101t071625z                         Created pod: mixload-20261101t071625z-4g26m
+39m         Normal   Pulled             pod/mixload-20261101t071625z-4g26m                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+39m         Normal   Created            pod/mixload-20261101t071625z-4g26m                   Container created
+39m         Normal   Started            pod/mixload-20261101t071625z-4g26m                   Container started
+37m         Normal   Completed          job/mixload-20261101t071625z                         Job completed
+37m         Normal   Scheduled          pod/mixload-20261101t071854z-9v7tx                   Successfully assigned durexec-lab/mixload-20261101t071854z-9v7tx to ip-10-91-0-54.ec2.internal
+37m         Normal   Pulled             pod/mixload-20261101t071854z-9v7tx                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+37m         Normal   Created            pod/mixload-20261101t071854z-9v7tx                   Container created
+37m         Normal   Started            pod/mixload-20261101t071854z-9v7tx                   Container started
+37m         Normal   SuccessfulCreate   job/mixload-20261101t071854z                         Created pod: mixload-20261101t071854z-9v7tx
+35m         Normal   Completed          job/mixload-20261101t071854z                         Job completed
+34m         Normal   Scheduled          pod/mixload-20261101t072205z-qdggw                   Successfully assigned durexec-lab/mixload-20261101t072205z-qdggw to ip-10-91-0-54.ec2.internal
+34m         Normal   SuccessfulCreate   job/mixload-20261101t072205z                         Created pod: mixload-20261101t072205z-qdggw
+34m         Normal   Started            pod/mixload-20261101t072205z-qdggw                   Container started
+34m         Normal   Pulled             pod/mixload-20261101t072205z-qdggw                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+34m         Normal   Created            pod/mixload-20261101t072205z-qdggw                   Container created
+31m         Normal   Completed          job/mixload-20261101t072205z                         Job completed
+31m         Normal   SuccessfulCreate   job/mixload-20261101t072436z                         Created pod: mixload-20261101t072436z-57cjb
+31m         Normal   Scheduled          pod/mixload-20261101t072436z-57cjb                   Successfully assigned durexec-lab/mixload-20261101t072436z-57cjb to ip-10-91-0-54.ec2.internal
+31m         Normal   Started            pod/mixload-20261101t072436z-57cjb                   Container started
+31m         Normal   Pulled             pod/mixload-20261101t072436z-57cjb                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+31m         Normal   Created            pod/mixload-20261101t072436z-57cjb                   Container created
+29m         Normal   Completed          job/mixload-20261101t072436z                         Job completed
+29m         Normal   SuccessfulCreate   job/mixload-20261101t072707z                         Created pod: mixload-20261101t072707z-ch7qf
+29m         Normal   Scheduled          pod/mixload-20261101t072707z-ch7qf                   Successfully assigned durexec-lab/mixload-20261101t072707z-ch7qf to ip-10-91-0-54.ec2.internal
+29m         Normal   Pulled             pod/mixload-20261101t072707z-ch7qf                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+29m         Normal   Created            pod/mixload-20261101t072707z-ch7qf                   Container created
+29m         Normal   Started            pod/mixload-20261101t072707z-ch7qf                   Container started
+26m         Normal   Completed          job/mixload-20261101t072707z                         Job completed
+26m         Normal   SuccessfulCreate   job/mixload-20261101t072938z                         Created pod: mixload-20261101t072938z-tl8n2
+26m         Normal   Scheduled          pod/mixload-20261101t072938z-tl8n2                   Successfully assigned durexec-lab/mixload-20261101t072938z-tl8n2 to ip-10-91-0-54.ec2.internal
+26m         Normal   Started            pod/mixload-20261101t072938z-tl8n2                   Container started
+26m         Normal   Pulled             pod/mixload-20261101t072938z-tl8n2                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+26m         Normal   Created            pod/mixload-20261101t072938z-tl8n2                   Container created
+24m         Normal   Completed          job/mixload-20261101t072938z                         Job completed
+24m         Normal   SuccessfulCreate   job/mixload-20261101t073210z                         Created pod: mixload-20261101t073210z-bvpp7
+24m         Normal   Scheduled          pod/mixload-20261101t073210z-bvpp7                   Successfully assigned durexec-lab/mixload-20261101t073210z-bvpp7 to ip-10-91-0-54.ec2.internal
+24m         Normal   Pulled             pod/mixload-20261101t073210z-bvpp7                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+24m         Normal   Created            pod/mixload-20261101t073210z-bvpp7                   Container created
+24m         Normal   Started            pod/mixload-20261101t073210z-bvpp7                   Container started
+21m         Normal   Completed          job/mixload-20261101t073210z                         Job completed
+21m         Normal   SuccessfulCreate   job/mixload-20261101t073440z                         Created pod: mixload-20261101t073440z-242sm
+21m         Normal   Scheduled          pod/mixload-20261101t073440z-242sm                   Successfully assigned durexec-lab/mixload-20261101t073440z-242sm to ip-10-91-0-54.ec2.internal
+21m         Normal   Pulled             pod/mixload-20261101t073440z-242sm                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+21m         Normal   Created            pod/mixload-20261101t073440z-242sm                   Container created
+21m         Normal   Started            pod/mixload-20261101t073440z-242sm                   Container started
+19m         Normal   Completed          job/mixload-20261101t073440z                         Job completed
+19m         Normal   Scheduled          pod/mixload-20261101t073712z-9k9pg                   Successfully assigned durexec-lab/mixload-20261101t073712z-9k9pg to ip-10-91-0-54.ec2.internal
+19m         Normal   SuccessfulCreate   job/mixload-20261101t073712z                         Created pod: mixload-20261101t073712z-9k9pg
+19m         Normal   Started            pod/mixload-20261101t073712z-9k9pg                   Container started
+19m         Normal   Pulled             pod/mixload-20261101t073712z-9k9pg                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+19m         Normal   Created            pod/mixload-20261101t073712z-9k9pg                   Container created
+16m         Normal   Completed          job/mixload-20261101t073712z                         Job completed
+16m         Normal   SuccessfulCreate   job/mixload-20261101t073943z                         Created pod: mixload-20261101t073943z-vlq9z
+16m         Normal   Scheduled          pod/mixload-20261101t073943z-vlq9z                   Successfully assigned durexec-lab/mixload-20261101t073943z-vlq9z to ip-10-91-0-54.ec2.internal
+16m         Normal   Started            pod/mixload-20261101t073943z-vlq9z                   Container started
+16m         Normal   Pulled             pod/mixload-20261101t073943z-vlq9z                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+16m         Normal   Created            pod/mixload-20261101t073943z-vlq9z                   Container created
+14m         Normal   Completed          job/mixload-20261101t073943z                         Job completed
+13m         Normal   SuccessfulCreate   job/mixload-20261101t074246z                         Created pod: mixload-20261101t074246z-j9p2n
+13m         Normal   Scheduled          pod/mixload-20261101t074246z-j9p2n                   Successfully assigned durexec-lab/mixload-20261101t074246z-j9p2n to ip-10-91-0-54.ec2.internal
+13m         Normal   Started            pod/mixload-20261101t074246z-j9p2n                   Container started
+13m         Normal   Pulled             pod/mixload-20261101t074246z-j9p2n                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+13m         Normal   Created            pod/mixload-20261101t074246z-j9p2n                   Container created
+11m         Normal   Completed          job/mixload-20261101t074246z                         Job completed
+11m         Normal   SuccessfulCreate   job/mixload-20261101t074516z                         Created pod: mixload-20261101t074516z-mnk96
+11m         Normal   Scheduled          pod/mixload-20261101t074516z-mnk96                   Successfully assigned durexec-lab/mixload-20261101t074516z-mnk96 to ip-10-91-0-54.ec2.internal
+11m         Normal   Pulled             pod/mixload-20261101t074516z-mnk96                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+11m         Normal   Created            pod/mixload-20261101t074516z-mnk96                   Container created
+11m         Normal   Started            pod/mixload-20261101t074516z-mnk96                   Container started
+8m46s       Normal   Completed          job/mixload-20261101t074516z                         Job completed
+8m36s       Normal   SuccessfulCreate   job/mixload-20261101t074748z                         Created pod: mixload-20261101t074748z-kqhtn
+8m36s       Normal   Scheduled          pod/mixload-20261101t074748z-kqhtn                   Successfully assigned durexec-lab/mixload-20261101t074748z-kqhtn to ip-10-91-0-54.ec2.internal
+8m35s       Normal   Started            pod/mixload-20261101t074748z-kqhtn                   Container started
+8m35s       Normal   Pulled             pod/mixload-20261101t074748z-kqhtn                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+8m35s       Normal   Created            pod/mixload-20261101t074748z-kqhtn                   Container created
+6m15s       Normal   Completed          job/mixload-20261101t074748z                         Job completed
+6m4s        Normal   Scheduled          pod/mixload-20261101t075019z-2h9hl                   Successfully assigned durexec-lab/mixload-20261101t075019z-2h9hl to ip-10-91-0-54.ec2.internal
+6m4s        Normal   Started            pod/mixload-20261101t075019z-2h9hl                   Container started
+6m4s        Normal   SuccessfulCreate   job/mixload-20261101t075019z                         Created pod: mixload-20261101t075019z-2h9hl
+6m4s        Normal   Pulled             pod/mixload-20261101t075019z-2h9hl                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+6m4s        Normal   Created            pod/mixload-20261101t075019z-2h9hl                   Container created
+3m36s       Normal   Completed          job/mixload-20261101t075019z                         Job completed
+3m25s       Normal   Scheduled          pod/mixload-20261101t075258z-k6msg                   Successfully assigned durexec-lab/mixload-20261101t075258z-k6msg to ip-10-91-0-54.ec2.internal
+3m25s       Normal   SuccessfulCreate   job/mixload-20261101t075258z                         Created pod: mixload-20261101t075258z-k6msg
+3m24s       Normal   Pulled             pod/mixload-20261101t075258z-k6msg                   Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+3m24s       Normal   Created            pod/mixload-20261101t075258z-k6msg                   Container created
+3m24s       Normal   Started            pod/mixload-20261101t075258z-k6msg                   Container started
+2m14s       Normal   Pulling            pod/node-debugger-ip-10-91-0-56.ec2.internal-7r9d9   Pulling image "public.ecr.aws/docker/library/busybox:1.36"
+2m13s       Normal   Started            pod/durexec-1                                        Container started
+2m13s       Normal   Pulled             pod/durexec-1                                        Container image "183192605828.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e" already present on machine and can be accessed by the pod
+2m13s       Normal   Created            pod/durexec-1                                        Container created
+2m13s       Normal   Pulled             pod/node-debugger-ip-10-91-0-56.ec2.internal-7r9d9   Successfully pulled image "public.ecr.aws/docker/library/busybox:1.36" in 340ms (340ms including waiting). Image size: 2217006 bytes.
+2m13s       Normal   Created            pod/node-debugger-ip-10-91-0-56.ec2.internal-7r9d9   Container created
+2m13s       Normal   Started            pod/node-debugger-ip-10-91-0-56.ec2.internal-7r9d9   Container started
+5s          Normal   Completed          job/mixload-20261101t075258z                         Job completed
