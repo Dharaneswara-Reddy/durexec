@@ -503,3 +503,28 @@ func HeldOut2() ([]Pair, error) {
 
 // HeldOut2Activity reports the activity type a second-held-out domain uses.
 func HeldOut2Activity(domain string) string { return heldOut2[domain].Activity }
+
+// AgentTools lists every activity type the corpora schedule their pairs
+// under, in a fixed order, so an engine can register one commit tool per
+// kind of task the evaluation sends it.
+func AgentTools() []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(a string) {
+		if a != "" && !seen[a] {
+			seen[a] = true
+			out = append(out, a)
+		}
+	}
+	add("BookFlight")
+	for _, d := range DomainOrder {
+		add(multiDomain[d].Activity)
+	}
+	for _, d := range HeldOutDomainOrder {
+		add(heldOut[d].Activity)
+	}
+	for _, d := range HeldOut2DomainOrder {
+		add(heldOut2[d].Activity)
+	}
+	return out
+}

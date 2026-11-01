@@ -255,13 +255,17 @@ func TestApplyOutcome(t *testing.T) {
 			// reused result is journaled at the NEXT sequence number, so the
 			// following replay resolves the future from history exactly as if
 			// the activity had run.
+			//
+			// The ONE task left is a workflow task that wakes the run to read
+			// that completion. Without it a run whose only pending step was
+			// suppressed never ran again (found by the DomainAgent workload).
 			name: "duplicate drops the task and journals a completion",
 			out: semanticOutcome{
 				reuse: map[int]json.RawMessage{1: json.RawMessage(`{"booking_id":"bk_1"}`)},
 				block: map[int]bool{},
 			},
 
-			wantTasks: 0, wantEvents: 2, wantLastSeq: 5, wantCompletionAt: 5,
+			wantTasks: 1, wantEvents: 2, wantLastSeq: 5, wantCompletionAt: 5,
 		},
 		{
 			// Held for a human: the task is dropped and NOTHING replaces it.
@@ -285,6 +289,13 @@ func TestApplyOutcome(t *testing.T) {
 			}
 			if len(d.NewTasks) != tc.wantTasks {
 				t.Errorf("tasks = %d, want %d", len(d.NewTasks), tc.wantTasks)
+			}
+			if tc.wantCompletionAt != 0 {
+				for _, task := range d.NewTasks {
+					if task.Type != core.TaskWorkflow {
+						t.Errorf("after a reuse the only task must wake the workflow, got a %s task", task.Type)
+					}
+				}
 			}
 			if len(d.Events) != tc.wantEvents {
 				t.Errorf("events = %d, want %d", len(d.Events), tc.wantEvents)

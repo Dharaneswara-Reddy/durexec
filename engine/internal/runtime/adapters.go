@@ -6,6 +6,7 @@ import (
 
 	"github.com/dharaneswar339/durexec/app/agent"
 	"github.com/dharaneswar339/durexec/app/delivery"
+	"github.com/dharaneswar339/durexec/app/mixed"
 	"github.com/dharaneswar339/durexec/internal/workflow"
 )
 
@@ -77,5 +78,13 @@ func RegisterDemoWorkflows(r *workflow.Registry) error {
 	if err := r.Register(delivery.WorkflowType, DeliveryWorkflow); err != nil {
 		return err
 	}
-	return r.Register(agent.WorkflowType, AgentWorkflow)
+	if err := r.Register(agent.WorkflowType, AgentWorkflow); err != nil {
+		return err
+	}
+	for name, fn := range mixed.Workflows() {
+		if err := r.Register(name, fn); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -308,10 +308,11 @@ func (p preface) lastSeq(start core.Seq) core.Seq {
 	return last
 }
 
-// intentText is the sentence the semantic check will compare a later call
-// against. It is produced by the same function the checker uses, so a stored
-// row and a live query can never be built from two different
-// canonicalisations of the same arguments.
+// intentText is the GENERIC rendering of a call. It is not what the stored
+// intent uses: an activity may register its own renderer with the checker,
+// and the stored row must be built by Checker.RenderIntentText so that it and
+// the live query are one rendering. Until that was fixed, an activity with a
+// renderer stored "Type(args=...)" and compared it with the rendered sentence.
 func intentText(sched core.ActivityScheduled) (string, error) {
 	return semantic.IntentText(sched.ActivityType, sched.Input)
 }

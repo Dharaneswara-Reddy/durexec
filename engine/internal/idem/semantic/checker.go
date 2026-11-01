@@ -334,6 +334,13 @@ func (c *Checker) observe(activityType string, v core.DedupVerdict, start time.T
 // renderIntent prefers the caller's per-activity renderer and falls back to the
 // generic form. A renderer that returns an empty string is treated as having no
 // opinion rather than as an instruction to embed nothing.
+// RenderIntentText is the sentence this checker compares for one call. The
+// intent stored when a call completes must be built by this same method, or
+// a stored row and a live query are two different renderings of one call.
+func (c *Checker) RenderIntentText(activityType string, input json.RawMessage) (string, error) {
+	return c.renderIntent(activityType, input)
+}
+
 func (c *Checker) renderIntent(activityType string, input json.RawMessage) (string, error) {
 	if c.RenderIntent != nil {
 		text, err := c.RenderIntent(activityType, input)

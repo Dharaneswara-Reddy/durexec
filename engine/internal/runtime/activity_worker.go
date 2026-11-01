@@ -402,7 +402,7 @@ func (w *ActivityWorker) intent(ctx context.Context, sched core.ActivitySchedule
 	if sched.Mode != core.ModeSemantic || e.Checker == nil || e.Checker.Embedder == nil {
 		return core.Intent{}, false
 	}
-	text, err := intentText(sched)
+	text, err := e.Checker.RenderIntentText(sched.ActivityType, sched.Input)
 	if err != nil {
 		e.logger().Warn(ctx, "build intent text", "activity", sched.ActivityType, "error", err)
 		return core.Intent{}, false

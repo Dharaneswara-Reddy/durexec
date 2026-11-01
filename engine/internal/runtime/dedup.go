@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/dharaneswar339/durexec/internal/core"
 	"github.com/dharaneswar339/durexec/internal/idem/semantic"
@@ -300,5 +301,17 @@ func applyOutcome(d *core.Decision, out semanticOutcome, now int64) error {
 		})
 	}
 	d.LastSeq = next
+	// The reused results resolve futures the workflow is waiting on, but the
+	// workflow is not running: nothing would ever read them. An activity
+	// completion wakes the run with a workflow task in the same transaction
+	// (activity_worker.go); a reused completion must do the same, or a run
+	// whose only pending step was suppressed stops for ever. (It went
+	// unnoticed while the only semantic workflow also waited on a signal,
+	// which woke it.)
+	d.NewTasks = append(d.NewTasks, core.Task{
+		ShardID: d.ShardID, Type: core.TaskWorkflow,
+		WorkflowID: d.WorkflowID, RunID: d.RunID,
+		ScheduledEventSeq: next, VisibleAt: time.Unix(0, now),
+	})
 	return nil
 }

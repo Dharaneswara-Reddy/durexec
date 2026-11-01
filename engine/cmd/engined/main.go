@@ -45,10 +45,12 @@ import (
 	"github.com/dharaneswar339/durexec/app/agent"
 	"github.com/dharaneswar339/durexec/app/agent/llm"
 	"github.com/dharaneswar339/durexec/app/delivery"
+	"github.com/dharaneswar339/durexec/app/mixed"
 	"github.com/dharaneswar339/durexec/internal/activity"
 	"github.com/dharaneswar339/durexec/internal/api"
 	"github.com/dharaneswar339/durexec/internal/config"
 	"github.com/dharaneswar339/durexec/internal/core"
+	"github.com/dharaneswar339/durexec/internal/evalcorpus"
 	"github.com/dharaneswar339/durexec/internal/eventlog"
 	"github.com/dharaneswar339/durexec/internal/extsim"
 	"github.com/dharaneswar339/durexec/internal/faultinj"
@@ -935,6 +937,19 @@ func registerActivities(r *activity.Registry, faults *faultinj.Injector) (intent
 		// Without this the checker embeds the whole tool-call envelope instead
 		// of the sentence inside it, and the constant JSON scaffolding dilutes
 		// every similarity score.
+		if reg.IntentText != nil {
+			renderers[reg.Type] = reg.IntentText
+		}
+	}
+	for _, reg := range mixed.Registrations(evalcorpus.AgentTools()) {
+		if err := r.Register(activity.Definition{
+			Name:  reg.Type,
+			Fn:    reg.Fn,
+			Mode:  reg.Mode,
+			Retry: reg.Retry,
+		}); err != nil {
+			return nil, err
+		}
 		if reg.IntentText != nil {
 			renderers[reg.Type] = reg.IntentText
 		}
