@@ -1,0 +1,7 @@
+NAME                       STATUS     COMPLETIONS   DURATION   AGE   CONTAINERS   IMAGES                                                                 SELECTOR
+mixload-20261101t074246z   Complete   1/1           2m20s      60m   loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e   batch.kubernetes.io/controller-uid=d25ebf75-fe54-454f-a39f-a638528f9fa9
+mixload-20261101t074516z   Complete   1/1           2m21s      57m   loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e   batch.kubernetes.io/controller-uid=2409a427-f89a-492b-ada6-658f9a1a7657
+mixload-20261101t074748z   Complete   1/1           2m20s      55m   loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e   batch.kubernetes.io/controller-uid=511d9f75-4ee9-4ea8-b7ff-583a4a515a26
+mixload-20261101t075019z   Complete   1/1           2m29s      52m   loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e   batch.kubernetes.io/controller-uid=19335e38-8bb1-40f6-8f83-49ddd47cb1a7
+mixload-20261101t075258z   Complete   1/1           3m20s      50m   loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e   batch.kubernetes.io/controller-uid=935ca0bd-032a-4986-953b-61a1663b7a92
+mixload-20261101t075730z   Complete   1/1           3m21s      45m   loadgen      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e   batch.kubernetes.io/controller-uid=c5c2f6f6-beb7-4f38-9878-b4bcbe0b4d82

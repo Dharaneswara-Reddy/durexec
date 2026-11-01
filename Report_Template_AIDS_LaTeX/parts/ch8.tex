@@ -35,11 +35,23 @@ Much of the database's work was polling: an idle cluster committed about 250
 transactions per second, and at the knee about 100 transactions were spent
 per completed workflow. Polling also set a latency floor of about 2.2\,s for a
 workflow with four activities and a short timer. Under open-loop overload the
-system lost shard leases, which turned overload into unavailability. And a
-general-purpose sentence encoder proved to be a poor basis for semantic
-deduplication on its own, judging most distinct but similar requests to be
-duplicates; comparing the deciding fields of a request exactly, and using
-similarity only for the remainder, resolved this on the evaluation corpus.
+system lost shard leases, which turned overload into unavailability. With
+six workflow types run together the same limits held: about 96 workflows per
+second before the database saturated, with long chains suffering most beyond
+it, and no journal violation in 172,280 runs including a process kill and a
+freeze.
+
+The duplicate check for re-planning agents was the least settled part of the
+work. Similarity of sentence embeddings on its own, and a field reader
+written for flight bookings, each suppressed a quarter or more of genuinely
+distinct actions once they were applied to other kinds of task. A pairwise,
+model-free comparator, which requires every typed value to agree and no word
+to be replaced, reduced that to 2--3\% on task kinds it had never seen, at the
+cost of catching only about half of the reworded repeats; using the
+embedding model to decide the remainder bought few catches at a high price in
+wrong suppressions. Automatic suppression is therefore safe to offer only for
+the clear cases, and the uncertain ones are better run, or held for a
+person, than guessed.
 
 \section{Future Work}
 
@@ -67,10 +79,13 @@ expected benefit.
     scaling of the engine itself and to test failover of the database.
   \item \emph{History retention.} Histories of completed runs should be
     archived or compacted.
-  \item \emph{Semantic deduplication on real traffic.} The hybrid comparator
-    should be evaluated on agent traces labelled by people, with thresholds
-    chosen on a held-out split, and the escalation path should be studied as
-    a human-in-the-loop interaction.
+  \item \emph{Duplicate checks on real traffic.} The comparators should be
+    evaluated on agent traces labelled by people. Requests whose old and new
+    comparators disagree could be held for a person instead of run; on the
+    held-out corpora that would recover most of the missed repeats at the
+    cost of reviewing about a quarter to a third of re-planned actions.
+    Tool calls with structured arguments would let the comparison use the
+    tool's own schema instead of reading prose.
   \item \emph{Wider fault coverage.} Network partitions, packet loss,
     instance termination and rolling upgrades under load remain untested.
 \end{enumerate}

@@ -247,15 +247,17 @@ semantic check lets the engine recognise a reworded retry of an action already
 taken by a language-model agent. On Amazon EKS with three engine nodes and one
 PostgreSQL host, a closed-loop workload reached 131 workflows per second at a
 99th-percentile latency of 3.1~s, limited by database CPU, and the sustainable
-open-loop rate was about 100 workflows per second. Workers, shards and engine
-replicas changed throughput by at most 19\%, and extra replicas gave no gain
+open-loop rate was about 100 workflows per second; extra replicas gave no gain
 while the database was the bottleneck. In sixteen fault-injection trials,
 covering engine termination, a 35~s process freeze, loss of database
 connections, a node drain and a database reboot, every accepted workflow
 completed, no journal invariant was violated and every write by a stale owner
-was rejected. On a corpus of 213 request pairs, similarity of sentence
-embeddings alone suppressed most similar but distinct requests, whereas
-comparing the deciding fields exactly separated every pair.
+was rejected; 172,280 runs of six mixed workflow types, under a process kill and
+a freeze, showed no journal violation. Across forty kinds of task, embedding
+similarity and a one-domain field reader each suppressed a quarter or more of
+distinct actions, whereas a model-free pairwise comparator caught about half
+of the reworded repeats and wrongly suppressed 2--3\% on task kinds it had
+never seen.
 
 \vspace{4pt}
 \textbf{Keywords:} durable execution, event sourcing, deterministic replay,

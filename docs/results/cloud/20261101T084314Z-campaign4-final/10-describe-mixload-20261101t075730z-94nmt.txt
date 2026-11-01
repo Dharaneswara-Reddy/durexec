@@ -1,0 +1,91 @@
+Name:             mixload-20261101t075730z-94nmt
+Namespace:        durexec-lab
+Priority:         0
+Service Account:  default
+Node:             ip-10-91-0-54.ec2.internal/10.91.0.54
+Start Time:       Sun, 01 Nov 2026 07:57:34 +0000
+Labels:           app=durexec-loadgen
+                  batch.kubernetes.io/controller-uid=c5c2f6f6-beb7-4f38-9878-b4bcbe0b4d82
+                  batch.kubernetes.io/job-name=mixload-20261101t075730z
+                  controller-uid=c5c2f6f6-beb7-4f38-9878-b4bcbe0b4d82
+                  job-name=mixload-20261101t075730z
+                  topology.kubernetes.io/region=us-east-1
+                  topology.kubernetes.io/zone=us-east-1a
+Annotations:      <none>
+Status:           Succeeded
+IP:               10.91.0.178
+IPs:
+  IP:           10.91.0.178
+Controlled By:  Job/mixload-20261101t075730z
+Containers:
+  loadgen:
+    Container ID:  containerd://3b6bd3dc30dd2529cb61ecdbe81536f784c8717e28e3c52ba1892ef87a09f12a
+    Image:         <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e
+    Image ID:      <ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:9b65cead481ea963d88b4c62d637854727a9ecb6c8082f295e965470b80fb2ef
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      /mixload
+    Args:
+      -nodes
+      http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080
+      -mix
+      DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15
+      -concurrency
+      64
+      -rate
+      0
+      -duration
+      180s
+      -warmup
+      15s
+      -agent-corpora
+      flight,multidomain,heldout,heldout2
+      -id-prefix
+      mx-20261101t075730z-
+      -seed
+      1
+      -out
+      /tmp/mix
+      -emit-csv
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Sun, 01 Nov 2026 07:57:35 +0000
+      Finished:     Sun, 01 Nov 2026 08:00:53 +0000
+    Ready:          False
+    Restart Count:  0
+    Limits:
+      memory:  512Mi
+    Requests:
+      cpu:        500m
+      memory:     128Mi
+    Environment:  <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-88vwp (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   False 
+  Initialized                 True 
+  Ready                       False 
+  ContainersReady             False 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-88vwp:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              durexec.io/role=harness
+Tolerations:                 durexec.io/harness=true:NoSchedule
+                             node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  46m   default-scheduler  Successfully assigned durexec-lab/mixload-20261101t075730z-94nmt to ip-10-91-0-54.ec2.internal
+  Normal  Pulled     46m   kubelet            spec.containers{loadgen}: Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+  Normal  Created    46m   kubelet            spec.containers{loadgen}: Container created
+  Normal  Started    46m   kubelet            spec.containers{loadgen}: Container started

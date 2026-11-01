@@ -1,0 +1,11 @@
+NAME                             READY   STATUS      RESTARTS      AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
+durexec-0                        1/1     Running     0             98m   10.91.0.13    ip-10-91-0-65.ec2.internal    <none>           <none>
+durexec-1                        1/1     Running     1 (49m ago)   98m   10.91.0.61    ip-10-91-0-56.ec2.internal    <none>           <none>
+durexec-2                        1/1     Running     0             98m   10.91.0.171   ip-10-91-0-167.ec2.internal   <none>           <none>
+durexec-probe                    1/1     Running     0             98m   10.91.0.83    ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t074246z-j9p2n   0/1     Completed   0             60m   10.91.0.178   ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t074516z-mnk96   0/1     Completed   0             57m   10.91.0.80    ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t074748z-kqhtn   0/1     Completed   0             55m   10.91.0.178   ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t075019z-2h9hl   0/1     Completed   0             52m   10.91.0.80    ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t075258z-k6msg   0/1     Completed   0             50m   10.91.0.82    ip-10-91-0-54.ec2.internal    <none>           <none>
+mixload-20261101t075730z-94nmt   0/1     Completed   0             45m   10.91.0.178   ip-10-91-0-54.ec2.internal    <none>           <none>

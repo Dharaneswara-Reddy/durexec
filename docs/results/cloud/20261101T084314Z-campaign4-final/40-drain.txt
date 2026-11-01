@@ -1,0 +1,1 @@
+drained=yes after 0s (limit 180s); nonterminal+pending at last check=0

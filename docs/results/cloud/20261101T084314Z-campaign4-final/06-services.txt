@@ -1,0 +1,6 @@
+NAME           TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+durexec        ClusterIP   172.20.36.227    <none>        8080/TCP         98m   app=durexec
+durexec-0-np   NodePort    172.20.147.49    <none>        8080:30081/TCP   98m   app=durexec,statefulset.kubernetes.io/pod-name=durexec-0
+durexec-1-np   NodePort    172.20.177.133   <none>        8080:30082/TCP   98m   app=durexec,statefulset.kubernetes.io/pod-name=durexec-1
+durexec-hl     ClusterIP   None             <none>        8080/TCP         98m   app=durexec
+durexec-np     NodePort    172.20.113.82    <none>        8080:30080/TCP   98m   app=durexec

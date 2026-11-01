@@ -1,0 +1,57 @@
+Name:             durexec-probe
+Namespace:        durexec-lab
+Priority:         0
+Service Account:  default
+Node:             ip-10-91-0-54.ec2.internal/10.91.0.54
+Start Time:       Sun, 01 Nov 2026 07:05:09 +0000
+Labels:           app=durexec-probe
+                  topology.kubernetes.io/region=us-east-1
+                  topology.kubernetes.io/zone=us-east-1a
+Annotations:      <none>
+Status:           Running
+IP:               10.91.0.83
+IPs:
+  IP:  10.91.0.83
+Containers:
+  probe:
+    Container ID:  containerd://a1d406aad5331533770b4afc86eb2b9db266e6685f2d12ce27c5dcffa6fbf20b
+    Image:         pgvector/pgvector:pg16
+    Image ID:      docker.io/pgvector/pgvector@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f
+    Port:          <none>
+    Host Port:     <none>
+    Command:
+      sh
+      -c
+      trap 'exit 0' TERM; while :; do sleep 3600 & wait; done
+    State:          Running
+      Started:      Sun, 01 Nov 2026 07:05:13 +0000
+    Ready:          True
+    Restart Count:  0
+    Requests:
+      cpu:     50m
+      memory:  64Mi
+    Environment:
+      DATABASE_URL:       <set to the key 'url' in secret 'durexec-db'>  Optional: false
+      PGCONNECT_TIMEOUT:  5
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-xfkd8 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-xfkd8:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              durexec.io/role=harness
+Tolerations:                 durexec.io/harness=true:NoSchedule
+                             node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>

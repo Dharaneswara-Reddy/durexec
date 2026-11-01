@@ -332,7 +332,63 @@ def fig_floor():
     save(fig, "fig_7_8_latency_floor.png")
 
 
+# --- 9. mixed workloads (campaign 4) ------------------------------------------------
+TYPES = [("DeliveryOrder", "Delivery saga"), ("MixPipeline", "Pipeline (20 steps)"),
+         ("MixFanOut", "Fan-out (8)"), ("MixApproval", "Approval signal"),
+         ("MixRetry", "Retries"), ("DomainAgent", "Agent (40 task kinds)")]
+
+
+def mix_points():
+    """Closed-loop ladder of the default mix: {conc: [ {type: row}, ... ]}."""
+    pts = defaultdict(list)
+    for d in sorted(glob.glob(os.path.join(EVID, "mixload", "*-c*-D30P15F15A15R10G15-d120s-*"))):
+        prov = open(os.path.join(d, "00-provenance.txt")).read()
+        if "exp=M2" not in prov:
+            continue
+        conc = int(os.path.basename(d).split("-c")[1].split("-")[0])
+        rows = {r["type"]: r for r in csv.DictReader(open(os.path.join(d, "types.csv")))}
+        pg = dict(l.strip().split("=", 1) for l in open(os.path.join(d, "60-pg-reduced.txt")) if "=" in l)
+        rows["_db"] = pg
+        pts[conc].append(rows)
+    return pts
+
+
+def fig_mixed():
+    pts = mix_points()
+    cs = sorted(pts)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(W, 2.6), gridspec_kw={"width_ratios": [1, 1.25]})
+    tput = [st.mean(float(r["ALL"]["wf_per_s"]) for r in pts[c]) for c in cs]
+    db = [st.mean(float(r["_db"].get("dbhost_cpu_busy_pct", "nan")) for r in pts[c]) for c in cs]
+    a1.plot(cs, tput, marker="o", color=C1, label="all six types")
+    a1.set_xscale("log", base=2)
+    a1.set_xticks(cs, [str(c) for c in cs])
+    a1.minorticks_off()
+    a1.set_xlabel("Concurrent workflows (closed loop)")
+    a1.set_ylabel("Completed workflows / s")
+    a1b = a1.twinx()
+    a1b.plot(cs, db, marker="s", color=C2, linestyle="--", label="database CPU")
+    a1b.set_ylabel("Database host CPU (%)", color=C2)
+    a1b.set_ylim(0, 100)
+    a1b.grid(False)
+    a1.set_ylim(0, max(tput) * 1.25)
+    a1.set_title("(a) throughput and database CPU")
+    for t, label in TYPES:
+        p99 = [st.mean(float(r[t]["p99_s"]) for r in pts[c]) for c in cs]
+        a2.plot(cs, p99, marker="o", markersize=3.5, label=label)
+    a2.set_xscale("log", base=2)
+    a2.set_yscale("log")
+    a2.set_xticks(cs, [str(c) for c in cs])
+    a2.minorticks_off()
+    a2.set_yticks([0.5, 1, 2, 5, 10, 20], ["0.5", "1", "2", "5", "10", "20"])
+    a2.set_xlabel("Concurrent workflows (closed loop)")
+    a2.set_ylabel("p99 latency (s)")
+    a2.set_title("(b) p99 latency by workflow type")
+    a2.legend(loc="upper left", fontsize=6.8, frameon=False)
+    fig.tight_layout()
+    save(fig, "fig_7_9_mixed.png")
+
+
 if __name__ == "__main__":
     for fn in (fig_closed_loop, fig_resources, fig_waits, fig_open_loop, fig_idle,
-               fig_sensitivity, fig_faults, fig_floor):
+               fig_sensitivity, fig_faults, fig_floor, fig_mixed):
         fn()

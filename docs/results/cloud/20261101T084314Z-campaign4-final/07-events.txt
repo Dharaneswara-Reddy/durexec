@@ -1,0 +1,54 @@
+LAST SEEN   TYPE      REASON             OBJECT                                                MESSAGE
+61m         Normal    Completed          job/mixload-20261101t073943z                          Job completed
+60m         Normal    SuccessfulCreate   job/mixload-20261101t074246z                          Created pod: mixload-20261101t074246z-j9p2n
+60m         Normal    Scheduled          pod/mixload-20261101t074246z-j9p2n                    Successfully assigned durexec-lab/mixload-20261101t074246z-j9p2n to ip-10-91-0-54.ec2.internal
+60m         Normal    Pulled             pod/mixload-20261101t074246z-j9p2n                    Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+60m         Normal    Started            pod/mixload-20261101t074246z-j9p2n                    Container started
+60m         Normal    Created            pod/mixload-20261101t074246z-j9p2n                    Container created
+58m         Normal    Completed          job/mixload-20261101t074246z                          Job completed
+57m         Normal    Scheduled          pod/mixload-20261101t074516z-mnk96                    Successfully assigned durexec-lab/mixload-20261101t074516z-mnk96 to ip-10-91-0-54.ec2.internal
+57m         Normal    SuccessfulCreate   job/mixload-20261101t074516z                          Created pod: mixload-20261101t074516z-mnk96
+57m         Normal    Pulled             pod/mixload-20261101t074516z-mnk96                    Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+57m         Normal    Created            pod/mixload-20261101t074516z-mnk96                    Container created
+57m         Normal    Started            pod/mixload-20261101t074516z-mnk96                    Container started
+55m         Normal    Completed          job/mixload-20261101t074516z                          Job completed
+55m         Normal    SuccessfulCreate   job/mixload-20261101t074748z                          Created pod: mixload-20261101t074748z-kqhtn
+55m         Normal    Scheduled          pod/mixload-20261101t074748z-kqhtn                    Successfully assigned durexec-lab/mixload-20261101t074748z-kqhtn to ip-10-91-0-54.ec2.internal
+55m         Normal    Created            pod/mixload-20261101t074748z-kqhtn                    Container created
+55m         Normal    Started            pod/mixload-20261101t074748z-kqhtn                    Container started
+55m         Normal    Pulled             pod/mixload-20261101t074748z-kqhtn                    Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+53m         Normal    Completed          job/mixload-20261101t074748z                          Job completed
+52m         Normal    Created            pod/mixload-20261101t075019z-2h9hl                    Container created
+52m         Normal    SuccessfulCreate   job/mixload-20261101t075019z                          Created pod: mixload-20261101t075019z-2h9hl
+52m         Normal    Started            pod/mixload-20261101t075019z-2h9hl                    Container started
+52m         Normal    Pulled             pod/mixload-20261101t075019z-2h9hl                    Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+52m         Normal    Scheduled          pod/mixload-20261101t075019z-2h9hl                    Successfully assigned durexec-lab/mixload-20261101t075019z-2h9hl to ip-10-91-0-54.ec2.internal
+50m         Normal    Completed          job/mixload-20261101t075019z                          Job completed
+50m         Normal    SuccessfulCreate   job/mixload-20261101t075258z                          Created pod: mixload-20261101t075258z-k6msg
+50m         Normal    Scheduled          pod/mixload-20261101t075258z-k6msg                    Successfully assigned durexec-lab/mixload-20261101t075258z-k6msg to ip-10-91-0-54.ec2.internal
+50m         Normal    Started            pod/mixload-20261101t075258z-k6msg                    Container started
+50m         Normal    Pulled             pod/mixload-20261101t075258z-k6msg                    Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+50m         Normal    Created            pod/mixload-20261101t075258z-k6msg                    Container created
+49m         Normal    Pulling            pod/node-debugger-ip-10-91-0-56.ec2.internal-7r9d9    Pulling image "public.ecr.aws/docker/library/busybox:1.36"
+49m         Normal    Started            pod/node-debugger-ip-10-91-0-56.ec2.internal-7r9d9    Container started
+49m         Normal    Created            pod/durexec-1                                         Container created
+49m         Normal    Started            pod/durexec-1                                         Container started
+49m         Normal    Pulled             pod/durexec-1                                         Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e" already present on machine and can be accessed by the pod
+49m         Normal    Created            pod/node-debugger-ip-10-91-0-56.ec2.internal-7r9d9    Container created
+49m         Normal    Pulled             pod/node-debugger-ip-10-91-0-56.ec2.internal-7r9d9    Successfully pulled image "public.ecr.aws/docker/library/busybox:1.36" in 340ms (340ms including waiting). Image size: 2217006 bytes.
+46m         Normal    Completed          job/mixload-20261101t075258z                          Job completed
+45m         Normal    Scheduled          pod/mixload-20261101t075730z-94nmt                    Successfully assigned durexec-lab/mixload-20261101t075730z-94nmt to ip-10-91-0-54.ec2.internal
+45m         Normal    SuccessfulCreate   job/mixload-20261101t075730z                          Created pod: mixload-20261101t075730z-94nmt
+45m         Normal    Started            pod/mixload-20261101t075730z-94nmt                    Container started
+45m         Normal    Pulled             pod/mixload-20261101t075730z-94nmt                    Container image "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e" already present on machine and can be accessed by the pod
+45m         Normal    Created            pod/mixload-20261101t075730z-94nmt                    Container created
+44m         Normal    Pulling            pod/node-debugger-ip-10-91-0-167.ec2.internal-8k8rf   Pulling image "public.ecr.aws/docker/library/busybox:1.36"
+44m         Normal    Started            pod/node-debugger-ip-10-91-0-167.ec2.internal-8k8rf   Container started
+44m         Normal    Created            pod/node-debugger-ip-10-91-0-167.ec2.internal-8k8rf   Container created
+44m         Normal    Pulled             pod/node-debugger-ip-10-91-0-167.ec2.internal-8k8rf   Successfully pulled image "public.ecr.aws/docker/library/busybox:1.36" in 391ms (391ms including waiting). Image size: 2217006 bytes.
+43m         Normal    Pulled             pod/node-debugger-ip-10-91-0-167.ec2.internal-rrc9x   Container image "public.ecr.aws/docker/library/busybox:1.36" already present on machine and can be accessed by the pod
+43m         Normal    Created            pod/node-debugger-ip-10-91-0-167.ec2.internal-rrc9x   Container created
+43m         Normal    Started            pod/node-debugger-ip-10-91-0-167.ec2.internal-rrc9x   Container started
+43m         Warning   Unhealthy          pod/durexec-2                                         Liveness probe failed: Get "http://10.91.0.171:8080/healthz": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+43m         Warning   Unhealthy          pod/durexec-2                                         Readiness probe failed: Get "http://10.91.0.171:8080/healthz": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+42m         Normal    Completed          job/mixload-20261101t075730z                          Job completed

@@ -1,0 +1,3169 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "prometheus.io/path": "/metrics",
+                    "prometheus.io/port": "8080",
+                    "prometheus.io/scrape": "true"
+                },
+                "creationTimestamp": "2026-11-01T07:05:16Z",
+                "generateName": "durexec-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec",
+                    "apps.kubernetes.io/pod-index": "0",
+                    "controller-revision-hash": "durexec-6c7455c58d",
+                    "statefulset.kubernetes.io/pod-name": "durexec-0",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "durexec-0",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "durexec",
+                        "uid": "af47e565-f3ea-4c48-8166-38efb8fe14e7"
+                    }
+                ],
+                "resourceVersion": "3419",
+                "uid": "2659dfab-f3fd-4136-83e7-af2226f681f1"
+            },
+            "spec": {
+                "affinity": {
+                    "podAntiAffinity": {
+                        "requiredDuringSchedulingIgnoredDuringExecution": [
+                            {
+                                "labelSelector": {
+                                    "matchLabels": {
+                                        "app": "durexec"
+                                    }
+                                },
+                                "topologyKey": "kubernetes.io/hostname"
+                            }
+                        ]
+                    }
+                },
+                "automountServiceAccountToken": false,
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "POD_NAME",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "apiVersion": "v1",
+                                        "fieldPath": "metadata.name"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "NODE_ID",
+                                "value": "$(POD_NAME).durexec-hl"
+                            },
+                            {
+                                "name": "DATABASE_URL",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "url",
+                                        "name": "durexec-db"
+                                    }
+                                }
+                            }
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "durexec-config"
+                                }
+                            }
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 6,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 30,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "engined",
+                        "ports": [
+                            {
+                                "containerPort": 8080,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 5,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "150m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true
+                        },
+                        "startupProbe": {
+                            "failureThreshold": 45,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 2,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "durexec-0",
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "# No `set -x`: tracing would echo PGPASSWORD into the pod log.\nset -eu\nhost=\"$DB_HOST\"; port=5432; user=durexec; db=durexec\ndeadline=$(( $(date +%s) + READY_DEADLINE_SECONDS ))\nauthfail=0\n\necho \"gate: waiting for postgres at ${host}:${port} (deadline ${READY_DEADLINE_SECONDS}s)\"\n\nwhile :; do\n  now=$(date +%s)\n  if [ \"$now\" -ge \"$deadline\" ]; then\n    echo \"GATE FAILED [TIMEOUT]: ${host}:${port} not usable within ${READY_DEADLINE_SECONDS}s\" \u003e\u00262\n    exit 1\n  fi\n\n  # Stage 1 -- is anything listening and accepting?\n  # Two traps here, both found by testing rather than reading.\n  # `$?` after `if ! cmd` is the status of the NEGATION, always\n  # 0, so the diagnostic category becomes a lie. And a BARE\n  # failing command under `set -e` kills the script before the\n  # retry loop can classify anything. `|| rc=$?` avoids both.\n  rc=0\n  pg_isready -h \"$host\" -p \"$port\" -U \"$user\" -d \"$db\" -t 5 \u003e/dev/null 2\u003e\u00261 || rc=$?\n  if [ \"$rc\" -ne 0 ]; then\n    case \"$rc\" in\n      2) echo \"gate: no response from ${host}:${port} (DNS, routing or security group); retrying\" ;;\n      1) echo \"gate: ${host}:${port} reachable but rejecting connections (starting up); retrying\" ;;\n      *) echo \"gate: pg_isready rc=${rc} against ${host}:${port}; retrying\" ;;\n    esac\n    sleep 3\n    continue\n  fi\n\n  # Stage 2 -- can we actually authenticate and run a query?\n  # This is what pg_isready cannot tell us. Output is discarded\n  # so a verbose server notice cannot carry anything sensitive\n  # into the log; only our own classification is printed.\n  if err=$(psql -h \"$host\" -p \"$port\" -U \"$user\" -d \"$db\" \\\n             -v ON_ERROR_STOP=1 -tAc 'select 1' 2\u003e\u00261 \u003e/dev/null); then\n    echo \"gate: OK -- ${host}:${port} accepted an authenticated query\"\n    exit 0\n  fi\n\n  case \"$err\" in\n    *\"authentication failed\"*|*\"password\"*|*\"role \\\"\"*\"does not exist\"*)\n      authfail=$(( authfail + 1 ))\n      echo \"GATE [AUTH] failure ${authfail}/${MAX_AUTH_FAILURES} for user '${user}' at ${host}\" \u003e\u00262\n      if [ \"$authfail\" -ge \"$MAX_AUTH_FAILURES\" ]; then\n        # Bad credentials never fix themselves. Retrying to the\n        # deadline would waste three minutes of a paid cluster\n        # and bury the real cause.\n        echo \"GATE FAILED [AUTH]: credentials rejected ${authfail} times; check the durexec-db secret\" \u003e\u00262\n        exit 1\n      fi\n      ;;\n    *\"does not exist\"*)\n      echo \"GATE FAILED [NO_DATABASE]: database '${db}' absent on ${host}\" \u003e\u00262\n      exit 1\n      ;;\n    *)\n      echo \"gate: server up but query failed (category UNKNOWN); retrying\" \u003e\u00262\n      ;;\n  esac\n  sleep 3\ndone\n"
+                        ],
+                        "env": [
+                            {
+                                "name": "PGPASSWORD",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "password",
+                                        "name": "durexec-db"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PGCONNECT_TIMEOUT",
+                                "value": "5"
+                            },
+                            {
+                                "name": "DB_HOST",
+                                "value": "10.91.0.108"
+                            },
+                            {
+                                "name": "READY_DEADLINE_SECONDS",
+                                "value": "180"
+                            },
+                            {
+                                "name": "MAX_AUTH_FAILURES",
+                                "value": "3"
+                            }
+                        ],
+                        "image": "pgvector/pgvector:pg16",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-postgres",
+                        "resources": {
+                            "limits": {
+                                "cpu": "200m",
+                                "memory": "64Mi"
+                            },
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true,
+                            "runAsNonRoot": true,
+                            "runAsUser": 65532
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File"
+                    }
+                ],
+                "nodeName": "ip-10-91-0-65.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "engine"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "runAsGroup": 65532,
+                    "runAsNonRoot": true,
+                    "runAsUser": 65532,
+                    "seccompProfile": {
+                        "type": "RuntimeDefault"
+                    }
+                },
+                "serviceAccount": "durexec",
+                "serviceAccountName": "durexec",
+                "subdomain": "durexec-hl",
+                "terminationGracePeriodSeconds": 45,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "150m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:22Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:24Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:24Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "150m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://7acb2287b7d836dd972d4ee57d3d0ed01bac18782064f8452f8045aa1f40584c",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine@sha256:1a08ac6a840925b020926df3abc1ccdafc767f7a997ee379a2babd18e467a323",
+                        "lastState": {},
+                        "name": "engined",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "150m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-11-01T07:05:23Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        }
+                    }
+                ],
+                "hostIP": "10.91.0.65",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.65"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "10m",
+                            "memory": "32Mi"
+                        },
+                        "containerID": "containerd://5208166c41240ca0d9f4b13e1c7b60521f5807df0bf9a004fd0736400b7753d8",
+                        "image": "docker.io/pgvector/pgvector:pg16",
+                        "imageID": "docker.io/pgvector/pgvector@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f",
+                        "lastState": {},
+                        "name": "wait-for-postgres",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "200m",
+                                "memory": "64Mi"
+                            },
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://5208166c41240ca0d9f4b13e1c7b60521f5807df0bf9a004fd0736400b7753d8",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T07:05:20Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:05:19Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        }
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.91.0.13",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.13"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "cpu": "2",
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "130m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:05:16Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "prometheus.io/path": "/metrics",
+                    "prometheus.io/port": "8080",
+                    "prometheus.io/scrape": "true"
+                },
+                "creationTimestamp": "2026-11-01T07:05:16Z",
+                "generateName": "durexec-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec",
+                    "apps.kubernetes.io/pod-index": "1",
+                    "controller-revision-hash": "durexec-6c7455c58d",
+                    "statefulset.kubernetes.io/pod-name": "durexec-1",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "durexec-1",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "durexec",
+                        "uid": "af47e565-f3ea-4c48-8166-38efb8fe14e7"
+                    }
+                ],
+                "resourceVersion": "16896",
+                "uid": "a5173ad9-def5-4dcc-b457-d3dd976d1011"
+            },
+            "spec": {
+                "affinity": {
+                    "podAntiAffinity": {
+                        "requiredDuringSchedulingIgnoredDuringExecution": [
+                            {
+                                "labelSelector": {
+                                    "matchLabels": {
+                                        "app": "durexec"
+                                    }
+                                },
+                                "topologyKey": "kubernetes.io/hostname"
+                            }
+                        ]
+                    }
+                },
+                "automountServiceAccountToken": false,
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "POD_NAME",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "apiVersion": "v1",
+                                        "fieldPath": "metadata.name"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "NODE_ID",
+                                "value": "$(POD_NAME).durexec-hl"
+                            },
+                            {
+                                "name": "DATABASE_URL",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "url",
+                                        "name": "durexec-db"
+                                    }
+                                }
+                            }
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "durexec-config"
+                                }
+                            }
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 6,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 30,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "engined",
+                        "ports": [
+                            {
+                                "containerPort": 8080,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 5,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "150m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true
+                        },
+                        "startupProbe": {
+                            "failureThreshold": 45,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 2,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "durexec-1",
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "# No `set -x`: tracing would echo PGPASSWORD into the pod log.\nset -eu\nhost=\"$DB_HOST\"; port=5432; user=durexec; db=durexec\ndeadline=$(( $(date +%s) + READY_DEADLINE_SECONDS ))\nauthfail=0\n\necho \"gate: waiting for postgres at ${host}:${port} (deadline ${READY_DEADLINE_SECONDS}s)\"\n\nwhile :; do\n  now=$(date +%s)\n  if [ \"$now\" -ge \"$deadline\" ]; then\n    echo \"GATE FAILED [TIMEOUT]: ${host}:${port} not usable within ${READY_DEADLINE_SECONDS}s\" \u003e\u00262\n    exit 1\n  fi\n\n  # Stage 1 -- is anything listening and accepting?\n  # Two traps here, both found by testing rather than reading.\n  # `$?` after `if ! cmd` is the status of the NEGATION, always\n  # 0, so the diagnostic category becomes a lie. And a BARE\n  # failing command under `set -e` kills the script before the\n  # retry loop can classify anything. `|| rc=$?` avoids both.\n  rc=0\n  pg_isready -h \"$host\" -p \"$port\" -U \"$user\" -d \"$db\" -t 5 \u003e/dev/null 2\u003e\u00261 || rc=$?\n  if [ \"$rc\" -ne 0 ]; then\n    case \"$rc\" in\n      2) echo \"gate: no response from ${host}:${port} (DNS, routing or security group); retrying\" ;;\n      1) echo \"gate: ${host}:${port} reachable but rejecting connections (starting up); retrying\" ;;\n      *) echo \"gate: pg_isready rc=${rc} against ${host}:${port}; retrying\" ;;\n    esac\n    sleep 3\n    continue\n  fi\n\n  # Stage 2 -- can we actually authenticate and run a query?\n  # This is what pg_isready cannot tell us. Output is discarded\n  # so a verbose server notice cannot carry anything sensitive\n  # into the log; only our own classification is printed.\n  if err=$(psql -h \"$host\" -p \"$port\" -U \"$user\" -d \"$db\" \\\n             -v ON_ERROR_STOP=1 -tAc 'select 1' 2\u003e\u00261 \u003e/dev/null); then\n    echo \"gate: OK -- ${host}:${port} accepted an authenticated query\"\n    exit 0\n  fi\n\n  case \"$err\" in\n    *\"authentication failed\"*|*\"password\"*|*\"role \\\"\"*\"does not exist\"*)\n      authfail=$(( authfail + 1 ))\n      echo \"GATE [AUTH] failure ${authfail}/${MAX_AUTH_FAILURES} for user '${user}' at ${host}\" \u003e\u00262\n      if [ \"$authfail\" -ge \"$MAX_AUTH_FAILURES\" ]; then\n        # Bad credentials never fix themselves. Retrying to the\n        # deadline would waste three minutes of a paid cluster\n        # and bury the real cause.\n        echo \"GATE FAILED [AUTH]: credentials rejected ${authfail} times; check the durexec-db secret\" \u003e\u00262\n        exit 1\n      fi\n      ;;\n    *\"does not exist\"*)\n      echo \"GATE FAILED [NO_DATABASE]: database '${db}' absent on ${host}\" \u003e\u00262\n      exit 1\n      ;;\n    *)\n      echo \"gate: server up but query failed (category UNKNOWN); retrying\" \u003e\u00262\n      ;;\n  esac\n  sleep 3\ndone\n"
+                        ],
+                        "env": [
+                            {
+                                "name": "PGPASSWORD",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "password",
+                                        "name": "durexec-db"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PGCONNECT_TIMEOUT",
+                                "value": "5"
+                            },
+                            {
+                                "name": "DB_HOST",
+                                "value": "10.91.0.108"
+                            },
+                            {
+                                "name": "READY_DEADLINE_SECONDS",
+                                "value": "180"
+                            },
+                            {
+                                "name": "MAX_AUTH_FAILURES",
+                                "value": "3"
+                            }
+                        ],
+                        "image": "pgvector/pgvector:pg16",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-postgres",
+                        "resources": {
+                            "limits": {
+                                "cpu": "200m",
+                                "memory": "64Mi"
+                            },
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true,
+                            "runAsNonRoot": true,
+                            "runAsUser": 65532
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File"
+                    }
+                ],
+                "nodeName": "ip-10-91-0-56.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "engine"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "runAsGroup": 65532,
+                    "runAsNonRoot": true,
+                    "runAsUser": 65532,
+                    "seccompProfile": {
+                        "type": "RuntimeDefault"
+                    }
+                },
+                "serviceAccount": "durexec",
+                "serviceAccountName": "durexec",
+                "subdomain": "durexec-hl",
+                "terminationGracePeriodSeconds": 45,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "150m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:23Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:54:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:54:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "150m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://78624633531c06cafccb246a58b104e11b89ce869d21c48ed48bb868041ff81b",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine@sha256:1a08ac6a840925b020926df3abc1ccdafc767f7a997ee379a2babd18e467a323",
+                        "lastState": {
+                            "terminated": {
+                                "containerID": "containerd://c6ea3c8df21e07f1ad<ACCT>f71d0b370031ccb49157e638dbae450f0c",
+                                "exitCode": 137,
+                                "finishedAt": "2026-11-01T07:54:15Z",
+                                "reason": "Error",
+                                "startedAt": "2026-11-01T07:05:24Z"
+                            }
+                        },
+                        "name": "engined",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "150m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 1,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-11-01T07:54:15Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        }
+                    }
+                ],
+                "hostIP": "10.91.0.56",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.56"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "10m",
+                            "memory": "32Mi"
+                        },
+                        "containerID": "containerd://ffff0753368520a8eadf48c2167ee3985ce60b2663941c7f4de0340d63924636",
+                        "image": "docker.io/pgvector/pgvector:pg16",
+                        "imageID": "docker.io/pgvector/pgvector@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f",
+                        "lastState": {},
+                        "name": "wait-for-postgres",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "200m",
+                                "memory": "64Mi"
+                            },
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://ffff0753368520a8eadf48c2167ee3985ce60b2663941c7f4de0340d63924636",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T07:05:19Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:05:19Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        }
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.91.0.61",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.61"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "cpu": "2",
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "130m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:05:16Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "prometheus.io/path": "/metrics",
+                    "prometheus.io/port": "8080",
+                    "prometheus.io/scrape": "true"
+                },
+                "creationTimestamp": "2026-11-01T07:05:16Z",
+                "generateName": "durexec-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec",
+                    "apps.kubernetes.io/pod-index": "2",
+                    "controller-revision-hash": "durexec-6c7455c58d",
+                    "statefulset.kubernetes.io/pod-name": "durexec-2",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "durexec-2",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "StatefulSet",
+                        "name": "durexec",
+                        "uid": "af47e565-f3ea-4c48-8166-38efb8fe14e7"
+                    }
+                ],
+                "resourceVersion": "18375",
+                "uid": "1c4d1a6f-0479-4c1b-b6ff-42defe32ef3c"
+            },
+            "spec": {
+                "affinity": {
+                    "podAntiAffinity": {
+                        "requiredDuringSchedulingIgnoredDuringExecution": [
+                            {
+                                "labelSelector": {
+                                    "matchLabels": {
+                                        "app": "durexec"
+                                    }
+                                },
+                                "topologyKey": "kubernetes.io/hostname"
+                            }
+                        ]
+                    }
+                },
+                "automountServiceAccountToken": false,
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "POD_NAME",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "apiVersion": "v1",
+                                        "fieldPath": "metadata.name"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "NODE_ID",
+                                "value": "$(POD_NAME).durexec-hl"
+                            },
+                            {
+                                "name": "DATABASE_URL",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "url",
+                                        "name": "durexec-db"
+                                    }
+                                }
+                            }
+                        ],
+                        "envFrom": [
+                            {
+                                "configMapRef": {
+                                    "name": "durexec-config"
+                                }
+                            }
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 6,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 30,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "engined",
+                        "ports": [
+                            {
+                                "containerPort": 8080,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 5,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "150m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true
+                        },
+                        "startupProbe": {
+                            "failureThreshold": 45,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": "http",
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 2,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "hostname": "durexec-2",
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "# No `set -x`: tracing would echo PGPASSWORD into the pod log.\nset -eu\nhost=\"$DB_HOST\"; port=5432; user=durexec; db=durexec\ndeadline=$(( $(date +%s) + READY_DEADLINE_SECONDS ))\nauthfail=0\n\necho \"gate: waiting for postgres at ${host}:${port} (deadline ${READY_DEADLINE_SECONDS}s)\"\n\nwhile :; do\n  now=$(date +%s)\n  if [ \"$now\" -ge \"$deadline\" ]; then\n    echo \"GATE FAILED [TIMEOUT]: ${host}:${port} not usable within ${READY_DEADLINE_SECONDS}s\" \u003e\u00262\n    exit 1\n  fi\n\n  # Stage 1 -- is anything listening and accepting?\n  # Two traps here, both found by testing rather than reading.\n  # `$?` after `if ! cmd` is the status of the NEGATION, always\n  # 0, so the diagnostic category becomes a lie. And a BARE\n  # failing command under `set -e` kills the script before the\n  # retry loop can classify anything. `|| rc=$?` avoids both.\n  rc=0\n  pg_isready -h \"$host\" -p \"$port\" -U \"$user\" -d \"$db\" -t 5 \u003e/dev/null 2\u003e\u00261 || rc=$?\n  if [ \"$rc\" -ne 0 ]; then\n    case \"$rc\" in\n      2) echo \"gate: no response from ${host}:${port} (DNS, routing or security group); retrying\" ;;\n      1) echo \"gate: ${host}:${port} reachable but rejecting connections (starting up); retrying\" ;;\n      *) echo \"gate: pg_isready rc=${rc} against ${host}:${port}; retrying\" ;;\n    esac\n    sleep 3\n    continue\n  fi\n\n  # Stage 2 -- can we actually authenticate and run a query?\n  # This is what pg_isready cannot tell us. Output is discarded\n  # so a verbose server notice cannot carry anything sensitive\n  # into the log; only our own classification is printed.\n  if err=$(psql -h \"$host\" -p \"$port\" -U \"$user\" -d \"$db\" \\\n             -v ON_ERROR_STOP=1 -tAc 'select 1' 2\u003e\u00261 \u003e/dev/null); then\n    echo \"gate: OK -- ${host}:${port} accepted an authenticated query\"\n    exit 0\n  fi\n\n  case \"$err\" in\n    *\"authentication failed\"*|*\"password\"*|*\"role \\\"\"*\"does not exist\"*)\n      authfail=$(( authfail + 1 ))\n      echo \"GATE [AUTH] failure ${authfail}/${MAX_AUTH_FAILURES} for user '${user}' at ${host}\" \u003e\u00262\n      if [ \"$authfail\" -ge \"$MAX_AUTH_FAILURES\" ]; then\n        # Bad credentials never fix themselves. Retrying to the\n        # deadline would waste three minutes of a paid cluster\n        # and bury the real cause.\n        echo \"GATE FAILED [AUTH]: credentials rejected ${authfail} times; check the durexec-db secret\" \u003e\u00262\n        exit 1\n      fi\n      ;;\n    *\"does not exist\"*)\n      echo \"GATE FAILED [NO_DATABASE]: database '${db}' absent on ${host}\" \u003e\u00262\n      exit 1\n      ;;\n    *)\n      echo \"gate: server up but query failed (category UNKNOWN); retrying\" \u003e\u00262\n      ;;\n  esac\n  sleep 3\ndone\n"
+                        ],
+                        "env": [
+                            {
+                                "name": "PGPASSWORD",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "password",
+                                        "name": "durexec-db"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PGCONNECT_TIMEOUT",
+                                "value": "5"
+                            },
+                            {
+                                "name": "DB_HOST",
+                                "value": "10.91.0.108"
+                            },
+                            {
+                                "name": "READY_DEADLINE_SECONDS",
+                                "value": "180"
+                            },
+                            {
+                                "name": "MAX_AUTH_FAILURES",
+                                "value": "3"
+                            }
+                        ],
+                        "image": "pgvector/pgvector:pg16",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "wait-for-postgres",
+                        "resources": {
+                            "limits": {
+                                "cpu": "200m",
+                                "memory": "64Mi"
+                            },
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true,
+                            "runAsNonRoot": true,
+                            "runAsUser": 65532
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File"
+                    }
+                ],
+                "nodeName": "ip-10-91-0-167.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "engine"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "runAsGroup": 65532,
+                    "runAsNonRoot": true,
+                    "runAsUser": 65532,
+                    "seccompProfile": {
+                        "type": "RuntimeDefault"
+                    }
+                },
+                "serviceAccount": "durexec",
+                "serviceAccountName": "durexec",
+                "subdomain": "durexec-hl",
+                "terminationGracePeriodSeconds": 45,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "150m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:22Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:59:30Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:59:30Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "150m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://cc806f41b232aecb235cd9ce9c27ab85a22040b0fb4d5b7900c16ffd949c53b3",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/engine@sha256:1a08ac6a840925b020926df3abc1ccdafc767f7a997ee379a2babd18e467a323",
+                        "lastState": {},
+                        "name": "engined",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "2",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "150m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-11-01T07:05:23Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        }
+                    }
+                ],
+                "hostIP": "10.91.0.167",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.167"
+                    }
+                ],
+                "initContainerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "10m",
+                            "memory": "32Mi"
+                        },
+                        "containerID": "containerd://77d4fd925f8109b1f02b4274db7bca185631f09c4073c0a1a1aa2d92db7fc36d",
+                        "image": "docker.io/pgvector/pgvector:pg16",
+                        "imageID": "docker.io/pgvector/pgvector@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f",
+                        "lastState": {},
+                        "name": "wait-for-postgres",
+                        "ready": true,
+                        "resources": {
+                            "limits": {
+                                "cpu": "200m",
+                                "memory": "64Mi"
+                            },
+                            "requests": {
+                                "cpu": "10m",
+                                "memory": "32Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://77d4fd925f8109b1f02b4274db7bca185631f09c4073c0a1a1aa2d92db7fc36d",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T07:05:19Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:05:19Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        }
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.91.0.171",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.171"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "cpu": "2",
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "130m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:05:16Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"durexec-probe\"},\"name\":\"durexec-probe\",\"namespace\":\"durexec-lab\"},\"spec\":{\"containers\":[{\"command\":[\"sh\",\"-c\",\"trap 'exit 0' TERM; while :; do sleep 3600 \\u0026 wait; done\"],\"env\":[{\"name\":\"DATABASE_URL\",\"valueFrom\":{\"secretKeyRef\":{\"key\":\"url\",\"name\":\"durexec-db\"}}},{\"name\":\"PGCONNECT_TIMEOUT\",\"value\":\"5\"}],\"image\":\"pgvector/pgvector:pg16\",\"name\":\"probe\",\"resources\":{\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}}}],\"nodeSelector\":{\"durexec.io/role\":\"harness\"},\"restartPolicy\":\"Always\",\"terminationGracePeriodSeconds\":1,\"tolerations\":[{\"effect\":\"NoSchedule\",\"key\":\"durexec.io/harness\",\"operator\":\"Equal\",\"value\":\"true\"}]}}\n"
+                },
+                "creationTimestamp": "2026-11-01T07:05:09Z",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec-probe",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "durexec-probe",
+                "namespace": "durexec-lab",
+                "resourceVersion": "3730",
+                "uid": "480cdf3a-c629-4150-a4bb-eb7b640f65e2"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-c",
+                            "trap 'exit 0' TERM; while :; do sleep 3600 \u0026 wait; done"
+                        ],
+                        "env": [
+                            {
+                                "name": "DATABASE_URL",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "url",
+                                        "name": "durexec-db"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "PGCONNECT_TIMEOUT",
+                                "value": "5"
+                            }
+                        ],
+                        "image": "pgvector/pgvector:pg16",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "probe",
+                        "resources": {
+                            "requests": {
+                                "cpu": "50m",
+                                "memory": "64Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-xfkd8",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "ip-10-91-0-54.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "harness"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 1,
+                "tolerations": [
+                    {
+                        "effect": "NoSchedule",
+                        "key": "durexec.io/harness",
+                        "operator": "Equal",
+                        "value": "true"
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-xfkd8",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "50m",
+                    "memory": "64Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:09Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:09Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:13Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:13Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:05:09Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "50m",
+                            "memory": "64Mi"
+                        },
+                        "containerID": "containerd://a1d406aad5331533770b4afc86eb2b9db266e6685f2d12ce27c5dcffa6fbf20b",
+                        "image": "docker.io/pgvector/pgvector:pg16",
+                        "imageID": "docker.io/pgvector/pgvector@sha256:0dd3149a06e4579a0d70d8fef9945636cd514005e7237deb27f9b67886f8dc4f",
+                        "lastState": {},
+                        "name": "probe",
+                        "ready": true,
+                        "resources": {
+                            "requests": {
+                                "cpu": "50m",
+                                "memory": "64Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-11-01T07:05:13Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 0,
+                                "supplementalGroups": [
+                                    0
+                                ],
+                                "uid": 0
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-xfkd8",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.91.0.54",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.54"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.91.0.83",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.83"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "requests": {
+                        "cpu": "28m",
+                        "memory": "64Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:05:09Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-11-01T07:42:51Z",
+                "generateName": "mixload-20261101t074246z-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec-loadgen",
+                    "batch.kubernetes.io/controller-uid": "d25ebf75-fe54-454f-a39f-a638528f9fa9",
+                    "batch.kubernetes.io/job-name": "mixload-20261101t074246z",
+                    "controller-uid": "d25ebf75-fe54-454f-a39f-a638528f9fa9",
+                    "job-name": "mixload-20261101t074246z",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "mixload-20261101t074246z-j9p2n",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "batch/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Job",
+                        "name": "mixload-20261101t074246z",
+                        "uid": "d25ebf75-fe54-454f-a39f-a638528f9fa9"
+                    }
+                ],
+                "resourceVersion": "14367",
+                "uid": "194411d7-e067-47f8-a946-dae87effa7f8"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "-nodes",
+                            "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080",
+                            "-mix",
+                            "DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15",
+                            "-concurrency",
+                            "64",
+                            "-rate",
+                            "40",
+                            "-duration",
+                            "120s",
+                            "-warmup",
+                            "15s",
+                            "-agent-corpora",
+                            "flight,multidomain,heldout,heldout2",
+                            "-id-prefix",
+                            "mx-20261101t074246z-",
+                            "-seed",
+                            "1",
+                            "-out",
+                            "/tmp/mix",
+                            "-emit-csv"
+                        ],
+                        "command": [
+                            "/mixload"
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "loadgen",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-7jxwn",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "ip-10-91-0-54.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "harness"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoSchedule",
+                        "key": "durexec.io/harness",
+                        "operator": "Equal",
+                        "value": "true"
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-7jxwn",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "500m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:45:10Z",
+                        "message": "pod sandbox is not ready",
+                        "observedGeneration": 1,
+                        "reason": "PodSandboxNotReady",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:42:51Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:45:09Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:45:09Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:42:51Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "500m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://c53842a376cf6cc<ACCT>1ecf3f266d6d84d7c13ca4961a9e1179952b0",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:9b65cead481ea963d88b4c62d637854727a9ecb6c8082f295e965470b80fb2ef",
+                        "lastState": {},
+                        "name": "loadgen",
+                        "ready": false,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://c53842a376cf6cc<ACCT>1ecf3f266d6d84d7c13ca4961a9e1179952b0",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T07:45:09Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:42:52Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-7jxwn",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.91.0.54",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.54"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Succeeded",
+                "podIP": "10.91.0.178",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.178"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "489m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:42:51Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-11-01T07:45:21Z",
+                "generateName": "mixload-20261101t074516z-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec-loadgen",
+                    "batch.kubernetes.io/controller-uid": "2409a427-f89a-492b-ada6-658f9a1a7657",
+                    "batch.kubernetes.io/job-name": "mixload-20261101t074516z",
+                    "controller-uid": "2409a427-f89a-492b-ada6-658f9a1a7657",
+                    "job-name": "mixload-20261101t074516z",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "mixload-20261101t074516z-mnk96",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "batch/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Job",
+                        "name": "mixload-20261101t074516z",
+                        "uid": "2409a427-f89a-492b-ada6-658f9a1a7657"
+                    }
+                ],
+                "resourceVersion": "15061",
+                "uid": "3afb219a-5ab1-4412-981c-13ff93ebb5f3"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "-nodes",
+                            "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080",
+                            "-mix",
+                            "DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15",
+                            "-concurrency",
+                            "64",
+                            "-rate",
+                            "60",
+                            "-duration",
+                            "120s",
+                            "-warmup",
+                            "15s",
+                            "-agent-corpora",
+                            "flight,multidomain,heldout,heldout2",
+                            "-id-prefix",
+                            "mx-20261101t074516z-",
+                            "-seed",
+                            "1",
+                            "-out",
+                            "/tmp/mix",
+                            "-emit-csv"
+                        ],
+                        "command": [
+                            "/mixload"
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "loadgen",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-pqw67",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "ip-10-91-0-54.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "harness"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoSchedule",
+                        "key": "durexec.io/harness",
+                        "operator": "Equal",
+                        "value": "true"
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-pqw67",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "500m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:47:41Z",
+                        "message": "pod sandbox is not ready",
+                        "observedGeneration": 1,
+                        "reason": "PodSandboxNotReady",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:45:21Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:47:40Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:47:40Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:45:21Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "500m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://6f04c42e556547dbb33cfba1cb2b0f12e9d9511ee9a09af100879fa730d85712",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:9b65cead481ea963d88b4c62d637854727a9ecb6c8082f295e965470b80fb2ef",
+                        "lastState": {},
+                        "name": "loadgen",
+                        "ready": false,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://6f04c42e556547dbb33cfba1cb2b0f12e9d9511ee9a09af100879fa730d85712",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T07:47:39Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:45:22Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-pqw67",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.91.0.54",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.54"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Succeeded",
+                "podIP": "10.91.0.80",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.80"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "489m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:45:21Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-11-01T07:47:52Z",
+                "generateName": "mixload-20261101t074748z-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec-loadgen",
+                    "batch.kubernetes.io/controller-uid": "511d9f75-4ee9-4ea8-b7ff-583a4a515a26",
+                    "batch.kubernetes.io/job-name": "mixload-20261101t074748z",
+                    "controller-uid": "511d9f75-4ee9-4ea8-b7ff-583a4a515a26",
+                    "job-name": "mixload-20261101t074748z",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "mixload-20261101t074748z-kqhtn",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "batch/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Job",
+                        "name": "mixload-20261101t074748z",
+                        "uid": "511d9f75-4ee9-4ea8-b7ff-583a4a515a26"
+                    }
+                ],
+                "resourceVersion": "15751",
+                "uid": "ad9b497b-7c76-4223-9a8d-c9212466ab99"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "-nodes",
+                            "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080",
+                            "-mix",
+                            "DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15",
+                            "-concurrency",
+                            "64",
+                            "-rate",
+                            "80",
+                            "-duration",
+                            "120s",
+                            "-warmup",
+                            "15s",
+                            "-agent-corpora",
+                            "flight,multidomain,heldout,heldout2",
+                            "-id-prefix",
+                            "mx-20261101t074748z-",
+                            "-seed",
+                            "1",
+                            "-out",
+                            "/tmp/mix",
+                            "-emit-csv"
+                        ],
+                        "command": [
+                            "/mixload"
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "loadgen",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-lwp8c",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "ip-10-91-0-54.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "harness"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoSchedule",
+                        "key": "durexec.io/harness",
+                        "operator": "Equal",
+                        "value": "true"
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-lwp8c",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "500m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:50:12Z",
+                        "message": "pod sandbox is not ready",
+                        "observedGeneration": 1,
+                        "reason": "PodSandboxNotReady",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:47:52Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:50:10Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:50:10Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:47:52Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "500m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://e9bcd4ca5a3c0b21c36e0d8afed31ef14fbe003a36de05e8d042d98e622bbc33",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:9b65cead481ea963d88b4c62d637854727a9ecb6c8082f295e965470b80fb2ef",
+                        "lastState": {},
+                        "name": "loadgen",
+                        "ready": false,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://e9bcd4ca5a3c0b21c36e0d8afed31ef14fbe003a36de05e8d042d98e622bbc33",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T07:50:10Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:47:53Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-lwp8c",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.91.0.54",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.54"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Succeeded",
+                "podIP": "10.91.0.178",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.178"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "489m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:47:52Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-11-01T07:50:24Z",
+                "generateName": "mixload-20261101t075019z-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec-loadgen",
+                    "batch.kubernetes.io/controller-uid": "19335e38-8bb1-40f6-8f83-49ddd47cb1a7",
+                    "batch.kubernetes.io/job-name": "mixload-20261101t075019z",
+                    "controller-uid": "19335e38-8bb1-40f6-8f83-49ddd47cb1a7",
+                    "job-name": "mixload-20261101t075019z",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "mixload-20261101t075019z-2h9hl",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "batch/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Job",
+                        "name": "mixload-20261101t075019z",
+                        "uid": "19335e38-8bb1-40f6-8f83-49ddd47cb1a7"
+                    }
+                ],
+                "resourceVersion": "16479",
+                "uid": "85f2742e-741a-4d3f-aad5-dd378433d6dc"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "-nodes",
+                            "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080",
+                            "-mix",
+                            "DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15",
+                            "-concurrency",
+                            "64",
+                            "-rate",
+                            "100",
+                            "-duration",
+                            "120s",
+                            "-warmup",
+                            "15s",
+                            "-agent-corpora",
+                            "flight,multidomain,heldout,heldout2",
+                            "-id-prefix",
+                            "mx-20261101t075019z-",
+                            "-seed",
+                            "1",
+                            "-out",
+                            "/tmp/mix",
+                            "-emit-csv"
+                        ],
+                        "command": [
+                            "/mixload"
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "loadgen",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-kv5rg",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "ip-10-91-0-54.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "harness"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoSchedule",
+                        "key": "durexec.io/harness",
+                        "operator": "Equal",
+                        "value": "true"
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-kv5rg",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "500m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:52:51Z",
+                        "message": "pod sandbox is not ready",
+                        "observedGeneration": 1,
+                        "reason": "PodSandboxNotReady",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:50:24Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:52:50Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:52:50Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:50:24Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "500m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://4cc574b3304b29058c1b08f04370bc702f1cd77fb29b59135370ece59a2d04c4",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:9b65cead481ea963d88b4c62d637854727a9ecb6c8082f295e965470b80fb2ef",
+                        "lastState": {},
+                        "name": "loadgen",
+                        "ready": false,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://4cc574b3304b29058c1b08f04370bc702f1cd77fb29b59135370ece59a2d04c4",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T07:52:49Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:50:24Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-kv5rg",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.91.0.54",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.54"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Succeeded",
+                "podIP": "10.91.0.80",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.80"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "requests": {
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:50:24Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-11-01T07:53:03Z",
+                "generateName": "mixload-20261101t075258z-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec-loadgen",
+                    "batch.kubernetes.io/controller-uid": "935ca0bd-032a-4986-953b-61a1663b7a92",
+                    "batch.kubernetes.io/job-name": "mixload-20261101t075258z",
+                    "controller-uid": "935ca0bd-032a-4986-953b-61a1663b7a92",
+                    "job-name": "mixload-20261101t075258z",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "mixload-20261101t075258z-k6msg",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "batch/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Job",
+                        "name": "mixload-20261101t075258z",
+                        "uid": "935ca0bd-032a-4986-953b-61a1663b7a92"
+                    }
+                ],
+                "resourceVersion": "17481",
+                "uid": "043ba36b-fe3a-40cf-91ec-b40fab2cade1"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "-nodes",
+                            "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080",
+                            "-mix",
+                            "DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15",
+                            "-concurrency",
+                            "64",
+                            "-rate",
+                            "0",
+                            "-duration",
+                            "180s",
+                            "-warmup",
+                            "15s",
+                            "-agent-corpora",
+                            "flight,multidomain,heldout,heldout2",
+                            "-id-prefix",
+                            "mx-20261101t075258z-",
+                            "-seed",
+                            "1",
+                            "-out",
+                            "/tmp/mix",
+                            "-emit-csv"
+                        ],
+                        "command": [
+                            "/mixload"
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "loadgen",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vzb6d",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "ip-10-91-0-54.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "harness"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoSchedule",
+                        "key": "durexec.io/harness",
+                        "operator": "Equal",
+                        "value": "true"
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-vzb6d",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "500m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:56:22Z",
+                        "message": "pod sandbox is not ready",
+                        "observedGeneration": 1,
+                        "reason": "PodSandboxNotReady",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:53:03Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:56:21Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:56:21Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:53:03Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "500m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://07ea01250c2d35bd76000b154ad600f5867b5930059245edfc2a9d53f630cda2",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:9b65cead481ea963d88b4c62d637854727a9ecb6c8082f295e965470b80fb2ef",
+                        "lastState": {},
+                        "name": "loadgen",
+                        "ready": false,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://07ea01250c2d35bd76000b154ad600f5867b5930059245edfc2a9d53f630cda2",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T07:56:21Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:53:04Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-vzb6d",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.91.0.54",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.54"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Succeeded",
+                "podIP": "10.91.0.82",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.82"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "requests": {
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:53:03Z"
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-11-01T07:57:34Z",
+                "generateName": "mixload-20261101t075730z-",
+                "generation": 1,
+                "labels": {
+                    "app": "durexec-loadgen",
+                    "batch.kubernetes.io/controller-uid": "c5c2f6f6-beb7-4f38-9878-b4bcbe0b4d82",
+                    "batch.kubernetes.io/job-name": "mixload-20261101t075730z",
+                    "controller-uid": "c5c2f6f6-beb7-4f38-9878-b4bcbe0b4d82",
+                    "job-name": "mixload-20261101t075730z",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "name": "mixload-20261101t075730z-94nmt",
+                "namespace": "durexec-lab",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "batch/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "Job",
+                        "name": "mixload-20261101t075730z",
+                        "uid": "c5c2f6f6-beb7-4f38-9878-b4bcbe0b4d82"
+                    }
+                ],
+                "resourceVersion": "18769",
+                "uid": "bfb57216-bbf9-497c-8486-cd1265881e92"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "args": [
+                            "-nodes",
+                            "http://durexec-0.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-1.durexec-hl.durexec-lab.svc.cluster.local:8080,http://durexec-2.durexec-hl.durexec-lab.svc.cluster.local:8080",
+                            "-mix",
+                            "DeliveryOrder=30,MixPipeline=15,MixFanOut=15,MixApproval=15,MixRetry=10,DomainAgent=15",
+                            "-concurrency",
+                            "64",
+                            "-rate",
+                            "0",
+                            "-duration",
+                            "180s",
+                            "-warmup",
+                            "15s",
+                            "-agent-corpora",
+                            "flight,multidomain,heldout,heldout2",
+                            "-id-prefix",
+                            "mx-20261101t075730z-",
+                            "-seed",
+                            "1",
+                            "-out",
+                            "/tmp/mix",
+                            "-emit-csv"
+                        ],
+                        "command": [
+                            "/mixload"
+                        ],
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "loadgen",
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-88vwp",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "ip-10-91-0-54.ec2.internal",
+                "nodeSelector": {
+                    "durexec.io/role": "harness"
+                },
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoSchedule",
+                        "key": "durexec.io/harness",
+                        "operator": "Equal",
+                        "value": "true"
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kube-api-access-88vwp",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "allocatedResources": {
+                    "cpu": "500m",
+                    "memory": "128Mi"
+                },
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T08:00:54Z",
+                        "message": "pod sandbox is not ready",
+                        "observedGeneration": 1,
+                        "reason": "PodSandboxNotReady",
+                        "status": "False",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:57:34Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T08:00:53Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T08:00:53Z",
+                        "observedGeneration": 1,
+                        "reason": "PodCompleted",
+                        "status": "False",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-11-01T07:57:34Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "allocatedResources": {
+                            "cpu": "500m",
+                            "memory": "128Mi"
+                        },
+                        "containerID": "containerd://3b6bd3dc30dd2529cb61ecdbe81536f784c8717e28e3c52ba1892ef87a09f12a",
+                        "image": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen:69c9d9e",
+                        "imageID": "<ACCT>.dkr.ecr.us-east-1.amazonaws.com/durexec/loadgen@sha256:9b65cead481ea963d88b4c62d637854727a9ecb6c8082f295e965470b80fb2ef",
+                        "lastState": {},
+                        "name": "loadgen",
+                        "ready": false,
+                        "resources": {
+                            "limits": {
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "restartCount": 0,
+                        "started": false,
+                        "state": {
+                            "terminated": {
+                                "containerID": "containerd://3b6bd3dc30dd2529cb61ecdbe81536f784c8717e28e3c52ba1892ef87a09f12a",
+                                "exitCode": 0,
+                                "finishedAt": "2026-11-01T08:00:53Z",
+                                "reason": "Completed",
+                                "startedAt": "2026-11-01T07:57:35Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 65532,
+                                "supplementalGroups": [
+                                    65532
+                                ],
+                                "uid": 65532
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-88vwp",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.91.0.54",
+                "hostIPs": [
+                    {
+                        "ip": "10.91.0.54"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Succeeded",
+                "podIP": "10.91.0.178",
+                "podIPs": [
+                    {
+                        "ip": "10.91.0.178"
+                    }
+                ],
+                "qosClass": "Burstable",
+                "resources": {
+                    "limits": {
+                        "memory": "512Mi"
+                    },
+                    "requests": {
+                        "cpu": "489m",
+                        "memory": "128Mi"
+                    }
+                },
+                "startTime": "2026-11-01T07:57:34Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

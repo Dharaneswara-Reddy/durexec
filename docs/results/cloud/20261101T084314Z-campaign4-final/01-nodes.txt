@@ -1,0 +1,5 @@
+NAME                          STATUS   ROLES    AGE    VERSION               INTERNAL-IP   EXTERNAL-IP     OS-IMAGE                        KERNEL-VERSION                            CONTAINER-RUNTIME
+ip-10-91-0-167.ec2.internal   Ready    <none>   103m   v1.37.1-eks-6e7947a   10.91.0.167   100.61.39.48    Amazon Linux 2023.12.20261102   6.18.56-125.164.amzn2023.x86_64 (amd64)   containerd://2.3.7+unknown
+ip-10-91-0-54.ec2.internal    Ready    <none>   103m   v1.37.1-eks-6e7947a   10.91.0.54    44.193.25.165   Amazon Linux 2023.12.20261102   6.18.56-125.164.amzn2023.x86_64 (amd64)   containerd://2.3.7+unknown
+ip-10-91-0-56.ec2.internal    Ready    <none>   103m   v1.37.1-eks-6e7947a   10.91.0.56    98.92.216.231   Amazon Linux 2023.12.20261102   6.18.56-125.164.amzn2023.x86_64 (amd64)   containerd://2.3.7+unknown
+ip-10-91-0-65.ec2.internal    Ready    <none>   103m   v1.37.1-eks-6e7947a   10.91.0.65    98.81.119.23    Amazon Linux 2023.12.20261102   6.18.56-125.164.amzn2023.x86_64 (amd64)   containerd://2.3.7+unknown

@@ -339,6 +339,69 @@ violation was found in any of them. This is evidence for these workloads and
 faults; it is not a proof, and the runs did not include network partitions
 between engines, which were not tested.
 
+\section{Mixed Workloads}
+\label{sec:mixed}
+
+The measurements so far used one workflow type. A fourth campaign ran the six
+types of Section~5.8 on the same test bed, with generic-v2 enabled. Each type
+was first run on its own at 32 concurrent workflows
+(Table~\ref{tab:mixsingle}); every type completed every run.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Each workflow type on its own (closed loop, $c=32$, 120\,s)}
+  \label{tab:mixsingle}
+  \small
+  \begin{tabular}{@{}lrrrr@{}}
+    \toprule
+    \textbf{Type} & \textbf{Workflows/s} & \textbf{Activities per run} &
+      \textbf{p50 (s)} & \textbf{p99 (s)} \\
+    \midrule
+    Delivery saga (with timer) & 16.5 & 4 & 1.94 & 3.07 \\
+    Pipeline & 15.3 & 20 & 2.04 & 2.76 \\
+    Fan-out and join & 26.9 & 9 & 1.13 & 2.24 \\
+    Approval signal & 23.3 & 2 & 1.33 & 1.94 \\
+    Retries & 20.6 & 3 (9 attempts) & 1.53 & 2.35 \\
+    Agent, 40 task kinds & 101.4 & 3 & 0.31 & 0.52 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The pipeline is the instructive row. Its twenty sequential activities take
+about the same time as the delivery saga's four steps and timer, which
+confirms that the latency floor of Section~7.1 is set by polling and timer
+scanning rather than by the number of steps.
+
+The default mix (30\% delivery, 15\% each of pipeline, fan-out, approval and
+agent, 10\% retries) was then driven with a closed-loop ladder
+(Fig.~\ref{fig:mixed}). Throughput rose to 96\,workflows/s at $c=128$ (three
+trials, 94--99) with every type's p99 below 3.4\,s. At $c=256$ throughput
+rose by only 10\% to 107\,workflows/s while the database host reached 94\%
+CPU and p99 latency rose four- to six-fold. The type that suffered most was
+the pipeline, whose p99 reached 17--21\,s, because each of its twenty steps
+waits again in the same database-bound queue. The limit is the same one
+found with the delivery workload alone.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_7_9_mixed.png}
+  \caption[Mixed workload against concurrency]{The six-type mix against
+    concurrency: throughput and database CPU, and p99 latency of each type.}
+  \label{fig:mixed}
+\end{figure}
+
+In open loop the mix sustained 40, 60 and 80\,workflows/s exactly, with p99
+between 2.35 and 2.55\,s; at 100\,workflows/s it fell behind, completing 71
+per second with p99 of 95\,s. Two faults were injected under the mix at
+$c=64$. Killing the engine process on one node passed almost unnoticed
+(p99 2.65\,s), because the restarted pod reclaimed its shards within
+seconds. Freezing one engine for 35\,s delayed the runs on its shards until
+its leases were taken over, raising the p99 of the delivery and approval
+types to about 30\,s, but every run of every type completed. In the whole
+campaign, 172{,}280 runs of six types over 20 measurement points, the journal invariants found no
+duplicate sequence number, duplicate completion, orphan completion, gap or
+second terminal event.
+
 \section{Semantic Deduplication}
 
 The duplicate check was evaluated in three steps: on the original flight

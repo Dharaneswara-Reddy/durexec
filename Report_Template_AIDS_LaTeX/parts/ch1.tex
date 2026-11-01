@@ -231,13 +231,16 @@ The contributions of this work are as follows.
   \item A two-level mapping in which workflows hash to a fixed set of shards
     and shards are assigned to nodes by a consistent-hash ring, so that a
     change of membership moves ownership but no data.
-  \item A semantic idempotency check that compares the meaning of an agent's
+  \item A duplicate check for agents that re-plan, which compares an agent's
     intended action with the actions already in the run's history and
-    journals the verdict, keeping replay deterministic and auditable.
+    journals the verdict, keeping replay deterministic and auditable, and an
+    evaluation of three comparators across forty kinds of task, two sets of
+    which were held out until the comparator under test was frozen.
   \item A cloud evaluation on Amazon EKS covering idle overhead, latency
     floor, closed- and open-loop capacity, sensitivity to workers, shards and
-    replicas, and recovery from six classes of injected fault, together with
-    the evaluation harness and its validity checks.
+    replicas, recovery from six classes of injected fault, and a mixed
+    workload of six workflow types, together with the evaluation harness and
+    its validity checks.
 \end{enumerate}
 
 \section{Organisation of the Report}
