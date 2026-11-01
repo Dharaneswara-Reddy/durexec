@@ -341,53 +341,85 @@ between engines, which were not tested.
 
 \section{Semantic Deduplication}
 
-Table~\ref{tab:semantic} gives the results of the offline evaluation of
-Section~6.3. Exact matching never suppresses a distinct request, but it
-detects only the 14 of 98 duplicates that are byte-identical after
-normalisation. Pure semantic matching at the shipped thresholds
-($\tau_\text{low}=0.85$, $\tau_\text{high}=0.90$) detected 56 duplicates
-automatically and sent 25 pairs to a person, but it also judged 108 of the
-115 distinct pairs to be duplicates, including all 91 lexically close ones.
-No single threshold between 0.70 and 0.99 separated the classes; the
-encoder places ``BLR to DEL Friday morning'' and ``BLR to DEL Saturday
-morning'' as close together as genuine paraphrases. The reworded
-double-booking case of Section~1.2.3 had a similarity of 0.87, inside the
-escalation band.
+The duplicate check was evaluated in three steps: on the original flight
+corpus, on corpora covering forty kinds of task, and inside the engine on
+the cloud test bed.
+
+\paragraph{One domain.} On the 213 flight pairs, exact matching never
+suppressed a distinct request but caught only the 14 of 98 repeats that are
+identical after normalisation. Pure semantic matching at the shipped
+thresholds ($\tau_\text{low}=0.85$, $\tau_\text{high}=0.90$) judged 108 of
+the 115 distinct pairs to be duplicates, including all 91 lexically close
+ones, and no threshold between 0.70 and 0.99 separated the classes: the
+encoder places ``BLR to DEL Friday morning'' as close to ``BLR to DEL
+Saturday morning'' as to a genuine paraphrase. The hybrid comparator with
+the flight field reader caught all 98 repeats with no false positive.
+
+\paragraph{Many domains.} That flight result does not transfer. The flight
+field reader was written by reading the flight corpus, and on the
+ten-domain corpus of Section~6.3 it caught only 29 of 150 repeats while
+suppressing 51 of 150 distinct actions, because outside flights it reads
+nothing and falls back to pure similarity. A first value-shape reader
+(generic-v1) caught 147 of 150 but still suppressed 40 of 150. Reading those
+40 errors showed that the deciding detail was often a word (a payee, a city,
+a service level, an action such as \emph{delete} against \emph{snapshot}), a
+direction, or a value stated on one side only. Generic-v2
+(Section~5.6) was designed from that analysis and then frozen, and it was
+scored once on each of two corpora of ten further task kinds that had been
+committed before it existed. Table~\ref{tab:semantic} gives the results.
 
 \begin{table}[htbp]
   \centering
-  \caption{Deduplication on the 213-pair corpus at the shipped thresholds}
+  \caption{Duplicate check on unseen task kinds (150 repeats and 150
+    distinct actions per corpus)}
   \label{tab:semantic}
   \small
-  \begin{tabular}{@{}lrrrrr@{}}
+  \begin{tabular}{@{}llrr@{}}
     \toprule
-    \textbf{Comparator} & \textbf{Detected} & \textbf{False positives} &
-      \textbf{Escalated} & \textbf{Precision} & \textbf{p50 / p99 ($\mu$s)} \\
+    \textbf{Corpus} & \textbf{Comparator} & \textbf{Repeats caught} &
+      \textbf{Distinct suppressed} \\
     \midrule
-    Exact & 14 / 98 & 0 / 115 & 0 & 1.000 & 2.4 / 8.2 \\
-    Semantic & 56 / 98 & 108 / 115 & 25 & 0.341 & 10.1 / 66.2 \\
-    Hybrid (opt-in) & 98 / 98 & 0 / 115 & 0 & 1.000 & 14.8 / 81.4 \\
+    Held-out 1 & Exact & 0 & 0 \\
+     & Value shapes (generic-v1) & 128 (85\%) & 41 (27.3\%) \\
+     & \textbf{Generic-v2} & 68 (45\%) & \textbf{5 (3.3\%)} \\
+    Held-out 2 & Exact & 0 & 0 \\
+     & Value shapes (generic-v1) & 115 (77\%) & 42 (28.0\%) \\
+     & \textbf{Generic-v2.1} & 82 (55\%) & \textbf{3 (2.0\%)} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The hybrid comparator, which compares the deciding fields exactly after
-normalisation and uses similarity only for the rest, detected all 98
-duplicates with no false positive at every threshold tested. This result
-must be read with two cautions. The corpus was built by construction and its
-labels were not assigned by people, and the same construction defines which
-fields are deciding; a perfect score on such a corpus shows that the
-mechanism works as intended, not that it would score as well on real agent
-traffic. The thresholds were also not chosen on a held-out set. The
-comparison cost, excluding the embedding call, was below 100\,$\mu$s at p99
-for every comparator, negligible beside a decision commit.
+On task kinds it had never seen, generic-v2 suppressed about one wrong
+action in forty instead of one in four, at the price of catching only about
+half of the reworded repeats. The repeats it misses are paraphrases that
+swap ordinary words, such as \emph{pay} for \emph{transfer} or \emph{move}
+for \emph{upgrade}; those are left to run, which is no worse than having no
+semantic check, and the dedup key still reaches the downstream service. The
+wrong suppressions that remain on the second held-out set were a seating
+tier hidden after a count (``2 gold tickets'') and two reversed directions
+phrased without ``to''.
 
-The conclusion we draw is that a general-purpose sentence encoder on its own
-is not a safe basis for suppressing actions, because it measures topical
-similarity, and a change of one word can change the identity of an action.
-The design decisions of Section~4.2.6, journalled verdicts, an escalation
-band and opt-in use, limit the damage of a wrong verdict, but the hybrid
-comparator is what makes the mechanism usable.
+\paragraph{Would a model help with the residue?} The pairs generic-v2 left
+undecided were scored with the engine's embedding model on the cloud
+operator. Calling such a pair a duplicate when its cosine reached 0.90 added
+3 and 1 caught repeats on the two held-out sets, but raised the wrongly
+suppressed actions from 1 to 10 and from 3 to 8 (generic-v2.1 throughout,
+so held-out~1 is scored post hoc here); at 0.85 the cost was 19
+and 10. The model does not separate a paraphrase from a one-word change of
+identity any better than WordNet does, so it is not used to decide.
+
+\paragraph{Inside the engine.} With generic-v2 configured, 12,173
+\cd{DomainAgent} runs on the cloud test bed replayed every pair of the four
+corpora through the engine's own path at 101 workflows/s. The rates matched
+the offline evaluation (held-out 1: 44\% of repeats suppressed, 0.7\% of
+distinct actions; held-out 2: 55\% and 1.9\%), and in no run did the
+journalled verdict disagree with the number of times the action really
+executed. Writing that workload exposed two defects in the semantic path,
+both since fixed with regression tests: a suppressed call journalled the
+reused result but never woke the workflow, so a run whose only pending step
+was suppressed stopped for ever; and the intent stored for a completed call
+was rendered differently from the live query it would later be compared
+with.
 
 \section{Threats to Validity}
 \label{sec:validity}
@@ -399,6 +431,6 @@ were repeated three times but not across days. Each measurement point lasted
 two minutes after warm-up, which is long enough to observe saturation but not
 long-term effects such as table bloat or autovacuum. The database was a
 single 2-vCPU host, so every capacity figure is a property of that host, and
-nothing here bears on database high availability. Only one workflow type was
-used for load. Finally, the semantic corpus was synthetic, as discussed
+nothing here bears on database high availability. Capacity was measured
+with one workflow type, the mixed workloads at moderate load only. Finally, the semantic corpus was synthetic, as discussed
 above.

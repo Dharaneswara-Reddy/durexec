@@ -93,12 +93,22 @@ the \cd{COMPLETED} state. A promotion drill with a streaming standby database
 was also carried out locally, but the cloud evaluation used a single database
 host and the drill is not discussed further.
 
-The semantic deduplication mechanism was evaluated offline on a corpus of 213
-pairs of flight-booking requests, 98 labelled duplicate and 115 distinct, of
-which 91 distinct pairs are lexically close to each other (for example, the
-same route on a different day). The pairs and their labels were produced by
-construction, not by human annotators, which is a limitation discussed with
-the results.
+The duplicate check was evaluated offline on four corpora of request pairs,
+all built the same way: several phrasings of one action form duplicate
+pairs, and phrasings of two actions that differ in one deciding detail form
+distinct pairs. The flight corpus has 213 pairs (98 duplicate). Three
+further corpora have 300 pairs each, 15 duplicate and 15 distinct per kind
+of task: a development corpus of ten kinds (flight, payment, refund,
+meeting, message, order, provisioning, ticket, subscription, shipment) and
+two held-out corpora of ten kinds each (hotel, car rental, share trade,
+insurance claim, password reset, file sharing, payroll, DNS change,
+prescription, deployment; and cab, invoice, leave, bill payment, event
+tickets, backup, access grant, table booking, repair, funds transfer). Each
+held-out corpus was committed to the repository before the comparator
+version it was used to test, and was scored once. A fifth set holds 45
+genuine rewordings produced by a live language model on both sides of a
+simulated crash; it has no distinct pairs. Labels follow from the
+construction and were not assigned by human annotators.
 
 \section{Cloud Test Bed}
 

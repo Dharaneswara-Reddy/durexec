@@ -124,32 +124,44 @@ and, on each call, compares the requested command with the event recorded at
 that position; a mismatch fails the run with a non-determinism error that
 names the position, the recorded command and the requested one.
 
-\section{Semantic and Hybrid Deduplication}
+\section{Semantic Deduplication}
 
-The semantic checker builds a canonical intent string from the activity type
-and its normalised, sorted arguments, obtains an embedding from the embedder
-service, and compares it by cosine similarity with the stored embeddings of
-completed activities of the same type in the run. The verdict and its inputs
-are journalled as a \cd{SemanticDedupEvaluated} event before any command is
-issued. Lookups and inserts of embeddings use the \cd{pgvector} type in
-\cd{activity\_intents}.
+The semantic checker renders each call's arguments as one intent sentence,
+compares it with the intents of completed calls of the same activity type in
+the same run, and journals its verdict as a \cd{SemanticDedupEvaluated}
+event before any command is issued. Three comparators can answer the
+question. The \emph{semantic} comparator embeds the whole sentence and
+applies the two thresholds. The \emph{hybrid} comparator compares deciding
+fields exactly and uses similarity only for the rest; its only field reader
+understood flight bookings. The third, \emph{generic-v2}, was written when
+the evaluation of Chapter~7 showed that neither of the first two works
+across kinds of task, and is selected with \cd{SEMANTIC\_FIELDS}.
 
-The evaluation in Chapter~7 showed that a general sentence encoder answers a
-different question from the one deduplication asks. It judges two requests
-for the same route on different days as very similar, which they are, though
-they are two different bookings. An opt-in \emph{hybrid} comparator was
-therefore added. The activity declares its deciding fields, for example the
-origin, destination and date of a flight; these are normalised (``BLR'' and
-``Bangalore'' map to one code, ``Friday AM'' to a date and time window) and
-compared exactly, and similarity is applied only to the remaining free text.
-The verdict is journalled in the same way, so the hybrid comparator changes
-the decision but not the replay mechanism.
+Generic-v2 compares the two sentences with each other rather than extracting
+a fixed schema from each. Typed values are recognised by their form and
+normalised: amounts with their currency, counts and measures with units,
+dates in several notations, weekdays and ``next'' or ``a week on''
+shifts, clock times and parts of the day, durations, identifiers, e-mail and
+host addresses, IP addresses and versions. Two values of one kind that
+differ make the pair distinct, and so does an ``X to Y'' pair whose ends
+are reversed. The remaining content words are matched through Princeton
+WordNet~3.0 synonyms, through abbreviations (``BLR'' and ``Bangalore'',
+``INFY'' and ``Infosys'') and through clipped forms (``prod'' and
+``production''); an optional table built from public airport data adds
+code-to-city aliases such as ``MAA'' and ``Chennai''. The rule that decides
+is containment: a repeat may add words, but it may not replace any, and a
+value stated on only one side escalates instead of matching. The comparator
+uses no embedding model and no per-domain vocabulary, and the WordNet
+lexicon (680\,KB) is embedded in the binary, so a verdict is deterministic
+and takes well under a millisecond.
 
 \section{API, Routing and Observability}
 
 The HTTP API (Table~\ref{tab:api}) is served by every node. A request for a
-run on a shard the node does not own is answered with HTTP~409 \cd{NotOwner} and, when
-known, the name of the current owner, and clients retry against that node. Every node exports
+run on a shard the node does not own is forwarded to the owner, which
+re-checks its fencing token at the write as always; while a shard has no
+owner the request is answered with HTTP~409 \cd{NotOwner} and the client
+retries. Every node exports
 Prometheus metrics for task latencies, commits, lease transitions, fencing
 rejections, deduplication verdicts and connection-pool use, and writes
 structured JSON logs. The fencing-rejection counter is the one used in
@@ -176,17 +188,25 @@ Chapter~7 to count stale writes.
   \end{tabular}
 \end{table}
 
-\section{Demonstration Applications}
+\section{Demonstration Applications and Workload Shapes}
 
-Two applications exercise the engine. The first is a food-delivery order
-written as a saga: payment, restaurant confirmation, driver assignment and
-notification, each with a compensation, and a durable timer for the
-preparation time. Every step has a natural exact key such as the order
-identifier, so it uses no semantic deduplication. It is the workload used for
-all load tests in Chapter~7. The second is a travel agent whose planner
-proposes flight and hotel bookings. It can run with a recorded fixture or a
-live language model, and it reproduces the double-booking case of
-Section~1.2.3 when a crash is injected between two planning steps.
+The food-delivery order is a saga of four steps, \cd{ChargePayment},
+\cd{ReserveInventory}, \cd{NotifyRestaurant} and \cd{DispatchDriver}, the
+first three with compensations, and a durable timer for the preparation
+time. Every step has a natural exact key, so it uses no semantic check. The
+travel agent plans flight bookings with a recorded fixture or a live language
+model and reproduces the double-booking case of Section~1.2.3.
+
+Five further workflow types were added so that the engine could be measured
+with work of different shapes at once: \cd{MixPipeline}, a chain of 20
+activities; \cd{MixFanOut}, eight activities started together and then
+joined; \cd{MixApproval}, which waits for an approval signal from outside;
+\cd{MixRetry}, whose activities fail twice before succeeding; and
+\cd{DomainAgent}, which executes a planned action, re-plans, and issues the
+action again in other words for any of 31 kinds of task. A load tool,
+\cd{mixload}, drives any weighted mix of the six types and, for each
+\cd{DomainAgent} run, reads the engine's journalled verdict and counts how
+many times the action really executed.
 
 \section{Deployment}
 
