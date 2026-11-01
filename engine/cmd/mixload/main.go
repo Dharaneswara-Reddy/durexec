@@ -65,6 +65,7 @@ type cfg struct {
 	out          string
 	seed         int64
 	timeout      time.Duration
+	emitCSV      bool
 }
 
 type weighted struct {
@@ -94,6 +95,7 @@ func main() {
 	flag.StringVar(&c.out, "out", "mixload", "output file prefix")
 	flag.Int64Var(&c.seed, "seed", 1, "random seed for the mix")
 	flag.DurationVar(&c.timeout, "run-timeout", 5*time.Minute, "give up following one workflow after this long")
+	flag.BoolVar(&c.emitCSV, "emit-csv", false, "also print the CSV files to stdout between === BEGIN/END name === markers (for a Job whose files vanish with its pod)")
 	flag.Parse()
 	c.nodes = strings.Split(nodes, ",")
 	var err error
@@ -112,6 +114,16 @@ func main() {
 	rand.New(rand.NewSource(c.seed)).Shuffle(len(pairs), func(i, j int) { pairs[i], pairs[j] = pairs[j], pairs[i] })
 	if err := run(context.Background(), c, pairs, os.Stdout); err != nil {
 		fail(err)
+	}
+	if c.emitCSV {
+		for _, suffix := range []string{"-types.csv", "-agent.csv"} {
+			b, err := os.ReadFile(c.out + suffix)
+			if err != nil {
+				continue
+			}
+			name := strings.TrimPrefix(suffix, "-")
+			fmt.Printf("=== BEGIN %s ===\n%s=== END %s ===\n", name, b, name)
+		}
 	}
 }
 

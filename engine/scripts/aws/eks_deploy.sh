@@ -87,9 +87,9 @@ echo "secret durexec-db : created (value never printed)"
 # --- 3. render and substitute ----------------------------------------------
 kubectl kustomize deploy/kubernetes/overlays/eks > "$RENDER"
 sed -i "s|DB_HOST_PLACEHOLDER|${DB_HOST}|g; s|IMAGE_PLACEHOLDER|${IMAGE}|g" "$RENDER"
-python3 - "$RENDER" "$ENGINE_REPLICAS" "$SHARD_COUNT" "$WORKFLOW_WORKERS" "$ACTIVITY_WORKERS" "$SYNC_COMMIT" <<'PY'
+python3 - "$RENDER" "$ENGINE_REPLICAS" "$SHARD_COUNT" "$WORKFLOW_WORKERS" "$ACTIVITY_WORKERS" "$SYNC_COMMIT" "${SEMANTIC_FIELDS:-}" <<'PY'
 import sys, yaml
-f, reps, shards, wfw, actw, sc = sys.argv[1:]
+f, reps, shards, wfw, actw, sc, semf = sys.argv[1:]
 docs = [d for d in yaml.safe_load_all(open(f)) if d]
 for d in docs:
     if d["kind"] == "StatefulSet" and d["metadata"]["name"] == "durexec":
@@ -100,6 +100,8 @@ for d in docs:
             "CLUSTER_NODES": ",".join(f"durexec-{i}.durexec-hl" for i in range(int(reps))),
             "WORKFLOW_WORKERS": wfw, "ACTIVITY_WORKERS": actw, "SYNC_COMMIT": sc,
         })
+        if semf:
+            d["data"]["SEMANTIC_FIELDS"] = semf
 yaml.safe_dump_all(docs, open(f, "w"), sort_keys=False)
 PY
 
