@@ -13,7 +13,7 @@ procedure whose results are reported in Chapter~7.
 
 \section{Unit and Integration Tests}
 
-The suite contains 591 test functions, which expand to 1,223 test cases when
+The suite contains 597 test functions, which expand to 1,229 test cases when
 table-driven subtests are counted. Table~\ref{tab:tests} gives their
 distribution. Tests that need a database start a disposable PostgreSQL
 schema through the \cd{testdb} helper, so the storage code is never tested
@@ -50,10 +50,10 @@ correctness.
     \cd{taskq}    & 32 & \cd{timers}   & 14 \\
     \cd{lease}    & 31 & \cd{obs}      & 13 \\
     \cd{activity} & 25 & \cd{saga}     & 10 \\
-    \cd{shard}    & 21 & others        & 230 \\
+    \cd{shard}    & 21 & others        & 236 \\
     \midrule
     \multicolumn{3}{@{}l}{Total test functions (test cases including subtests)} &
-      591 (1,223) \\
+      597 (1,229) \\
     \bottomrule
   \end{tabular}
 \end{table}
