@@ -55,30 +55,38 @@ Table~\ref{tab:terminology} fixes the terms used throughout the report.
   \caption{Terminology used in this report}
   \label{tab:terminology}
   \small
-  \begin{tabular}{@{}p{1.15in}p{4.4in}@{}}
-    \toprule
+  \begin{tabular}{|p{1.11in}|p{4.25in}|}
+    \hline
     \textbf{Term} & \textbf{Meaning} \\
-    \midrule
+    \hline
     Workflow & Orchestration code that decides what happens next and performs
       no input or output itself. It must be deterministic, because it is
       re-executed on every recovery. \\
+    \hline
     Activity & One step with an external side effect, such as charging a card
       or calling an API. It may be non-deterministic and runs at least once. \\
+    \hline
     Event & An immutable record appended to the log describing something that
       has already happened. \\
+    \hline
     History & The ordered events of one workflow run; the complete state of
       that run. \\
+    \hline
     Replay & Re-executing a workflow against its history so that completed
       steps resolve from the log. \\
+    \hline
     Shard & One of a fixed number of partitions. A workflow belongs to one
       shard for its whole life. \\
+    \hline
     Lease & A time-limited claim on a shard, held in a database row and
       renewed periodically, that makes one node the owner of the shard. \\
+    \hline
     Fencing token & A counter that increases whenever ownership of a shard
       changes; a write is accepted only with the current value. \\
+    \hline
     Saga & A multi-step transaction that, if it fails part way, is undone by
       running a compensating action for each step that had succeeded. \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -165,27 +173,34 @@ mechanism that realises each and the chapter in which it is evaluated.
   \caption{Project objectives}
   \label{tab:objectives}
   \small
-  \begin{tabular}{@{}p{0.2in}p{2.75in}p{1.65in}p{0.75in}@{}}
-    \toprule
+  \begin{tabular}{|p{0.19in}|p{2.58in}|p{1.55in}|p{0.70in}|}
+    \hline
     \textbf{No.} & \textbf{Objective} & \textbf{Mechanism} & \textbf{Evaluated} \\
-    \midrule
+    \hline
     1 & Record every state transition as an immutable event so that a run can
         be reconstructed exactly & Append-only event log & Ch.~6, 7 \\
+    \hline
     2 & Resume a failed run from its history rather than from the start &
         Deterministic replay & Ch.~6, 7 \\
+    \hline
     3 & Never repeat an external side effect across retries & Stable
         deduplication keys & Ch.~6 \\
+    \hline
     4 & Partition execution across nodes & Fixed shards, consistent-hash
         ring & Ch.~7 \\
+    \hline
     5 & Lose no progress when a shard owner fails & Leases with fencing
         tokens & Ch.~7 \\
+    \hline
     6 & Undo multi-step transactions that fail part way & Saga
         compensation & Ch.~6 \\
+    \hline
     7 & Detect reworded duplicate agent actions & Journalled semantic
         verdict & Ch.~6 \\
+    \hline
     8 & Measure capacity, sensitivity and recovery on cloud hardware & EKS
         test bed, fault injector & Ch.~7 \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 

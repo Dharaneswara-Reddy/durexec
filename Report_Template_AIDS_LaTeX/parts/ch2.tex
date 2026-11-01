@@ -205,27 +205,33 @@ properties that the engine is designed to combine.
   \caption{Comparison of related systems}
   \label{tab:litcompare}
   \small
-  \begin{tabular}{@{}p{1.25in}p{0.95in}p{0.85in}p{0.95in}p{0.85in}@{}}
-    \toprule
+  \begin{tabular}{|p{1.25in}|p{0.95in}|p{0.85in}|p{0.95in}|p{0.85in}|}
+    \hline
     \textbf{System} & \textbf{Infrastructure} & \textbf{Partitioned} &
       \textbf{Ownership safety} & \textbf{Semantic dedup} \\
-    \midrule
+    \hline
     Temporal~\cite{temporaldocs} & 4 services + DB (+ search) & Yes &
       Range IDs per shard & No \\
+    \hline
     Durable Functions~\cite{durablefunctions2021, netherite2022} & Cloud
       storage or Netherite & Yes & Partition leases & No \\
+    \hline
     Beldi~\cite{beldi2020} & Serverless + key-value store & By key &
       Logged conditional writes & No \\
+    \hline
     Boki~\cite{boki2021} & Custom shared log & Yes & Log sequencer & No \\
+    \hline
     DBOS~\cite{dbos2022} & PostgreSQL & No & Database transactions & No \\
+    \hline
     Shard Manager~\cite{shardmanager2021} & ZooKeeper + control plane & Yes &
       Coordination service & Not applicable \\
+    \hline
     GPTCache~\cite{gptcache2023} & Vector store & Not applicable &
       Not applicable & Cache only \\
-    \midrule
+    \hline
     \textbf{This work} & \textbf{PostgreSQL} & \textbf{Yes} &
       \textbf{Fencing token in each write} & \textbf{Journalled verdict} \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 

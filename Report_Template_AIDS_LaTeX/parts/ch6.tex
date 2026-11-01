@@ -40,21 +40,27 @@ correctness.
   \caption{Distribution of test functions by package}
   \label{tab:tests}
   \small
-  \begin{tabular}{@{}lr@{\hspace{0.5in}}lr@{}}
-    \toprule
+  \begin{tabular}{|l|r|l|r|}
+    \hline
     \textbf{Package} & \textbf{Tests} & \textbf{Package} & \textbf{Tests} \\
-    \midrule
+    \hline
     \cd{runtime}  & 70 & \cd{eventlog} & 20 \\
+    \hline
     \cd{api}      & 59 & \cd{config}   & 18 \\
+    \hline
     \cd{workflow} & 33 & \cd{faultinj} & 15 \\
+    \hline
     \cd{taskq}    & 32 & \cd{timers}   & 14 \\
+    \hline
     \cd{lease}    & 31 & \cd{obs}      & 13 \\
+    \hline
     \cd{activity} & 25 & \cd{saga}     & 10 \\
+    \hline
     \cd{shard}    & 21 & others        & 236 \\
-    \midrule
-    \multicolumn{3}{@{}l}{Total test functions (test cases including subtests)} &
+    \hline
+    \multicolumn{3}{|l|}{Total test functions (test cases including subtests)} &
       597 (1,229) \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -158,27 +164,37 @@ found to vary by up to 40\%.
   \caption{Evaluation stages}
   \label{tab:stages}
   \small
-  \begin{tabular}{@{}p{0.3in}p{1.75in}p{3.45in}@{}}
-    \toprule
+  \begin{tabular}{|p{0.28in}|p{1.65in}|p{3.26in}|}
+    \hline
     \textbf{Stage} & \textbf{Purpose} & \textbf{Procedure} \\
-    \midrule
+    \hline
     B & Idle overhead & No workload; database commits per second for five
       configurations, 3 trials each \\
+    \hline
     C & Latency floor & Closed loop at $c=1$, and open loop at 1\,wf/s,
       3 trials each \\
+    \hline
     D & Closed-loop capacity & $c$ from 4 to 512; repeats at 128, 256, 512 \\
+    \hline
     E & Open-loop capacity & 0.5 to 1.1 times the Stage~D knee, 3 trials each \\
+    \hline
     F & Worker sensitivity & Workers per shard 2+4 and 8+16 against the
       default 4+8 \\
+    \hline
     G & Shard sensitivity & 32 and 64 shards at a constant 192 workers \\
+    \hline
     H & Replica scaling & One and two engine replicas against three \\
+    \hline
     Faults & Recovery & Six fault types under open-loop load
       (Section~\ref{sec:faultmethod}) \\
+    \hline
     M1 & Workflow types & Each of six types alone, $c=32$ \\
+    \hline
     M2--M3 & Mixed capacity & Six-type mix: $c$ from 32 to 256 with repeats; open
       loop at 40--100\,wf/s \\
+    \hline
     M4 & Mixed faults & Process kill and 35\,s freeze under the mix \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 

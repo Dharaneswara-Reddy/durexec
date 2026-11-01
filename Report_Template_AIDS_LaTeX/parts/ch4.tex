@@ -159,22 +159,27 @@ rows of the shards it owns.
   \caption{Persistent data model}
   \label{tab:schema}
   \small
-  \begin{tabular}{@{}p{1.15in}p{1.9in}p{2.45in}@{}}
-    \toprule
+  \begin{tabular}{|p{1.09in}|p{1.79in}|p{2.31in}|}
+    \hline
     \textbf{Table} & \textbf{Key} & \textbf{Contents} \\
-    \midrule
+    \hline
     \cd{events} & (shard, workflow, run, seq) & Event type and JSON payload;
       append-only, gap-free \cd{seq} \\
+    \hline
     \cd{executions} & (shard, workflow) & Run identifier, type, status and the
       last sequence number \\
+    \hline
     \cd{tasks} & (shard, id) & Workflow and activity tasks with visibility
       time, lock expiry, lock token and attempt count \\
+    \hline
     \cd{timers} & (shard, workflow, run, seq) & Fire time of each durable
       timer \\
+    \hline
     \cd{shard\_leases} & shard & Owner, fencing token and expiry \\
+    \hline
     \cd{activity\_intents} & (shard, workflow, run, seq) & Canonical intent
       text and its 384-dimensional embedding \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -262,19 +267,22 @@ engine has no record of it, and the activity will be called again.
   \caption{Crash windows for one activity execution}
   \label{tab:crashwindows}
   \small
-  \begin{tabular}{@{}p{0.2in}p{1.75in}p{2.45in}p{0.6in}@{}}
-    \toprule
+  \begin{tabular}{|p{0.2in}|p{1.75in}|p{2.45in}|p{0.6in}|}
+    \cline{2-4}
     & \textbf{Crash point} & \textbf{Recovery} & \textbf{Safe} \\
-    \midrule
+    \hline
     A & Activity scheduled, not yet polled & Another worker polls the task;
       the activity runs once & Yes \\
+    \hline
     B & Task polled, external call not made & The lock expires and the task is
       redelivered; the activity runs once & Yes \\
+    \hline
     C & External call succeeded, completion not recorded & The lock expires
       and the task is redelivered; the external call is made again & No \\
+    \hline
     D & Completion recorded, workflow task not yet processed & Replay resolves
       the activity from history; it is not run again & Yes \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 

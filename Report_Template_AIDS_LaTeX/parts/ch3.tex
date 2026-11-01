@@ -19,36 +19,47 @@ objectives in Table~\ref{tab:objectives}.
   \caption{Functional requirements}
   \label{tab:fr}
   \small
-  \begin{tabular}{@{}p{0.5in}p{5.0in}@{}}
-    \toprule
+  \begin{tabular}{|p{0.49in}|p{4.88in}|}
+    \hline
     \textbf{ID} & \textbf{Requirement} \\
-    \midrule
+    \hline
     FR-1 & A client can start a workflow of a registered type with an
       identifier and an input. Starting the same identifier twice returns the
       existing run rather than creating a second one. \\
+    \hline
     FR-2 & Every state change of a run is appended to its history as an
       immutable event with a gap-free sequence number. \\
+    \hline
     FR-3 & A run interrupted by a crash at any point resumes from its history
       and reaches the same result it would have reached without the crash. \\
+    \hline
     FR-4 & Activities are executed by workers through a durable task queue,
       with a configurable retry policy and per-task lock timeout. \\
+    \hline
     FR-5 & Each activity receives a deduplication key that is identical on
       every attempt and every replay. \\
+    \hline
     FR-6 & Workflows can wait on durable timers and on named signals sent by
       clients; both survive restarts. \\
+    \hline
     FR-7 & A workflow can register compensations; on failure they run in
       reverse order of registration, and rollback survives a crash. \\
+    \hline
     FR-8 & Workflows are partitioned into a fixed number of shards, each owned
       by at most one node at a time. \\
+    \hline
     FR-9 & When a node fails, its shards are claimed by surviving nodes and
       their runs continue without loss of progress. \\
+    \hline
     FR-10 & A write by a node that no longer owns the shard is rejected. \\
+    \hline
     FR-11 & An activity may opt in to semantic deduplication. A request whose
       meaning matches a completed activity of the same type in the same run
       returns that activity's recorded result instead of executing again. \\
+    \hline
     FR-12 & Clients can query the status and history of a run, and operators
       can read metrics for throughput, latency, ownership and errors. \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -59,29 +70,36 @@ objectives in Table~\ref{tab:objectives}.
   \caption{Non-functional requirements}
   \label{tab:nfr}
   \small
-  \begin{tabular}{@{}p{0.55in}p{1.15in}p{3.8in}@{}}
-    \toprule
+  \begin{tabular}{|p{0.52in}|p{1.09in}|p{3.59in}|}
+    \hline
     \textbf{ID} & \textbf{Property} & \textbf{Requirement} \\
-    \midrule
+    \hline
     NFR-1 & Correctness & No completed activity is executed again by the
       engine because of a crash, retry or ownership change, apart from the
       unavoidable window described in Section~\ref{sec:crashwindows}. \\
+    \hline
     NFR-2 & Recovery & After a node is killed, its shards are claimed within
       one lease period plus one renewal interval. \\
+    \hline
     NFR-3 & Dependencies & PostgreSQL is the only infrastructure dependency.
       The embedding service is needed only by activities that use semantic
       deduplication, and never during replay. \\
+    \hline
     NFR-4 & Scalability & Throughput increases when nodes or workers are
       added, until the database becomes the limit. \\
+    \hline
     NFR-5 & Efficiency & An idle cluster places a small, bounded load on the
       database. \\
+    \hline
     NFR-6 & Observability & Every node exports Prometheus metrics and
       structured logs; every semantic verdict is recorded with its inputs. \\
+    \hline
     NFR-7 & Portability & The engine runs as a single static binary in a
       container on Kubernetes or directly on a host. \\
+    \hline
     NFR-8 & Testability & Fault injection hooks allow crashes, pauses and
       database outages to be triggered at named points in tests. \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -101,15 +119,18 @@ each setting.
   \caption{Hardware used for development and evaluation}
   \label{tab:hw}
   \small
-  \begin{tabular}{@{}p{1.3in}p{1.75in}p{2.45in}@{}}
-    \toprule
+  \begin{tabular}{|p{1.23in}|p{1.65in}|p{2.31in}|}
+    \hline
     \textbf{Role} & \textbf{Instance} & \textbf{Resources} \\
-    \midrule
+    \hline
     Development & Laptop / cloud container & 4--8 vCPU, 16\,GB, Docker \\
+    \hline
     Engine nodes (cloud) & 3 $\times$ m7i-flex.large & 2 vCPU, 8\,GB each \\
+    \hline
     Load harness (cloud) & 1 $\times$ c7i-flex.large & 2 vCPU, 4\,GB \\
+    \hline
     Database (cloud) & 1 $\times$ m7i-flex.large & 2 vCPU, 8\,GB, gp3 volume \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 

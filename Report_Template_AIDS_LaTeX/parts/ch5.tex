@@ -23,29 +23,42 @@ together, and \cd{cmd/engined} builds the process from configuration.
   \caption{Main packages of the engine}
   \label{tab:packages}
   \small
-  \begin{tabular}{@{}p{1.25in}p{0.55in}p{3.7in}@{}}
-    \toprule
+  \begin{tabular}{|p{1.18in}|p{0.52in}|p{3.49in}|}
+    \hline
     \textbf{Package} & \textbf{Lines} & \textbf{Responsibility} \\
-    \midrule
+    \hline
     \cd{core} & 625 & Event types, identifiers, decision and store interfaces \\
+    \hline
     \cd{eventlog} & 1,005 & Reading histories; the fenced decision commit \\
+    \hline
     \cd{taskq} & 1,002 & Durable task queue: poll, lock, heartbeat, complete,
       retry \\
+    \hline
     \cd{lease} & 789 & Lease store and the ownership state machine \\
+    \hline
     \cd{shard} & 275 & Workflow-to-shard hash and the consistent-hash ring \\
+    \hline
     \cd{timers} & 264 & Durable timers and the due-timer scanner \\
+    \hline
     \cd{workflow} & 1,644 & Workflow context, replay by program order,
       cooperative dispatcher \\
+    \hline
     \cd{activity} & 729 & Activity registry, retry policy, deduplication keys \\
+    \hline
     \cd{saga} & 202 & Compensation stack \\
+    \hline
     \cd{idem} & 4,705 & Exact, semantic, hybrid and generic-v2 deduplication,
       embedder client, WordNet lexicon \\
+    \hline
     \cd{runtime} & 2,954 & Workflow, activity and timer workers; per-shard
       worker pools \\
+    \hline
     \cd{api} & 1,959 & HTTP API, error mapping, request routing \\
+    \hline
     \cd{obs} & 444 & Prometheus metrics and structured logging \\
+    \hline
     \cd{faultinj} & 364 & Named crash points for tests \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -172,19 +185,26 @@ Chapter~7 to count stale writes.
   \caption{HTTP API}
   \label{tab:api}
   \small
-  \begin{tabular}{@{}p{2.6in}p{2.9in}@{}}
-    \toprule
+  \begin{tabular}{|p{2.54in}|p{2.83in}|}
+    \hline
     \textbf{Endpoint} & \textbf{Purpose} \\
-    \midrule
+    \hline
     \cd{POST /v1/workflows} & Start a run (idempotent on identifier) \\
+    \hline
     \cd{GET /v1/workflows/\{id\}} & Status of a run \\
+    \hline
     \cd{GET /v1/workflows/\{id\}/history} & Event history of a run \\
+    \hline
     \cd{POST /v1/workflows/\{id\}/signals} & Send a named signal \\
+    \hline
     \cd{POST /v1/workflows/\{id\}/cancel} & Request cancellation \\
+    \hline
     \cd{GET /v1/shards} & Current lease table \\
+    \hline
     \cd{GET /v1/dedup/verdicts} & Recorded semantic verdicts \\
+    \hline
     \cd{GET /healthz}, \cd{GET /metrics} & Liveness and metrics \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -210,10 +230,7 @@ many times the action really executed.
 
 \section{Deployment}
 
-The binary is built into a small container image. Locally, Docker Compose
-starts three engine nodes, PostgreSQL with \cd{pgvector}, the embedder,
-Prometheus and Grafana. On Kubernetes the engine runs as a StatefulSet, so
-that each pod has a stable name that is also its node identifier on the ring;
-pod anti-affinity places one engine per node. The AWS environment of
-Chapter~6 is created by Terraform and contains no component other than
-those listed here: no message broker, cache or coordination service.
+The binary ships as one container image. On Kubernetes it runs as a
+StatefulSet, so each pod's stable name is its node identifier on the ring,
+with one engine per node; the AWS environment of Chapter~6 contains no
+broker, cache or coordination service.

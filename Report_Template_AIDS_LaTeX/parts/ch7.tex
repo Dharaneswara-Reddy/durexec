@@ -89,18 +89,23 @@ measured. In this range the system is limited by latency, not capacity.
   \caption{Closed-loop results (r3/S16/w4x8)}
   \label{tab:closed}
   \small
-  \begin{tabular}{@{}rrrrrr@{}}
-    \toprule
+  \begin{tabular}{|r|r|r|r|r|r|}
+    \hline
     $c$ & \textbf{Workflows/s} & \textbf{p50 (s)} & \textbf{p99 (s)} &
       \textbf{DB CPU (\%)} & \textbf{Commits/s} \\
-    \midrule
+    \hline
     4   & 1.6   & 2.41 & 4.51 & 4      & 481 \\
+    \hline
     16  & 7.2   & 2.21 & 3.21 & 8      & 1,209 \\
+    \hline
     64  & 36.8  & 1.80 & 2.50 & 22     & 4,100 \\
+    \hline
     128 & 66.5  & 1.9--2.0 & 2.6--2.7 & 41--52 & 7,150 \\
+    \hline
     256 & \textbf{131.1} & 1.9--2.0 & 2.7--3.1 & 74--96 & 13,200 \\
+    \hline
     512 & 123.7 & 3.1--4.1 & 8.8--14.0 & 96 & 18,400--20,100 \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -161,20 +166,25 @@ at 108 and one at 144\,workflows/s kept up.
   \caption{Open-loop results (three trials per rate)}
   \label{tab:open}
   \small
-  \begin{tabular}{@{}rrrrr@{}}
-    \toprule
+  \begin{tabular}{|r|r|r|r|r|}
+    \hline
     \textbf{Offered (wf/s)} & \textbf{Completed (wf/s)} & \textbf{Dropped} &
       \textbf{p99 (s)} & \textbf{Lease changes} \\
-    \midrule
+    \hline
     65.6  & 64.6--64.9 & 0 & 2.2 & 0 \\
+    \hline
     98.3  & 96.9--97.2 & 0 & 2.2--2.9 & 0 \\
+    \hline
     108.2 & 67.6 / 76.3 / 106.8 & 3,340 / 2,507 / 0 & 44.5 / 45.2 / 2.7 &
       10 / 0 / 0 \\
+    \hline
     118.0 & 82--85 & 2,234--2,648 & 46--48 & 10 each \\
+    \hline
     131.1 & 67--99 & 2,700--5,889 & 43--51 & 10 / 28 / 10 \\
+    \hline
     144.2 & 75.0 / 102.8 / 128.8 & 5,849 / 3,010 / 0 & 55.9 / 44.6 / 39.0 &
       14 / 10 / 0 \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -230,20 +240,27 @@ the limiting resource was the shared database, not the busiest engine.
   \caption{Capacity at $c=256$ under parameter changes (mean of three trials)}
   \label{tab:sens}
   \small
-  \begin{tabular}{@{}llrr@{}}
-    \toprule
+  \begin{tabular}{|l|l|r|r|}
+    \hline
     \textbf{Parameter} & \textbf{Value} & \textbf{Workflows/s} &
       \textbf{p99 (s)} \\
-    \midrule
+    \hline
     Workers per shard & 2+4 & 106.2 & 3.4--4.1 \\
+    \cline{2-4}
      & 4+8 (default) & 131.1 & 2.7--3.1 \\
+    \cline{2-4}
      & 8+16 & 120.0 & 3.8--7.7 \\
+    \hline
     Shards (192 workers) & 32 & 130.3 & 2.8--3.4 \\
+    \cline{2-4}
      & 64 & 113.8 & 3.9--4.5 \\
+    \hline
     Engine replicas & 1 & 130.4 & 2.7--3.0 \\
+    \cline{2-4}
      & 2 & 128.2 & 2.6--3.7 \\
+    \cline{2-4}
      & 3 (default) & 131.1 & 2.7--3.1 \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -267,19 +284,24 @@ trials. The cases fall into three groups.
   \caption{Fault recovery under 65.6\,wf/s open-loop load}
   \label{tab:faults}
   \small
-  \begin{tabular}{@{}p{1.15in}rrrrr@{}}
-    \toprule
+  \begin{tabular}{|p{1.15in}|r|r|r|r|r|}
+    \hline
     \textbf{Fault} & \textbf{$t_\text{expire}$ (s)} & \textbf{$t_\text{claim}$ (s)}
       & \textbf{$t_\text{ring}$ (s)} & \textbf{Refused} & \textbf{p99 (s)} \\
-    \midrule
+    \hline
     Graceful delete & 1.4--4.1 & 4.1--5.9 & 31.9--32.3 & 0--1 & 4.4--5.8 \\
+    \hline
     \cd{SIGKILL} & 4.7--5.3 & 4.7--5.3 & 34.6--36.8 & 0--1 & 2.2--3.3 \\
+    \hline
     Freeze 35\,s & 12.2--12.8 & 32.3--47.7 & 51.2--55.2 & 118--864 &
       31.9--46.2 \\
+    \hline
     Database sever & none & none & not broken & 0 & 2.2 \\
+    \hline
     Node drain & 4.2--8.3 & 23.1--23.9 & 38.5--49.7 & 176--736 & 4.8--6.7 \\
+    \hline
     Database reboot & 22.4 & 33.2 & 35.2 & 1,365 & 5.2 \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -352,18 +374,23 @@ was first run on its own at 32 concurrent workflows
   \caption{Each workflow type on its own (closed loop, $c=32$, 120\,s)}
   \label{tab:mixsingle}
   \small
-  \begin{tabular}{@{}lrrrr@{}}
-    \toprule
+  \begin{tabular}{|l|r|r|r|r|}
+    \hline
     \textbf{Type} & \textbf{Workflows/s} & \textbf{Activities per run} &
       \textbf{p50 (s)} & \textbf{p99 (s)} \\
-    \midrule
+    \hline
     Delivery saga (with timer) & 16.5 & 4 & 1.94 & 3.07 \\
+    \hline
     Pipeline & 15.3 & 20 & 2.04 & 2.76 \\
+    \hline
     Fan-out and join & 26.9 & 9 & 1.13 & 2.24 \\
+    \hline
     Approval signal & 23.3 & 2 & 1.33 & 1.94 \\
+    \hline
     Retries & 20.6 & 3 (9 attempts) & 1.53 & 2.35 \\
+    \hline
     Agent, 40 task kinds & 101.4 & 3 & 0.31 & 0.52 \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
@@ -437,18 +464,23 @@ committed before it existed. Table~\ref{tab:semantic} gives the results.
     distinct actions per corpus)}
   \label{tab:semantic}
   \small
-  \begin{tabular}{@{}llrr@{}}
-    \toprule
+  \begin{tabular}{|l|l|r|r|}
+    \hline
     \textbf{Corpus} & \textbf{Comparator} & \textbf{Repeats caught} &
       \textbf{Distinct suppressed} \\
-    \midrule
+    \hline
     Held-out 1 & Exact & 0 & 0 \\
+    \cline{2-4}
      & Value shapes (generic-v1) & 128 (85\%) & 41 (27.3\%) \\
+    \cline{2-4}
      & \textbf{Generic-v2} & 68 (45\%) & \textbf{5 (3.3\%)} \\
+    \hline
     Held-out 2 & Exact & 0 & 0 \\
+    \cline{2-4}
      & Value shapes (generic-v1) & 115 (77\%) & 42 (28.0\%) \\
+    \cline{2-4}
      & \textbf{Generic-v2.1} & 82 (55\%) & \textbf{3 (2.0\%)} \\
-    \bottomrule
+    \hline
   \end{tabular}
 \end{table}
 
